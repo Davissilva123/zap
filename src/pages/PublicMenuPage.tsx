@@ -235,78 +235,130 @@ export default function PublicMenuPage() {
     <div className="min-h-screen bg-[#f5f5f5]">
 
       {/* ── HERO ── */}
-      <div className="relative overflow-hidden" style={{ background: accent }}>
-        {/* Cover image */}
-        {settings.coverUrl && (
-          <>
-            <img src={settings.coverUrl} alt="capa" className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0" style={{ background: `${accent}cc` }} />
-          </>
-        )}
-        {/* decorative circles */}
-        {!settings.coverUrl && (
-          <>
-            <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full opacity-20" style={{ background: 'rgba(255,255,255,0.3)' }} />
-            <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-10" style={{ background: 'rgba(255,255,255,0.4)' }} />
-          </>
-        )}
+      {settings.coverUrl ? (
+        /* ── WITH COVER IMAGE ── */
+        <>
+          {/* Cover photo */}
+          <div className="relative overflow-hidden" style={{ height: 220 }}>
+            <img src={settings.coverUrl} alt="capa" className="w-full h-full object-cover" />
+            {/* Dark gradient bottom so logo/buttons stay readable */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/10" />
 
-        <div className="relative max-w-xl mx-auto px-5 pt-12 pb-20">
-          {/* Customer account button */}
-          <div className="absolute top-3 right-5">
-            {customer ? (
-              <button
-                onClick={() => navigate(`/m/${slug}/conta`)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/30 transition-colors"
-              >
-                <User className="w-3.5 h-3.5" />
-                Meus pedidos
-              </button>
-            ) : (
-              <button
-                onClick={() => { setShowCart(true); setStep('auth'); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/30 transition-colors"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                Entrar
-              </button>
-            )}
+            {/* Account button top-right */}
+            <div className="absolute top-4 right-4">
+              {customer ? (
+                <button onClick={() => navigate(`/m/${slug}/conta`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-sm text-white text-xs font-semibold">
+                  <User className="w-3.5 h-3.5" /> Meus pedidos
+                </button>
+              ) : (
+                <button onClick={() => { setShowCart(true); setStep('auth'); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-sm text-white text-xs font-semibold">
+                  <LogIn className="w-3.5 h-3.5" /> Entrar
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-5">
-            {settings.logoUrl ? (
-              <img src={settings.logoUrl} alt={settings.name} className="w-20 h-20 rounded-2xl object-cover shadow-xl ring-4 ring-white/25 flex-shrink-0" />
-            ) : (
-              <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 ring-2 ring-white/20">
-                <ChefHat className="w-9 h-9 text-white" />
+          {/* White info card — logo pops out halfway from the cover */}
+          <div className="bg-white border-b border-slate-100">
+            <div className="max-w-xl mx-auto px-5 pb-5">
+              {/* Logo overlapping */}
+              <div className="-mt-10 mb-3 flex items-end gap-4">
+                {settings.logoUrl ? (
+                  <img
+                    src={settings.logoUrl}
+                    alt={settings.name}
+                    className="w-20 h-20 rounded-2xl object-cover shadow-xl ring-4 ring-white flex-shrink-0"
+                  />
+                ) : (
+                  <div
+                    className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-white flex-shrink-0"
+                    style={{ backgroundColor: accent }}
+                  >
+                    <ChefHat className="w-9 h-9 text-white" />
+                  </div>
+                )}
+                {/* Accent line under logo */}
+                <div className="flex-1 self-end pb-1">
+                  <div className="h-1 rounded-full w-12" style={{ backgroundColor: accent }} />
+                </div>
+              </div>
+
+              <h1 className="text-xl font-extrabold text-slate-900 leading-tight tracking-tight">{settings.name}</h1>
+              {settings.description && (
+                <p className="text-slate-500 mt-1 text-sm leading-relaxed">{settings.description}</p>
+              )}
+              {(settings.address || settings.phone) && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {settings.address && (
+                    <span className="flex items-center gap-1.5 bg-slate-100 rounded-full px-3 py-1.5 text-xs text-slate-600 font-medium">
+                      <MapPin className="w-3 h-3 text-slate-400" /> {settings.address}
+                    </span>
+                  )}
+                  {settings.phone && (
+                    <span className="flex items-center gap-1.5 bg-slate-100 rounded-full px-3 py-1.5 text-xs text-slate-600 font-medium">
+                      <Phone className="w-3 h-3 text-slate-400" /> {settings.phone}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        /* ── WITHOUT COVER (accent color background) ── */
+        <div className="relative overflow-hidden" style={{ background: accent }}>
+          <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full opacity-20" style={{ background: 'rgba(255,255,255,0.3)' }} />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-10" style={{ background: 'rgba(255,255,255,0.4)' }} />
+
+          <div className="relative max-w-xl mx-auto px-5 pt-12 pb-20">
+            {/* Account button */}
+            <div className="absolute top-3 right-5">
+              {customer ? (
+                <button onClick={() => navigate(`/m/${slug}/conta`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/30 transition-colors">
+                  <User className="w-3.5 h-3.5" /> Meus pedidos
+                </button>
+              ) : (
+                <button onClick={() => { setShowCart(true); setStep('auth'); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/30 transition-colors">
+                  <LogIn className="w-3.5 h-3.5" /> Entrar
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-5">
+              {settings.logoUrl ? (
+                <img src={settings.logoUrl} alt={settings.name} className="w-20 h-20 rounded-2xl object-cover shadow-xl ring-4 ring-white/25 flex-shrink-0" />
+              ) : (
+                <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 ring-2 ring-white/20">
+                  <ChefHat className="w-9 h-9 text-white" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl font-extrabold text-white leading-tight tracking-tight">{settings.name}</h1>
+                {settings.description && (
+                  <p className="text-white/70 mt-1 text-sm leading-relaxed line-clamp-2">{settings.description}</p>
+                )}
+              </div>
+            </div>
+
+            {(settings.address || settings.phone) && (
+              <div className="flex flex-wrap gap-2 mt-5">
+                {settings.address && (
+                  <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm rounded-full px-3 py-1.5">
+                    <MapPin className="w-3 h-3 text-white/80" />
+                    <span className="text-white/80 text-xs font-medium truncate max-w-[180px]">{settings.address}</span>
+                  </div>
+                )}
+                {settings.phone && (
+                  <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm rounded-full px-3 py-1.5">
+                    <Phone className="w-3 h-3 text-white/80" />
+                    <span className="text-white/80 text-xs font-medium">{settings.phone}</span>
+                  </div>
+                )}
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-extrabold text-white leading-tight tracking-tight">{settings.name}</h1>
-              {settings.description && (
-                <p className="text-white/70 mt-1 text-sm leading-relaxed line-clamp-2">{settings.description}</p>
-              )}
-            </div>
           </div>
-
-          {(settings.address || settings.phone) && (
-            <div className="flex flex-wrap gap-2 mt-5">
-              {settings.address && (
-                <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm rounded-full px-3 py-1.5">
-                  <MapPin className="w-3 h-3 text-white/80" />
-                  <span className="text-white/80 text-xs font-medium truncate max-w-[180px]">{settings.address}</span>
-                </div>
-              )}
-              {settings.phone && (
-                <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm rounded-full px-3 py-1.5">
-                  <Phone className="w-3 h-3 text-white/80" />
-                  <span className="text-white/80 text-xs font-medium">{settings.phone}</span>
-                </div>
-              )}
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
       {/* ── CATEGORY BAR ── */}
       <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-black/5 shadow-sm">
