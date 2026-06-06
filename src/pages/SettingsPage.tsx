@@ -4,7 +4,8 @@ import { useAuth } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { RestaurantSettings, PaymentMethod } from '../lib/types';
-import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X } from 'lucide-react';
+import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2 } from 'lucide-react';
+import type { DeliveryNeighborhood, DayHours } from '../lib/types';
 
 const allPaymentMethods: PaymentMethod[] = ['pix', 'credit_card', 'debit_card', 'cash', 'meal_voucher'];
 
@@ -269,6 +270,99 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+      </SectionCard>
+
+      {/* Horário de funcionamento */}
+      <SectionCard icon={Clock} title="Horário de funcionamento" description="Defina os dias e horários em que o restaurante está aberto">
+        {(['0','1','2','3','4','5','6'] as const).map(day => {
+          const labels = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+          const hours: DayHours = form.openingHours?.[day] ?? { open: false, from: '09:00', to: '22:00' };
+          const setDay = (h: DayHours) => setForm(f => ({ ...f!, openingHours: { ...f!.openingHours, [day]: h } }));
+          return (
+            <div key={day} className="flex items-center gap-3">
+              <div
+                onClick={() => setDay({ ...hours, open: !hours.open })}
+                className={`w-10 h-5 rounded-full flex items-center cursor-pointer flex-shrink-0 transition-colors ${hours.open ? 'bg-emerald-500' : 'bg-slate-200'}`}
+              >
+                <div className={`w-4 h-4 bg-white rounded-full shadow-sm mx-0.5 transition-transform ${hours.open ? 'translate-x-5' : ''}`} />
+              </div>
+              <span className={`text-sm w-20 flex-shrink-0 ${hours.open ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>{labels[Number(day)]}</span>
+              {hours.open ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <input type="time" value={hours.from} onChange={e => setDay({ ...hours, from: e.target.value })}
+                    className="input-field py-1.5 text-sm" />
+                  <span className="text-slate-400 text-sm">até</span>
+                  <input type="time" value={hours.to} onChange={e => setDay({ ...hours, to: e.target.value })}
+                    className="input-field py-1.5 text-sm" />
+                </div>
+              ) : (
+                <span className="text-xs text-slate-400 italic">Fechado</span>
+              )}
+            </div>
+          );
+        })}
+      </SectionCard>
+
+      {/* Entrega */}
+      <SectionCard icon={Truck} title="Configurações de entrega" description="Tempo estimado e taxas por bairro">
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Tempo estimado de entrega</label>
+          <div className="flex items-center gap-2">
+            <input type="text" value={form.deliveryTime} onChange={e => setForm(f => ({ ...f!, deliveryTime: e.target.value }))}
+              className="input-field w-32" placeholder="30-45" />
+            <span className="text-sm text-slate-500">minutos</span>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">Ex: "30-45" ou "50" ou "1h"</p>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Taxa de entrega padrão (R$)</label>
+          <input type="number" min={0} step={0.5} value={form.deliveryFee}
+            onChange={e => setForm(f => ({ ...f!, deliveryFee: Number(e.target.value) }))}
+            className="input-field w-36" placeholder="0,00" />
+          <p className="text-[11px] text-slate-400 mt-1">Usada quando nenhum bairro abaixo bater</p>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Taxas por bairro</label>
+          <div className="space-y-2">
+            {(form.deliveryNeighborhoods || []).map((nb, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  value={nb.name}
+                  onChange={e => {
+                    const arr = [...form.deliveryNeighborhoods];
+                    arr[i] = { ...arr[i], name: e.target.value };
+                    setForm(f => ({ ...f!, deliveryNeighborhoods: arr }));
+                  }}
+                  className="input-field flex-1 py-1.5 text-sm" placeholder="Nome do bairro"
+                />
+                <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1.5">
+                  <span className="text-xs text-slate-400">R$</span>
+                  <input
+                    type="number" min={0} step={0.5} value={nb.fee}
+                    onChange={e => {
+                      const arr = [...form.deliveryNeighborhoods];
+                      arr[i] = { ...arr[i], fee: Number(e.target.value) };
+                      setForm(f => ({ ...f!, deliveryNeighborhoods: arr }));
+                    }}
+                    className="w-16 text-sm outline-none text-center"
+                  />
+                </div>
+                <button onClick={() => setForm(f => ({ ...f!, deliveryNeighborhoods: f!.deliveryNeighborhoods.filter((_, j) => j !== i) }))}
+                  className="p-1.5 hover:bg-red-50 rounded-lg">
+                  <Trash2 className="w-4 h-4 text-red-400" />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => setForm(f => ({ ...f!, deliveryNeighborhoods: [...(f!.deliveryNeighborhoods || []), { name: '', fee: 0 }] }))}
+              className="flex items-center gap-1.5 text-sm text-emerald-600 hover:text-emerald-700 font-medium py-1"
+            >
+              <Plus className="w-4 h-4" /> Adicionar bairro
+            </button>
+          </div>
+        </div>
       </SectionCard>
 
       <button onClick={save} disabled={saving} className={`btn-primary px-8 py-3 disabled:opacity-60 ${saved ? '!bg-emerald-600' : ''}`}>

@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2 } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState } from 'react';
@@ -8,6 +8,7 @@ const navItems = [
   { to: '/menu', icon: UtensilsCrossed, label: 'Cardápio' },
   { to: '/categories', icon: Grid3X3, label: 'Categorias' },
   { to: '/orders', icon: Receipt, label: 'Pedidos' },
+  { to: '/reports', icon: BarChart2, label: 'Relatórios' },
   { to: '/qrcode', icon: QrCode, label: 'QR Code' },
   { to: '/settings', icon: Settings, label: 'Configurações' },
 ];

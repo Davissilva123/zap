@@ -3,12 +3,24 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../lib/db';
 import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import { useCustomerAuth } from '../lib/customerAuth';
-import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress } from '../lib/types';
-import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff } from 'lucide-react';
+import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption } from '../lib/types';
+import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, AlertCircle } from 'lucide-react';
 
 interface CartItem extends OrderItem { categoryId: string; }
 type CheckoutStep = 'cart' | 'auth' | 'delivery' | 'payment' | 'paying' | 'pix' | 'success' | 'error' | 'no-xgate' | 'no-methods' | 'order_placed';
 const emptyAddress: DeliveryAddress = { street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zip: '' };
+
+function isRestaurantOpen(settings: RestaurantSettings): boolean {
+  if (!settings.openingHours || Object.keys(settings.openingHours).length === 0) return true;
+  const now = new Date();
+  const day = String(now.getDay());
+  const hours = settings.openingHours[day];
+  if (!hours?.open) return false;
+  const [fh, fm] = hours.from.split(':').map(Number);
+  const [th, tm] = hours.to.split(':').map(Number);
+  const cur = now.getHours() * 60 + now.getMinutes();
+  return cur >= fh * 60 + fm && cur <= th * 60 + tm;
+}
 
 export default function PublicMenuPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -36,6 +48,15 @@ export default function PublicMenuPage() {
   const [polling, setPolling] = useState(false);
   const [cashChange, setCashChange] = useState('');
   const catBarRef = useRef<HTMLDivElement>(null);
+
+  // Adicionais
+  const [itemModal, setItemModal] = useState<{ item: MenuItem; groups: ItemGroup[] } | null>(null);
+  const [itemModalQty, setItemModalQty] = useState(1);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, SelectedOption>>({});
+  const [loadingGroups, setLoadingGroups] = useState(false);
+
+  // Taxa de entrega
+  const [deliveryFee, setDeliveryFee] = useState(0);
 
   // Customer auth form state
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -67,22 +88,52 @@ export default function PublicMenuPage() {
     if (customer?.user_metadata?.phone) setCustomerPhone(customer.user_metadata.phone);
   }, [customer]);
 
-  const cartTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const cartSubtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const cartTotal = cartSubtotal + (deliveryType === 'delivery' ? deliveryFee : 0);
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
   const availablePaymentMethods = settings?.paymentMethods?.filter(m => m) || [];
 
-  const addToCart = (item: MenuItem) => {
+  const openItemModal = async (item: MenuItem) => {
+    setLoadingGroups(true);
+    setItemModal(null);
+    setItemModalQty(1);
+    setSelectedOptions({});
+    const groups = await db.getItemGroupsForItems([item.id]);
+    setItemModal({ item, groups });
+    setLoadingGroups(false);
+  };
+
+  const addToCart = (item: MenuItem, qty = 1, opts: SelectedOption[] = []) => {
+    const optPrice = opts.reduce((s, o) => s + o.priceDelta, 0);
+    const unitPrice = item.price + optPrice;
+    const key = item.id + (opts.length ? '_' + opts.map(o => o.optionId).join(',') : '');
     setCart(prev => {
-      const existing = prev.find(c => c.menuItemId === item.id);
-      if (existing) return prev.map(c => c.menuItemId === item.id ? { ...c, quantity: c.quantity + 1 } : c);
-      return [...prev, { menuItemId: item.id, name: item.name, emoji: item.emoji, price: item.price, quantity: 1, categoryId: item.categoryId }];
+      const existing = prev.find(c => c.menuItemId === key);
+      if (existing && !opts.length) return prev.map(c => c.menuItemId === key ? { ...c, quantity: c.quantity + qty } : c);
+      return [...prev, { menuItemId: key, name: item.name, emoji: item.emoji, price: unitPrice, quantity: qty, categoryId: item.categoryId, selectedOptions: opts.length ? opts : undefined }];
     });
+  };
+
+  const confirmItemModal = () => {
+    if (!itemModal) return;
+    const opts = Object.values(selectedOptions);
+    const missing = itemModal.groups.find(g => g.required && !opts.find(o => o.groupId === g.id));
+    if (missing) { alert(`Selecione uma opção em "${missing.name}"`); return; }
+    addToCart(itemModal.item, itemModalQty, opts);
+    setItemModal(null);
   };
 
   const removeFromCart = (menuItemId: string) => setCart(prev => prev.filter(c => c.menuItemId !== menuItemId));
   const updateQty = (menuItemId: string, qty: number) => {
     if (qty <= 0) return removeFromCart(menuItemId);
     setCart(prev => prev.map(c => c.menuItemId === menuItemId ? { ...c, quantity: qty } : c));
+  };
+
+  const handleNeighborhoodChange = (neighborhood: string) => {
+    setAddress(a => ({ ...a, neighborhood }));
+    if (!settings) return;
+    const match = settings.deliveryNeighborhoods?.find(n => n.name === neighborhood);
+    setDeliveryFee(match ? match.fee : (settings.deliveryFee || 0));
   };
 
   const validateDeliveryStep = () => {
@@ -293,7 +344,21 @@ export default function PublicMenuPage() {
 
           {/* Barra de info abaixo da capa */}
           <div className="bg-white border-b border-slate-100 shadow-sm">
-            <div className="max-w-xl mx-auto px-5 py-3 flex flex-wrap gap-3">
+            <div className="max-w-xl mx-auto px-5 py-3 flex flex-wrap gap-3 items-center">
+              {(() => {
+                const open = isRestaurantOpen(settings);
+                return (
+                  <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${open ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${open ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                    {open ? 'Aberto agora' : 'Fechado'}
+                  </span>
+                );
+              })()}
+              {settings.deliveryTime && (
+                <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                  <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" /> {settings.deliveryTime} min
+                </span>
+              )}
               {settings.address && (
                 <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
                   <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" /> {settings.address}
@@ -464,7 +529,7 @@ export default function PublicMenuPage() {
                             </div>
                           ) : (
                             <button
-                              onClick={() => addToCart(item)}
+                              onClick={() => openItemModal(item)}
                               className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-md"
                               style={{ backgroundColor: accent }}
                             >
@@ -513,6 +578,119 @@ export default function PublicMenuPage() {
             <span className="font-bold text-[15px] flex-1 text-left">Ver meu pedido</span>
             <span className="font-extrabold text-base">R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
           </button>
+        </div>
+      )}
+
+      {/* ── ITEM MODAL ── */}
+      {(loadingGroups || itemModal) && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { if (!loadingGroups) setItemModal(null); }} />
+          <div className="relative w-full max-w-md bg-white flex flex-col shadow-2xl rounded-t-3xl sm:rounded-3xl" style={{ maxHeight: '90dvh' }}>
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 sm:hidden flex-shrink-0" />
+            {loadingGroups ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-slate-300" />
+              </div>
+            ) : itemModal && (
+              <>
+                <div className="flex items-start gap-4 px-5 pt-4 pb-4 flex-shrink-0">
+                  <div className="w-16 h-16 rounded-2xl flex-shrink-0 overflow-hidden">
+                    {itemModal.item.imageUrl ? (
+                      <img src={itemModal.item.imageUrl} alt={itemModal.item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-3xl" style={{ backgroundColor: accent + '15' }}>
+                        {itemModal.item.emoji}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 pt-1">
+                    <h3 className="font-extrabold text-slate-900 text-lg leading-tight">{itemModal.item.name}</h3>
+                    {itemModal.item.description && (
+                      <p className="text-sm text-slate-400 mt-0.5 leading-snug">{itemModal.item.description}</p>
+                    )}
+                    <p className="font-extrabold mt-1 text-base" style={{ color: accent }}>
+                      R$ {itemModal.item.price.toFixed(2).replace('.', ',')}
+                    </p>
+                  </div>
+                  <button onClick={() => setItemModal(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 mt-1">
+                    <X className="w-4 h-4 text-slate-500" />
+                  </button>
+                </div>
+                <div className="h-px bg-slate-100 mx-5 flex-shrink-0" />
+                <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-5">
+                  {itemModal.groups.length === 0 && (
+                    <p className="text-sm text-slate-400 text-center py-4">Sem opções adicionais</p>
+                  )}
+                  {itemModal.groups.map(group => (
+                    <div key={group.id}>
+                      <div className="flex items-center gap-2 mb-2.5">
+                        <span className="font-bold text-slate-900 text-sm">{group.name}</span>
+                        {group.required && (
+                          <span className="text-[10px] font-bold bg-red-50 text-red-500 px-2 py-0.5 rounded-full border border-red-100">Obrigatório</span>
+                        )}
+                        {group.maxChoices > 1 && (
+                          <span className="text-[10px] text-slate-400 font-medium">Até {group.maxChoices}</span>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {group.options.map(opt => {
+                          const isSelected = selectedOptions[group.id]?.optionId === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              onClick={() => {
+                                setSelectedOptions(prev => {
+                                  if (isSelected) { const next = { ...prev }; delete next[group.id]; return next; }
+                                  return { ...prev, [group.id]: { groupId: group.id, optionId: opt.id, name: opt.name, priceDelta: opt.priceDelta } };
+                                });
+                              }}
+                              className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 text-left transition-all duration-150"
+                              style={isSelected ? { borderColor: accent, backgroundColor: accent + '08' } : { borderColor: '#f1f5f9', backgroundColor: '#f8fafc' }}
+                            >
+                              <div
+                                className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
+                                style={isSelected ? { borderColor: accent, backgroundColor: accent } : { borderColor: '#e2e8f0' }}
+                              >
+                                {isSelected && <Check className="w-3 h-3 text-white" />}
+                              </div>
+                              <span className="flex-1 text-sm font-semibold" style={isSelected ? { color: accent } : { color: '#374151' }}>{opt.name}</span>
+                              {opt.priceDelta !== 0 && (
+                                <span className="text-sm font-bold flex-shrink-0" style={{ color: accent }}>
+                                  {opt.priceDelta > 0 ? '+' : ''}R$ {opt.priceDelta.toFixed(2).replace('.', ',')}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-5 pt-4 pb-6 flex-shrink-0 border-t border-slate-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-700">Quantidade</span>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setItemModalQty(q => Math.max(1, q - 1))} className="w-9 h-9 rounded-full border-2 flex items-center justify-center" style={{ borderColor: accent }}>
+                        <Minus className="w-4 h-4" style={{ color: accent }} />
+                      </button>
+                      <span className="text-lg font-extrabold w-6 text-center" style={{ color: accent }}>{itemModalQty}</span>
+                      <button onClick={() => setItemModalQty(q => q + 1)} className="w-9 h-9 rounded-full flex items-center justify-center shadow-sm" style={{ backgroundColor: accent }}>
+                        <Plus className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    onClick={confirmItemModal}
+                    className="w-full py-4 rounded-2xl text-white font-extrabold text-base active:scale-[0.98] transition-transform shadow-lg flex items-center justify-center gap-2"
+                    style={{ backgroundColor: accent, boxShadow: `0 8px 24px ${accent}40` }}
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    Adicionar • R$ {((itemModal.item.price + Object.values(selectedOptions).reduce((s, o) => s + o.priceDelta, 0)) * itemModalQty).toFixed(2).replace('.', ',')}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -811,10 +989,28 @@ export default function PublicMenuPage() {
                         <input type="text" value={address.complement} onChange={e => setAddress(a => ({ ...a, complement: e.target.value }))}
                           className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
                           placeholder="Complemento" />
-                        <input type="text" value={address.neighborhood} onChange={e => setAddress(a => ({ ...a, neighborhood: e.target.value }))}
-                          className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
-                          placeholder="Bairro *" />
+                        {settings.deliveryNeighborhoods && settings.deliveryNeighborhoods.length > 0 ? (
+                          <select
+                            value={address.neighborhood}
+                            onChange={e => handleNeighborhoodChange(e.target.value)}
+                            className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-none focus:border-slate-300"
+                          >
+                            <option value="">Bairro *</option>
+                            {settings.deliveryNeighborhoods.map(n => (
+                              <option key={n.name} value={n.name}>{n.name} — R$ {n.fee.toFixed(2).replace('.', ',')}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input type="text" value={address.neighborhood} onChange={e => setAddress(a => ({ ...a, neighborhood: e.target.value }))}
+                            className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
+                            placeholder="Bairro *" />
+                        )}
                       </div>
+                      {address.neighborhood && deliveryFee > 0 && (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                          <Truck className="w-3.5 h-3.5 text-slate-400" /> Taxa de entrega: <strong className="text-slate-700">R$ {deliveryFee.toFixed(2).replace('.', ',')}</strong>
+                        </div>
+                      )}
                       <div className="grid grid-cols-5 gap-2">
                         <input type="text" value={address.city} onChange={e => setAddress(a => ({ ...a, city: e.target.value }))}
                           className="col-span-3 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
@@ -851,6 +1047,8 @@ export default function PublicMenuPage() {
                         { label: 'Telefone', value: customerPhone },
                         { label: 'Entrega', value: deliveryType === 'pickup' ? '🏠 Retirada no local' : '🛵 Delivery' },
                         ...(deliveryType === 'delivery' && address.street ? [{ label: 'Endereço', value: formatAddress(address) }] : []),
+                        { label: 'Subtotal', value: `R$ ${cartSubtotal.toFixed(2).replace('.', ',')}` },
+                        ...(deliveryType === 'delivery' && deliveryFee > 0 ? [{ label: 'Taxa de entrega', value: `R$ ${deliveryFee.toFixed(2).replace('.', ',')}` }] : []),
                       ].map(row => (
                         <div key={row.label} className="flex justify-between items-start gap-3 text-sm">
                           <span className="text-slate-400 flex-shrink-0 font-medium">{row.label}</span>
@@ -1043,11 +1241,23 @@ export default function PublicMenuPage() {
 
               {step === 'cart' && cart.length > 0 && (
                 <>
-                  <div className="flex justify-between items-center px-1 pb-1">
-                    <span className="text-sm text-slate-400 font-medium">Total</span>
-                    <span className="text-lg font-extrabold tracking-tight" style={{ color: accent }}>
-                      R$ {cartTotal.toFixed(2).replace('.', ',')}
-                    </span>
+                  <div className="space-y-1.5 px-1 pb-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-400 font-medium">Subtotal</span>
+                      <span className="text-sm font-bold text-slate-700">R$ {cartSubtotal.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                    {deliveryType === 'delivery' && deliveryFee > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-400 font-medium">Taxa de entrega</span>
+                        <span className="text-sm font-bold text-slate-700">R$ {deliveryFee.toFixed(2).replace('.', ',')}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center pt-1.5 border-t border-slate-100">
+                      <span className="text-sm font-bold text-slate-700">Total</span>
+                      <span className="text-lg font-extrabold tracking-tight" style={{ color: accent }}>
+                        R$ {cartTotal.toFixed(2).replace('.', ',')}
+                      </span>
+                    </div>
                   </div>
                   <button
                     onClick={() => setStep(customer ? 'delivery' : 'auth')}

@@ -3,7 +3,8 @@ import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import type { Category, MenuItem } from '../lib/types';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, X, ImagePlus, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, X, ImagePlus, Loader2, ChevronDown, Settings2 } from 'lucide-react';
+import ItemGroupsEditor from '../components/ItemGroupsEditor';
 
 export default function MenuPage() {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ export default function MenuPage() {
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showGroupsFor, setShowGroupsFor] = useState<string | null>(null);
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
   const [form, setForm] = useState({ name: '', description: '', price: '', emoji: '🍽️', categoryId: '', available: true, imageUrl: '' });
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -129,31 +131,44 @@ export default function MenuPage() {
             </div>
             <div className="card overflow-hidden divide-y divide-slate-100">
               {catItems.map(item => (
-                <div key={item.id} className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors group ${!item.available ? 'opacity-50' : ''}`}>
-                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0 overflow-hidden">
-                    {item.imageUrl
-                      ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                      : item.emoji}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
-                      {!item.available && <span className="badge bg-red-50 text-red-500 text-[10px] py-0.5">Indisponível</span>}
+                <div key={item.id} className={`group ${!item.available ? 'opacity-60' : ''}`}>
+                  <div className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
+                    <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0 overflow-hidden">
+                      {item.imageUrl
+                        ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        : item.emoji}
                     </div>
-                    <p className="text-xs text-slate-400 truncate mt-0.5">{item.description}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
+                        {!item.available && <span className="badge bg-red-50 text-red-500 text-[10px] py-0.5">Indisponível</span>}
+                      </div>
+                      <p className="text-xs text-slate-400 truncate mt-0.5">{item.description}</p>
+                    </div>
+                    <span className="text-base font-bold text-emerald-600 flex-shrink-0">R$ {item.price.toFixed(2).replace('.', ',')}</span>
+                    <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => toggleAvailable(item)} title={item.available ? 'Desativar' : 'Ativar'} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                        {item.available ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5 text-slate-400" />}
+                      </button>
+                      <button onClick={() => setShowGroupsFor(showGroupsFor === item.id ? null : item.id)} title="Adicionais/Complementos" className={`p-2 rounded-lg hover:bg-slate-100 transition-colors ${showGroupsFor === item.id ? 'bg-emerald-50' : ''}`}>
+                        <Settings2 className={`w-4 h-4 ${showGroupsFor === item.id ? 'text-emerald-500' : 'text-slate-400'}`} />
+                      </button>
+                      <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                        <Pencil className="w-4 h-4 text-slate-400" />
+                      </button>
+                      <button onClick={() => deleteItem(item.id)} className="p-2 rounded-lg hover:bg-red-50 transition-colors">
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-base font-bold text-emerald-600 flex-shrink-0">R$ {item.price.toFixed(2).replace('.', ',')}</span>
-                  <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => toggleAvailable(item)} title={item.available ? 'Desativar' : 'Ativar'} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
-                      {item.available ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5 text-slate-400" />}
-                    </button>
-                    <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
-                      <Pencil className="w-4 h-4 text-slate-400" />
-                    </button>
-                    <button onClick={() => deleteItem(item.id)} className="p-2 rounded-lg hover:bg-red-50 transition-colors">
-                      <Trash2 className="w-4 h-4 text-red-400" />
-                    </button>
-                  </div>
+                  {showGroupsFor === item.id && (
+                    <div className="px-5 pb-4 bg-slate-50 border-t border-slate-100">
+                      <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider pt-3 pb-2 flex items-center gap-1.5">
+                        <Settings2 className="w-3.5 h-3.5" /> Adicionais / Complementos
+                      </p>
+                      <ItemGroupsEditor menuItemId={item.id} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress } from './types';
+import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, ItemOption, OpeningHours, DeliveryNeighborhood } from './types';
 
 // ---- Supabase row shapes (snake_case) ----
 interface SettingsRow {
@@ -7,21 +7,39 @@ interface SettingsRow {
   description: string; address: string; phone: string; logo_url: string; cover_url: string;
   xgate_email: string; xgate_password: string; payment_methods: string[];
   whatsapp_api_token: string; whatsapp_phone_number_id: string; whatsapp_enabled: boolean;
+  opening_hours: OpeningHours; delivery_time: string; delivery_fee: number;
+  delivery_neighborhoods: DeliveryNeighborhood[];
   created_at: string;
 }
 interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; created_at: string; }
 interface MenuItemRow { id: string; user_id: string; category_id: string; name: string; description: string; emoji: string; image_url: string; price: number; available: boolean; order: number; created_at: string; }
 interface ScanRow { id: string; user_id: string; scanned_at: string; }
 interface OrderRow { id: string; user_id: string; customer_user_id: string | null; items: OrderItem[]; total: number; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; created_at: string; paid_at: string | null; }
+interface ItemGroupRow { id: string; user_id: string; menu_item_id: string; name: string; required: boolean; min_choices: number; max_choices: number; order: number; created_at: string; }
+interface ItemOptionRow { id: string; user_id: string; group_id: string; name: string; price_delta: number; order: number; created_at: string; }
 
 // ---- Mappers ----
 function toSettings(r: SettingsRow): RestaurantSettings {
-  return { userId: r.user_id, name: r.name, slug: r.slug, accentColor: r.accent_color, description: r.description, address: r.address, phone: r.phone, logoUrl: r.logo_url, coverUrl: r.cover_url ?? '', xgateEmail: r.xgate_email, xgatePassword: r.xgate_password, paymentMethods: r.payment_methods as PaymentMethod[], whatsappApiToken: r.whatsapp_api_token, whatsappPhoneNumberId: r.whatsapp_phone_number_id, whatsappEnabled: r.whatsapp_enabled };
+  return {
+    userId: r.user_id, name: r.name, slug: r.slug, accentColor: r.accent_color,
+    description: r.description, address: r.address, phone: r.phone,
+    logoUrl: r.logo_url, coverUrl: r.cover_url ?? '',
+    xgateEmail: r.xgate_email, xgatePassword: r.xgate_password,
+    paymentMethods: r.payment_methods as PaymentMethod[],
+    whatsappApiToken: r.whatsapp_api_token, whatsappPhoneNumberId: r.whatsapp_phone_number_id,
+    whatsappEnabled: r.whatsapp_enabled,
+    openingHours: r.opening_hours ?? {},
+    deliveryTime: r.delivery_time ?? '30-45',
+    deliveryFee: Number(r.delivery_fee ?? 0),
+    deliveryNeighborhoods: r.delivery_neighborhoods ?? [],
+  };
 }
 function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, createdAt: r.created_at }; }
 function toMenuItem(r: MenuItemRow): MenuItem { return { id: r.id, userId: r.user_id, categoryId: r.category_id, name: r.name, description: r.description, emoji: r.emoji, imageUrl: r.image_url ?? '', price: Number(r.price), available: r.available, order: r.order, createdAt: r.created_at }; }
 function toScan(r: ScanRow): Scan { return { id: r.id, userId: r.user_id, scannedAt: r.scanned_at }; }
 function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, customerUserId: r.customer_user_id ?? undefined, items: r.items, total: Number(r.total), status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as 'pickup' | 'delivery', pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, createdAt: r.created_at, paidAt: r.paid_at }; }
+function toItemGroup(r: ItemGroupRow, options: ItemOption[] = []): ItemGroup { return { id: r.id, userId: r.user_id, menuItemId: r.menu_item_id, name: r.name, required: r.required, minChoices: r.min_choices, maxChoices: r.max_choices, order: r.order, options }; }
+function toItemOption(r: ItemOptionRow): ItemOption { return { id: r.id, userId: r.user_id, groupId: r.group_id, name: r.name, priceDelta: Number(r.price_delta), order: r.order }; }
 
 export const db = {
   // ---- Settings ----
@@ -31,6 +49,7 @@ export const db = {
       user_id: userId, name, slug, accent_color: '#059669', description: '', address: '', phone: '', logo_url: '', cover_url: '',
       xgate_email: '', xgate_password: '', payment_methods: ['pix', 'cash'],
       whatsapp_api_token: '', whatsapp_phone_number_id: '', whatsapp_enabled: false,
+      opening_hours: {}, delivery_time: '30-45', delivery_fee: 0, delivery_neighborhoods: [],
     }, { onConflict: 'user_id', ignoreDuplicates: true });
   },
 
@@ -56,6 +75,10 @@ export const db = {
     if (updates.whatsappApiToken !== undefined) row.whatsapp_api_token = updates.whatsappApiToken;
     if (updates.whatsappPhoneNumberId !== undefined) row.whatsapp_phone_number_id = updates.whatsappPhoneNumberId;
     if (updates.whatsappEnabled !== undefined) row.whatsapp_enabled = updates.whatsappEnabled;
+    if (updates.openingHours !== undefined) row.opening_hours = updates.openingHours;
+    if (updates.deliveryTime !== undefined) row.delivery_time = updates.deliveryTime;
+    if (updates.deliveryFee !== undefined) row.delivery_fee = updates.deliveryFee;
+    if (updates.deliveryNeighborhoods !== undefined) row.delivery_neighborhoods = updates.deliveryNeighborhoods;
     await supabase.from('restaurant_settings').update(row).eq('user_id', userId);
   },
 
@@ -118,6 +141,60 @@ export const db = {
     await supabase.from('menu_items').delete().eq('id', id);
   },
 
+  // ---- Item Groups & Options ----
+  async getItemGroups(menuItemId: string): Promise<ItemGroup[]> {
+    const { data: groupsData, error } = await supabase
+      .from('item_groups').select('*').eq('menu_item_id', menuItemId).order('order', { ascending: true });
+    if (error || !groupsData?.length) return [];
+    const groupIds = (groupsData as ItemGroupRow[]).map(g => g.id);
+    const { data: optionsData } = await supabase
+      .from('item_options').select('*').in('group_id', groupIds).order('order', { ascending: true });
+    const options = (optionsData as ItemOptionRow[] || []).map(toItemOption);
+    return (groupsData as ItemGroupRow[]).map(g =>
+      toItemGroup(g, options.filter(o => o.groupId === g.id))
+    );
+  },
+
+  async addItemGroup(userId: string, menuItemId: string, group: Omit<ItemGroup, 'id' | 'userId' | 'menuItemId' | 'options'>): Promise<ItemGroup> {
+    const { data, error } = await supabase.from('item_groups')
+      .insert({ user_id: userId, menu_item_id: menuItemId, name: group.name, required: group.required, min_choices: group.minChoices, max_choices: group.maxChoices, order: group.order })
+      .select().single();
+    if (error) throw new Error(error.message);
+    return toItemGroup(data as ItemGroupRow, []);
+  },
+
+  async updateItemGroup(id: string, updates: Partial<Pick<ItemGroup, 'name' | 'required' | 'minChoices' | 'maxChoices'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.name !== undefined) row.name = updates.name;
+    if (updates.required !== undefined) row.required = updates.required;
+    if (updates.minChoices !== undefined) row.min_choices = updates.minChoices;
+    if (updates.maxChoices !== undefined) row.max_choices = updates.maxChoices;
+    await supabase.from('item_groups').update(row).eq('id', id);
+  },
+
+  async deleteItemGroup(id: string): Promise<void> {
+    await supabase.from('item_groups').delete().eq('id', id);
+  },
+
+  async addItemOption(userId: string, groupId: string, option: Omit<ItemOption, 'id' | 'userId' | 'groupId'>): Promise<ItemOption> {
+    const { data, error } = await supabase.from('item_options')
+      .insert({ user_id: userId, group_id: groupId, name: option.name, price_delta: option.priceDelta, order: option.order })
+      .select().single();
+    if (error) throw new Error(error.message);
+    return toItemOption(data as ItemOptionRow);
+  },
+
+  async updateItemOption(id: string, updates: Partial<Pick<ItemOption, 'name' | 'priceDelta'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.name !== undefined) row.name = updates.name;
+    if (updates.priceDelta !== undefined) row.price_delta = updates.priceDelta;
+    await supabase.from('item_options').update(row).eq('id', id);
+  },
+
+  async deleteItemOption(id: string): Promise<void> {
+    await supabase.from('item_options').delete().eq('id', id);
+  },
+
   // ---- Scans ----
   async getScans(userId: string): Promise<Scan[]> {
     const { data, error } = await supabase.from('scans').select('*').eq('user_id', userId);
@@ -136,9 +213,23 @@ export const db = {
     const settings = toSettings(settingsData as SettingsRow);
     const [{ data: catsData }, { data: itemsData }] = await Promise.all([
       supabase.from('categories').select('*').eq('user_id', settings.userId).order('order', { ascending: true }),
-      supabase.from('menu_items').select('*').eq('user_id', settings.userId).eq('available', true).order('order', { ascending: true }),
+      supabase.from('menu_items').select('*').eq('user_id', settings.userId).order('order', { ascending: true }),
     ]);
     return { settings, categories: (catsData as CategoryRow[] || []).map(toCategory), items: (itemsData as MenuItemRow[] || []).map(toMenuItem) };
+  },
+
+  async getItemGroupsForItems(menuItemIds: string[]): Promise<ItemGroup[]> {
+    if (!menuItemIds.length) return [];
+    const { data: groupsData } = await supabase
+      .from('item_groups').select('*').in('menu_item_id', menuItemIds).order('order', { ascending: true });
+    if (!groupsData?.length) return [];
+    const groupIds = (groupsData as ItemGroupRow[]).map(g => g.id);
+    const { data: optionsData } = await supabase
+      .from('item_options').select('*').in('group_id', groupIds).order('order', { ascending: true });
+    const options = (optionsData as ItemOptionRow[] || []).map(toItemOption);
+    return (groupsData as ItemGroupRow[]).map(g =>
+      toItemGroup(g, options.filter(o => o.groupId === g.id))
+    );
   },
 
   // ---- Orders ----
@@ -159,7 +250,6 @@ export const db = {
     };
     const row = order.customerUserId ? { ...baseRow, customer_user_id: order.customerUserId } : baseRow;
     const { data, error } = await supabase.from('orders').insert(row).select().single();
-    // If the column doesn't exist yet (migration not run), retry without it
     if (error?.message?.includes('customer_user_id')) {
       const { data: d2, error: e2 } = await supabase.from('orders').insert(baseRow).select().single();
       if (e2) throw new Error(e2.message || JSON.stringify(e2));

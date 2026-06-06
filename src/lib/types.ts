@@ -29,6 +29,35 @@ export interface MenuItem {
   createdAt: string;
 }
 
+export interface ItemOption {
+  id: string;
+  groupId: string;
+  userId: string;
+  name: string;
+  priceDelta: number;
+  order: number;
+}
+
+export interface ItemGroup {
+  id: string;
+  menuItemId: string;
+  userId: string;
+  name: string;
+  required: boolean;
+  minChoices: number;
+  maxChoices: number;
+  order: number;
+  options: ItemOption[];
+}
+
+export interface SelectedOption {
+  groupId: string;
+  groupName: string;
+  optionId: string;
+  optionName: string;
+  priceDelta: number;
+}
+
 export interface Scan {
   id: string;
   userId: string;
@@ -36,6 +65,19 @@ export interface Scan {
 }
 
 export type PaymentMethod = 'pix' | 'credit_card' | 'debit_card' | 'cash' | 'meal_voucher';
+
+export interface DayHours {
+  open: boolean;
+  from: string;
+  to: string;
+}
+
+export type OpeningHours = Record<string, DayHours>; // key = "0"–"6" (0=domingo)
+
+export interface DeliveryNeighborhood {
+  name: string;
+  fee: number;
+}
 
 export interface RestaurantSettings {
   userId: string;
@@ -53,6 +95,10 @@ export interface RestaurantSettings {
   whatsappApiToken: string;
   whatsappPhoneNumberId: string;
   whatsappEnabled: boolean;
+  openingHours: OpeningHours;
+  deliveryTime: string;
+  deliveryFee: number;
+  deliveryNeighborhoods: DeliveryNeighborhood[];
 }
 
 export interface OrderItem {
@@ -61,6 +107,7 @@ export interface OrderItem {
   emoji: string;
   price: number;
   quantity: number;
+  selectedOptions?: SelectedOption[];
 }
 
 export interface DeliveryAddress {
