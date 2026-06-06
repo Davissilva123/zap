@@ -15,6 +15,7 @@ import CouponsPage from './pages/CouponsPage';
 import TablesPage from './pages/TablesPage';
 import OperatorsPage from './pages/OperatorsPage';
 import OpOrdersPage from './pages/op/OrdersPage';
+import OpTablesPage from './pages/op/TablesPage';
 import PublicMenuPage from './pages/PublicMenuPage';
 import CustomerPortalPage from './pages/CustomerPortalPage';
 
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="/op" element={<OperatorRoute><OperatorLayout /></OperatorRoute>}>
             <Route index element={<Navigate to="/op/pedidos" replace />} />
             <Route path="pedidos" element={<OpOrdersPage />} />
+            <Route path="mesas" element={<OpTablesPage />} />
             <Route path="relatorios" element={<ReportsPage />} />
             <Route path="cardapio" element={<MenuPage />} />
             <Route path="cupons" element={<CouponsPage />} />

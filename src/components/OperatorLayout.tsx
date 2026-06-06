@@ -13,13 +13,14 @@ type NavItem = { to: string; icon: typeof Receipt; label: string };
 
 function getNavItems(role: 'waiter' | 'cashier' | 'admin'): NavItem[] {
   const orders: NavItem = { to: '/op/pedidos', icon: Receipt, label: 'Pedidos' };
+  const tables: NavItem = { to: '/op/mesas', icon: LayoutGrid, label: 'Mesas' };
   const reports: NavItem = { to: '/op/relatorios', icon: BarChart2, label: 'Relatórios' };
   const menu: NavItem = { to: '/op/cardapio', icon: UtensilsCrossed, label: 'Cardápio' };
   const coupons: NavItem = { to: '/op/cupons', icon: Tag, label: 'Cupons' };
 
-  if (role === 'waiter') return [orders];
-  if (role === 'cashier') return [orders, reports];
-  return [orders, menu, reports, coupons]; // admin
+  if (role === 'waiter') return [orders, tables];
+  if (role === 'cashier') return [orders, tables, reports];
+  return [orders, tables, menu, reports, coupons]; // admin
 }
 
 export default function OperatorLayout() {
