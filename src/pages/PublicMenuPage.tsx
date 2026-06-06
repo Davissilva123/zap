@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { db } from '../lib/db';
 import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress } from '../lib/types';
-import { MapPin, Phone, ShoppingCart, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ShoppingBag, ArrowLeft, ChefHat, Zap } from 'lucide-react';
+import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart } from 'lucide-react';
 
 interface CartItem extends OrderItem { categoryId: string; }
 type CheckoutStep = 'cart' | 'delivery' | 'payment' | 'paying' | 'pix' | 'success' | 'error' | 'no-xgate' | 'no-methods' | 'order_placed';
@@ -14,6 +14,7 @@ export default function PublicMenuPage() {
   const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeCat, setActiveCat] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
@@ -37,6 +38,7 @@ export default function PublicMenuPage() {
     if (!slug) return;
     const load = async () => {
       const data = await db.getPublicMenu(slug);
+      setLoading(false);
       if (!data) return;
       setSettings(data.settings);
       setCategories(data.categories);
@@ -108,8 +110,7 @@ export default function PublicMenuPage() {
       try {
         const result = await checkPixPayment(settings.xgateEmail!, settings.xgatePassword!, pixTxId);
         if (result.status === 'PAID' || result.status === 'CONCLUIDA' || result.status === 'COMPLETED') {
-          setPolling(false);
-          setStep('success');
+          setPolling(false); setStep('success');
         }
       } catch { /* keep polling */ }
     }, 5000);
@@ -130,63 +131,101 @@ export default function PublicMenuPage() {
     return parts.filter(Boolean).join(', ');
   };
 
-  const copyPixCode = () => { navigator.clipboard.writeText(pixCopyPaste); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const copyPixCode = () => { navigator.clipboard.writeText(pixCopyPaste); setCopied(true); setTimeout(() => setCopied(false), 2500); };
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f5]">
+        <div className="h-52 bg-slate-200 animate-pulse" />
+        <div className="max-w-xl mx-auto px-4 pt-5 space-y-4">
+          {[1,2,3].map(i => (
+            <div key={i} className="bg-white rounded-2xl p-4 flex gap-4 animate-pulse">
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex-shrink-0" />
+              <div className="flex-1 space-y-2 pt-1">
+                <div className="h-4 bg-slate-100 rounded-full w-3/4" />
+                <div className="h-3 bg-slate-100 rounded-full w-1/2" />
+                <div className="h-4 bg-slate-100 rounded-full w-1/4 mt-2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!settings) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center">
         <div className="text-center px-6">
-          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-            <ChefHat className="w-8 h-8 text-slate-300" />
+          <div className="w-20 h-20 rounded-3xl bg-white shadow-sm flex items-center justify-center mx-auto mb-5">
+            <ChefHat className="w-9 h-9 text-slate-300" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900">Cardápio não encontrado</h2>
-          <p className="text-slate-400 mt-1 text-sm">Verifique o link e tente novamente</p>
+          <h2 className="text-xl font-bold text-slate-800">Cardápio não encontrado</h2>
+          <p className="text-slate-400 mt-2 text-sm">Verifique o link e tente novamente</p>
         </div>
       </div>
     );
   }
 
   const accent = settings.accentColor;
-
   const visibleCategories = categories.filter(c => items.some(i => i.categoryId === c.id));
   const filteredCategories = activeCat ? visibleCategories.filter(c => c.id === activeCat) : visibleCategories;
 
   return (
-    <div className="min-h-screen bg-white" style={{ '--accent': accent } as React.CSSProperties}>
+    <div className="min-h-screen bg-[#f5f5f5]">
 
-      {/* Hero */}
-      <div className="relative" style={{ background: `linear-gradient(135deg, ${accent} 0%, ${accent}cc 100%)` }}>
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.35) 100%)' }} />
-        <div className="relative max-w-xl mx-auto px-5 pt-10 pb-16 text-center">
-          {settings.logoUrl ? (
-            <img src={settings.logoUrl} alt={settings.name} className="w-20 h-20 rounded-2xl object-cover mx-auto mb-4 ring-4 ring-white/20 shadow-xl" />
-          ) : (
-            <div className="w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center mx-auto mb-4 ring-2 ring-white/20">
-              <ChefHat className="w-8 h-8 text-white" />
+      {/* ── HERO ── */}
+      <div className="relative overflow-hidden" style={{ background: accent }}>
+        {/* decorative circles */}
+        <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full opacity-20" style={{ background: 'rgba(255,255,255,0.3)' }} />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-10" style={{ background: 'rgba(255,255,255,0.4)' }} />
+
+        <div className="relative max-w-xl mx-auto px-5 pt-12 pb-20">
+          <div className="flex items-center gap-5">
+            {settings.logoUrl ? (
+              <img src={settings.logoUrl} alt={settings.name} className="w-20 h-20 rounded-2xl object-cover shadow-xl ring-4 ring-white/25 flex-shrink-0" />
+            ) : (
+              <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0 ring-2 ring-white/20">
+                <ChefHat className="w-9 h-9 text-white" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-extrabold text-white leading-tight tracking-tight">{settings.name}</h1>
+              {settings.description && (
+                <p className="text-white/70 mt-1 text-sm leading-relaxed line-clamp-2">{settings.description}</p>
+              )}
+            </div>
+          </div>
+
+          {(settings.address || settings.phone) && (
+            <div className="flex flex-wrap gap-2 mt-5">
+              {settings.address && (
+                <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm rounded-full px-3 py-1.5">
+                  <MapPin className="w-3 h-3 text-white/80" />
+                  <span className="text-white/80 text-xs font-medium truncate max-w-[180px]">{settings.address}</span>
+                </div>
+              )}
+              {settings.phone && (
+                <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm rounded-full px-3 py-1.5">
+                  <Phone className="w-3 h-3 text-white/80" />
+                  <span className="text-white/80 text-xs font-medium">{settings.phone}</span>
+                </div>
+              )}
             </div>
           )}
-          <h1 className="text-2xl font-bold text-white tracking-tight">{settings.name}</h1>
-          {settings.description && (
-            <p className="text-white/75 mt-2 text-sm max-w-xs mx-auto leading-relaxed">{settings.description}</p>
-          )}
-          <div className="flex items-center justify-center gap-4 mt-3 flex-wrap">
-            {settings.address && (
-              <span className="flex items-center gap-1 text-white/60 text-xs"><MapPin className="w-3 h-3" />{settings.address}</span>
-            )}
-            {settings.phone && (
-              <span className="flex items-center gap-1 text-white/60 text-xs"><Phone className="w-3 h-3" />{settings.phone}</span>
-            )}
-          </div>
         </div>
       </div>
 
-      {/* Category bar - sticky */}
-      <div className="sticky top-0 z-30 bg-white border-b border-slate-100 shadow-sm">
-        <div ref={catBarRef} className="max-w-xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      {/* ── CATEGORY BAR ── */}
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-black/5 shadow-sm">
+        <div ref={catBarRef} className="max-w-xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <button
             onClick={() => setActiveCat('')}
-            className="px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0"
-            style={!activeCat ? { backgroundColor: accent, color: '#fff' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
+            className="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border"
+            style={!activeCat
+              ? { backgroundColor: accent, color: '#fff', borderColor: accent }
+              : { backgroundColor: 'transparent', color: '#6b7280', borderColor: '#e5e7eb' }}
           >
             Todos
           </button>
@@ -194,74 +233,93 @@ export default function PublicMenuPage() {
             <button
               key={cat.id}
               onClick={() => setActiveCat(activeCat === cat.id ? '' : cat.id)}
-              className="px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0"
-              style={activeCat === cat.id ? { backgroundColor: accent, color: '#fff' } : { backgroundColor: '#f1f5f9', color: '#64748b' }}
+              className="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border flex items-center gap-1.5"
+              style={activeCat === cat.id
+                ? { backgroundColor: accent, color: '#fff', borderColor: accent }
+                : { backgroundColor: 'transparent', color: '#6b7280', borderColor: '#e5e7eb' }}
             >
-              {cat.emoji} {cat.name}
+              <span>{cat.emoji}</span>
+              <span>{cat.name}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Menu */}
-      <div className="max-w-xl mx-auto pb-32">
+      {/* ── MENU ITEMS ── */}
+      <div className="max-w-xl mx-auto px-4 pb-36 pt-2">
         {filteredCategories.map(cat => {
           const catItems = items.filter(i => i.categoryId === cat.id);
           if (catItems.length === 0) return null;
           return (
-            <div key={cat.id}>
-              <div className="px-5 pt-7 pb-3 flex items-center gap-2">
-                <span className="text-xl">{cat.emoji}</span>
-                <h2 className="text-base font-bold text-slate-900">{cat.name}</h2>
-                <span className="text-xs text-slate-400 font-medium ml-auto">{catItems.length} {catItems.length === 1 ? 'item' : 'itens'}</span>
+            <div key={cat.id} className="mt-6">
+              {/* Category header */}
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <span className="text-2xl">{cat.emoji}</span>
+                <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">{cat.name}</h2>
               </div>
-              <div className="divide-y divide-slate-100">
+
+              {/* Items */}
+              <div className="space-y-3">
                 {catItems.map(item => {
                   const inCart = cart.find(c => c.menuItemId === item.id);
                   return (
-                    <div key={item.id} className="flex items-center gap-4 px-5 py-4 active:bg-slate-50 transition-colors">
-                      {/* Emoji */}
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0" style={{ backgroundColor: accent + '12' }}>
-                        {item.emoji}
-                      </div>
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 text-[15px] leading-snug">{item.name}</h3>
-                        {item.description && (
-                          <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">{item.description}</p>
-                        )}
-                        <p className="text-sm font-bold mt-1.5" style={{ color: accent }}>
-                          R$ {item.price.toFixed(2).replace('.', ',')}
-                        </p>
-                      </div>
-                      {/* Add / Qty */}
-                      <div className="flex-shrink-0">
-                        {inCart ? (
-                          <div className="flex items-center gap-2">
+                    <div
+                      key={item.id}
+                      className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5 flex items-stretch"
+                    >
+                      {/* Left color bar */}
+                      <div className="w-1 flex-shrink-0" style={{ backgroundColor: inCart ? accent : 'transparent' }} />
+
+                      <div className="flex items-center gap-4 px-4 py-4 flex-1 min-w-0">
+                        {/* Emoji */}
+                        <div
+                          className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0 transition-transform duration-200"
+                          style={{ backgroundColor: accent + '15' }}
+                        >
+                          {item.emoji}
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-slate-900 text-[15px] leading-snug">{item.name}</h3>
+                          {item.description && (
+                            <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">{item.description}</p>
+                          )}
+                          <p className="text-base font-extrabold mt-2 tracking-tight" style={{ color: accent }}>
+                            R$ {item.price.toFixed(2).replace('.', ',')}
+                          </p>
+                        </div>
+
+                        {/* Add / Qty */}
+                        <div className="flex-shrink-0">
+                          {inCart ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => updateQty(item.id, inCart.quantity - 1)}
+                                className="w-8 h-8 rounded-full border-2 flex items-center justify-center active:scale-90 transition-transform"
+                                style={{ borderColor: accent }}
+                              >
+                                <Minus className="w-3.5 h-3.5" style={{ color: accent }} />
+                              </button>
+                              <span className="text-sm font-extrabold w-6 text-center" style={{ color: accent }}>{inCart.quantity}</span>
+                              <button
+                                onClick={() => updateQty(item.id, inCart.quantity + 1)}
+                                className="w-8 h-8 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-sm"
+                                style={{ backgroundColor: accent }}
+                              >
+                                <Plus className="w-3.5 h-3.5 text-white" />
+                              </button>
+                            </div>
+                          ) : (
                             <button
-                              onClick={() => updateQty(item.id, inCart.quantity - 1)}
-                              className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center active:scale-95 transition-transform"
-                            >
-                              <Minus className="w-3.5 h-3.5 text-slate-600" />
-                            </button>
-                            <span className="text-sm font-bold w-5 text-center text-slate-900">{inCart.quantity}</span>
-                            <button
-                              onClick={() => updateQty(item.id, inCart.quantity + 1)}
-                              className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-transform shadow-md"
+                              onClick={() => addToCart(item)}
+                              className="w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition-transform shadow-md"
                               style={{ backgroundColor: accent }}
                             >
-                              <Plus className="w-3.5 h-3.5 text-white" />
+                              <Plus className="w-4.5 h-4.5 text-white" />
                             </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => addToCart(item)}
-                            className="w-9 h-9 rounded-full flex items-center justify-center shadow-md active:scale-95 transition-transform"
-                            style={{ backgroundColor: accent }}
-                          >
-                            <Plus className="w-4 h-4 text-white" />
-                          </button>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -272,126 +330,177 @@ export default function PublicMenuPage() {
         })}
 
         {filteredCategories.length === 0 && (
-          <div className="text-center py-20 px-6">
-            <ChefHat className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-            <p className="text-slate-400 text-sm">Nenhum item disponível</p>
+          <div className="text-center py-24">
+            <div className="w-20 h-20 rounded-3xl bg-white shadow-sm flex items-center justify-center mx-auto mb-4">
+              <ChefHat className="w-9 h-9 text-slate-200" />
+            </div>
+            <p className="text-slate-400 font-medium">Nenhum item disponível</p>
           </div>
         )}
       </div>
 
-      {/* Footer */}
-      <div className="text-center py-6 text-[11px] text-slate-300 font-medium flex items-center justify-center gap-1.5">
+      {/* ── FOOTER ── */}
+      <div className="text-center pb-8 text-[11px] text-slate-300 font-semibold flex items-center justify-center gap-1.5 tracking-wide uppercase">
         <Zap className="w-3 h-3" /> Powered by ZapMenu
       </div>
 
-      {/* Cart FAB */}
+      {/* ── CART FAB ── */}
       {cartCount > 0 && !showCart && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-6 max-w-xl mx-auto">
+        <div className="fixed bottom-6 left-0 right-0 z-40 px-5 max-w-xl mx-auto">
           <button
             onClick={() => setShowCart(true)}
-            className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl text-white active:scale-[0.98] transition-transform"
+            className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-white active:scale-[0.97] transition-all duration-150 shadow-2xl"
             style={{ backgroundColor: accent }}
           >
-            <div className="relative">
+            <div className="relative flex-shrink-0">
               <ShoppingCart className="w-5 h-5" />
-              <span className="absolute -top-2 -right-2 w-4 h-4 bg-white rounded-full text-[10px] font-bold flex items-center justify-center" style={{ color: accent }}>
+              <span className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-white rounded-full text-[10px] font-extrabold flex items-center justify-center shadow" style={{ color: accent }}>
                 {cartCount}
               </span>
             </div>
-            <span className="font-bold text-[15px] flex-1 text-left">Ver pedido</span>
-            <span className="font-bold text-[15px]">R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
+            <span className="font-bold text-[15px] flex-1 text-left">Ver meu pedido</span>
+            <span className="font-extrabold text-base">R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
           </button>
         </div>
       )}
 
-      {/* Checkout drawer */}
+      {/* ── CHECKOUT MODAL ── */}
       {showCart && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { if (['cart', 'success', 'order_placed'].includes(step)) setShowCart(false); }} />
-          <div className="relative ml-auto w-full max-w-md bg-white flex flex-col h-full shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => { if (['cart', 'success', 'order_placed'].includes(step)) setShowCart(false); }}
+          />
 
-            {/* Drawer header */}
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+          {/* Panel */}
+          <div className="relative w-full max-w-md bg-white flex flex-col shadow-2xl rounded-t-3xl sm:rounded-3xl"
+            style={{ maxHeight: '92dvh' }}>
+
+            {/* Handle bar (mobile) */}
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 mb-1 sm:hidden flex-shrink-0" />
+
+            {/* Header */}
+            <div className="flex items-center gap-3 px-5 pt-3 pb-4 flex-shrink-0">
               {['delivery', 'payment'].includes(step) && (
-                <button onClick={() => setStep(step === 'payment' ? 'delivery' : 'cart')} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                <button
+                  onClick={() => setStep(step === 'payment' ? 'delivery' : 'cart')}
+                  className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0"
+                >
                   <ArrowLeft className="w-4 h-4 text-slate-600" />
                 </button>
               )}
               <div className="flex-1">
-                <h3 className="font-bold text-slate-900 text-base">
-                  {step === 'cart' && 'Seu pedido'}
-                  {step === 'delivery' && 'Dados de entrega'}
-                  {step === 'payment' && 'Forma de pagamento'}
-                  {step === 'paying' && 'Processando...'}
+                <h3 className="font-extrabold text-slate-900 text-lg leading-tight">
+                  {step === 'cart' && 'Meu Pedido'}
+                  {step === 'delivery' && 'Informações'}
+                  {step === 'payment' && 'Pagamento'}
+                  {step === 'paying' && 'Aguarde...'}
                   {step === 'pix' && 'Pagar com PIX'}
-                  {step === 'success' && 'Pedido confirmado!'}
-                  {step === 'order_placed' && 'Pedido realizado!'}
-                  {step === 'error' && 'Erro no pagamento'}
+                  {step === 'success' && 'Pago! ✓'}
+                  {step === 'order_placed' && 'Pedido feito! ✓'}
+                  {step === 'error' && 'Ops!'}
                   {step === 'no-xgate' && 'PIX indisponível'}
-                  {step === 'no-methods' && 'Pagamento indisponível'}
+                  {step === 'no-methods' && 'Indisponível'}
                 </h3>
-                {step === 'cart' && <p className="text-xs text-slate-400 mt-0.5">{cartCount} {cartCount === 1 ? 'item' : 'itens'}</p>}
+                {step === 'cart' && cartCount > 0 && (
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">{cartCount} {cartCount === 1 ? 'item' : 'itens'} selecionados</p>
+                )}
               </div>
-              {step === 'cart' && (
-                <button onClick={() => setShowCart(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                  <X className="w-4 h-4 text-slate-600" />
+              {(step === 'cart' || ['success', 'order_placed', 'error', 'no-xgate', 'no-methods'].includes(step)) && (
+                <button
+                  onClick={() => ['success', 'order_placed', 'error', 'no-xgate', 'no-methods'].includes(step) ? closeAndReset() : setShowCart(false)}
+                  className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0"
+                >
+                  <X className="w-4 h-4 text-slate-500" />
                 </button>
               )}
             </div>
 
-            {/* Step indicator */}
+            {/* Step progress */}
             {['cart', 'delivery', 'payment'].includes(step) && (
-              <div className="px-5 py-3 flex items-center gap-2">
-                {['cart', 'delivery', 'payment'].map((s, i) => (
-                  <div key={s} className="flex items-center gap-2 flex-1">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all ${
-                      step === s ? 'text-white shadow-md' : i < ['cart', 'delivery', 'payment'].indexOf(step) ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'
-                    }`} style={step === s ? { backgroundColor: accent } : {}}>
-                      {i < ['cart', 'delivery', 'payment'].indexOf(step) ? <Check className="w-3 h-3" /> : i + 1}
-                    </div>
-                    {i < 2 && <div className={`flex-1 h-0.5 rounded-full transition-all ${i < ['cart', 'delivery', 'payment'].indexOf(step) ? 'bg-emerald-500' : 'bg-slate-100'}`} />}
-                  </div>
-                ))}
+              <div className="px-5 pb-4 flex-shrink-0">
+                <div className="flex items-center gap-0">
+                  {(['cart', 'delivery', 'payment'] as const).map((s, i) => {
+                    const idx = ['cart', 'delivery', 'payment'].indexOf(step);
+                    const done = i < idx;
+                    const active = step === s;
+                    return (
+                      <div key={s} className="flex items-center flex-1 last:flex-none">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold flex-shrink-0 transition-all duration-300"
+                          style={active
+                            ? { backgroundColor: accent, color: '#fff' }
+                            : done
+                            ? { backgroundColor: accent + '30', color: accent }
+                            : { backgroundColor: '#f1f5f9', color: '#94a3b8' }}
+                        >
+                          {done ? <Check className="w-3.5 h-3.5" /> : i + 1}
+                        </div>
+                        {i < 2 && (
+                          <div
+                            className="flex-1 h-0.5 mx-1 rounded-full transition-all duration-300"
+                            style={{ backgroundColor: done ? accent + '50' : '#e2e8f0' }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between mt-1.5 px-0.5">
+                  {['Pedido', 'Dados', 'Pagamento'].map((l, i) => {
+                    const idx = ['cart', 'delivery', 'payment'].indexOf(step);
+                    return <span key={l} className="text-[10px] font-semibold" style={{ color: i <= idx ? accent : '#cbd5e1' }}>{l}</span>;
+                  })}
+                </div>
               </div>
             )}
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto">
+            {/* Divider */}
+            <div className="h-px bg-slate-100 mx-5 flex-shrink-0" />
 
-              {/* CART */}
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto overscroll-contain">
+
+              {/* ── STEP: CART ── */}
               {step === 'cart' && (
                 <div className="px-5 py-4">
                   {cart.length === 0 ? (
                     <div className="text-center py-16">
-                      <ShoppingCart className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                      <p className="text-slate-400 text-sm">Seu carrinho está vazio</p>
+                      <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mx-auto mb-4">
+                        <ShoppingCart className="w-7 h-7 text-slate-200" />
+                      </div>
+                      <p className="text-slate-400 font-medium text-sm">Seu carrinho está vazio</p>
+                      <button onClick={() => setShowCart(false)} className="mt-3 text-sm font-semibold" style={{ color: accent }}>
+                        Ver o cardápio
+                      </button>
                     </div>
                   ) : (
-                    <div className="space-y-0 divide-y divide-slate-100">
+                    <div className="divide-y divide-slate-50 -mx-5">
                       {cart.map(item => (
-                        <div key={item.menuItemId} className="flex items-center gap-3 py-4">
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ backgroundColor: accent + '12' }}>
+                        <div key={item.menuItemId} className="flex items-center gap-3 px-5 py-3.5">
+                          <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0" style={{ backgroundColor: accent + '15' }}>
                             {item.emoji}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-900 truncate">{item.name}</p>
-                            <p className="text-xs text-slate-400">R$ {item.price.toFixed(2).replace('.', ',')} un.</p>
+                            <p className="text-sm font-bold text-slate-900 truncate">{item.name}</p>
+                            <p className="text-xs text-slate-400 font-medium">R$ {item.price.toFixed(2).replace('.', ',')} un.</p>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <button onClick={() => updateQty(item.menuItemId, item.quantity - 1)} className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center active:scale-95">
-                              <Minus className="w-3 h-3 text-slate-600" />
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button onClick={() => updateQty(item.menuItemId, item.quantity - 1)}
+                              className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center active:scale-90">
+                              {item.quantity === 1 ? <Trash2 className="w-3 h-3 text-red-400" /> : <Minus className="w-3 h-3 text-slate-600" />}
                             </button>
-                            <span className="text-sm font-bold w-5 text-center">{item.quantity}</span>
-                            <button onClick={() => updateQty(item.menuItemId, item.quantity + 1)} className="w-7 h-7 rounded-full flex items-center justify-center active:scale-95" style={{ backgroundColor: accent }}>
+                            <span className="text-sm font-extrabold w-5 text-center text-slate-900">{item.quantity}</span>
+                            <button onClick={() => updateQty(item.menuItemId, item.quantity + 1)}
+                              className="w-7 h-7 rounded-full flex items-center justify-center active:scale-90"
+                              style={{ backgroundColor: accent }}>
                               <Plus className="w-3 h-3 text-white" />
                             </button>
                           </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <p className="text-sm font-bold text-slate-900 w-16 text-right">R$ {(item.price * item.quantity).toFixed(2).replace('.', ',')}</p>
-                            <button onClick={() => removeFromCart(item.menuItemId)} className="w-6 h-6 rounded-full hover:bg-red-50 flex items-center justify-center transition-colors">
-                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                            </button>
-                          </div>
+                          <p className="text-sm font-extrabold text-slate-900 w-16 text-right flex-shrink-0">
+                            R$ {(item.price * item.quantity).toFixed(2).replace('.', ',')}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -399,115 +508,122 @@ export default function PublicMenuPage() {
                 </div>
               )}
 
-              {/* DELIVERY */}
+              {/* ── STEP: DELIVERY ── */}
               {step === 'delivery' && (
-                <div className="px-5 py-4 space-y-5">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Tipo de entrega</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { value: 'pickup' as const, label: 'Retirada', icon: ShoppingBag },
-                        { value: 'delivery' as const, label: 'Delivery', icon: Truck },
-                      ].map(opt => (
-                        <button
-                          key={opt.value}
-                          onClick={() => setDeliveryType(opt.value)}
-                          className="p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2"
-                          style={deliveryType === opt.value ? { borderColor: accent, backgroundColor: accent + '08' } : { borderColor: '#e2e8f0' }}
-                        >
-                          <opt.icon className="w-5 h-5" style={deliveryType === opt.value ? { color: accent } : { color: '#94a3b8' }} />
-                          <span className="text-sm font-semibold" style={deliveryType === opt.value ? { color: accent } : { color: '#64748b' }}>
-                            {opt.label}
-                          </span>
-                        </button>
-                      ))}
+                <div className="px-5 py-5 space-y-5">
+                  {/* Pickup / Delivery toggle */}
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+                    {([
+                      { value: 'pickup' as const, label: 'Retirada', icon: ShoppingBag },
+                      { value: 'delivery' as const, label: 'Delivery', icon: Truck },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setDeliveryType(opt.value)}
+                        className="py-3 rounded-xl flex flex-col items-center gap-1.5 transition-all duration-200 text-sm font-bold"
+                        style={deliveryType === opt.value
+                          ? { backgroundColor: '#fff', color: accent, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }
+                          : { color: '#94a3b8' }}
+                      >
+                        <opt.icon className="w-4 h-4" />
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Name + Phone */}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nome completo *</label>
+                      <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-slate-400 bg-slate-50 transition-colors"
+                        placeholder="Seu nome" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">WhatsApp / Telefone *</label>
+                      <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-slate-400 bg-slate-50 transition-colors"
+                        placeholder="(11) 99999-0000" />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2 sm:col-span-1">
-                      <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Nome *</label>
-                      <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} className="input-field" placeholder="Seu nome" />
-                    </div>
-                    <div className="col-span-2 sm:col-span-1">
-                      <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Telefone *</label>
-                      <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="input-field" placeholder="(11) 99999-0000" />
-                    </div>
-                  </div>
-
+                  {/* Address fields */}
                   {deliveryType === 'delivery' && (
                     <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5" /> Endereço de entrega
-                      </p>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Endereço de entrega</span>
+                      </div>
                       <div className="grid grid-cols-4 gap-2">
-                        <div className="col-span-3">
-                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">Rua *</label>
-                          <input type="text" value={address.street} onChange={e => setAddress(a => ({ ...a, street: e.target.value }))} className="input-field py-2" />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">Nº *</label>
-                          <input type="text" value={address.number} onChange={e => setAddress(a => ({ ...a, number: e.target.value }))} className="input-field py-2" />
-                        </div>
+                        <input type="text" value={address.street} onChange={e => setAddress(a => ({ ...a, street: e.target.value }))}
+                          className="col-span-3 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
+                          placeholder="Rua / Av. *" />
+                        <input type="text" value={address.number} onChange={e => setAddress(a => ({ ...a, number: e.target.value }))}
+                          className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
+                          placeholder="Nº *" />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">Complemento</label>
-                          <input type="text" value={address.complement} onChange={e => setAddress(a => ({ ...a, complement: e.target.value }))} className="input-field py-2" />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">Bairro *</label>
-                          <input type="text" value={address.neighborhood} onChange={e => setAddress(a => ({ ...a, neighborhood: e.target.value }))} className="input-field py-2" />
-                        </div>
+                        <input type="text" value={address.complement} onChange={e => setAddress(a => ({ ...a, complement: e.target.value }))}
+                          className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
+                          placeholder="Complemento" />
+                        <input type="text" value={address.neighborhood} onChange={e => setAddress(a => ({ ...a, neighborhood: e.target.value }))}
+                          className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
+                          placeholder="Bairro *" />
                       </div>
-                      <div className="grid grid-cols-4 gap-2">
-                        <div className="col-span-2">
-                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">Cidade *</label>
-                          <input type="text" value={address.city} onChange={e => setAddress(a => ({ ...a, city: e.target.value }))} className="input-field py-2" />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">UF</label>
-                          <input type="text" value={address.state} onChange={e => setAddress(a => ({ ...a, state: e.target.value }))} className="input-field py-2" maxLength={2} />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-slate-400 mb-1">CEP</label>
-                          <input type="text" value={address.zip} onChange={e => setAddress(a => ({ ...a, zip: e.target.value }))} className="input-field py-2" />
-                        </div>
+                      <div className="grid grid-cols-5 gap-2">
+                        <input type="text" value={address.city} onChange={e => setAddress(a => ({ ...a, city: e.target.value }))}
+                          className="col-span-3 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
+                          placeholder="Cidade *" />
+                        <input type="text" value={address.state} onChange={e => setAddress(a => ({ ...a, state: e.target.value }))}
+                          className="col-span-1 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
+                          placeholder="UF" maxLength={2} />
+                        <input type="text" value={address.zip} onChange={e => setAddress(a => ({ ...a, zip: e.target.value }))}
+                          className="col-span-1 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300 hidden sm:block"
+                          placeholder="CEP" />
                       </div>
                     </div>
                   )}
 
                   {errorMsg && (
-                    <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100">{errorMsg}</div>
+                    <div className="flex items-center gap-2 bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100 font-medium">
+                      <X className="w-4 h-4 flex-shrink-0" /> {errorMsg}
+                    </div>
                   )}
                 </div>
               )}
 
-              {/* PAYMENT */}
+              {/* ── STEP: PAYMENT ── */}
               {step === 'payment' && (
-                <div className="px-5 py-4 space-y-5">
-                  {/* Order summary */}
-                  <div className="bg-slate-50 rounded-2xl p-4 space-y-2 border border-slate-100">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Resumo do pedido</p>
-                    {[
-                      { label: 'Cliente', value: customerName },
-                      { label: 'Telefone', value: customerPhone },
-                      { label: 'Entrega', value: deliveryType === 'pickup' ? 'Retirada no local' : 'Delivery' },
-                      ...(deliveryType === 'delivery' && address.street ? [{ label: 'Endereço', value: formatAddress(address) }] : []),
-                    ].map(row => (
-                      <div key={row.label} className="flex justify-between text-sm">
-                        <span className="text-slate-400">{row.label}</span>
-                        <span className="font-medium text-slate-700 text-right max-w-[200px] truncate">{row.value}</span>
+                <div className="px-5 py-5 space-y-5">
+                  {/* Summary card */}
+                  <div className="rounded-2xl overflow-hidden border border-slate-100">
+                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Resumo</p>
+                    </div>
+                    <div className="px-4 py-3 space-y-2.5 bg-white">
+                      {[
+                        { label: 'Cliente', value: customerName },
+                        { label: 'Telefone', value: customerPhone },
+                        { label: 'Entrega', value: deliveryType === 'pickup' ? '🏠 Retirada no local' : '🛵 Delivery' },
+                        ...(deliveryType === 'delivery' && address.street ? [{ label: 'Endereço', value: formatAddress(address) }] : []),
+                      ].map(row => (
+                        <div key={row.label} className="flex justify-between items-start gap-3 text-sm">
+                          <span className="text-slate-400 flex-shrink-0 font-medium">{row.label}</span>
+                          <span className="font-semibold text-slate-700 text-right">{row.value}</span>
+                        </div>
+                      ))}
+                      <div className="pt-2.5 mt-1 border-t border-slate-100 flex justify-between items-center">
+                        <span className="font-bold text-slate-900 text-sm">Total a pagar</span>
+                        <span className="text-xl font-extrabold tracking-tight" style={{ color: accent }}>
+                          R$ {cartTotal.toFixed(2).replace('.', ',')}
+                        </span>
                       </div>
-                    ))}
-                    <div className="flex justify-between pt-2 border-t border-slate-200 mt-2">
-                      <span className="font-bold text-slate-900">Total</span>
-                      <span className="font-bold text-lg" style={{ color: accent }}>R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
                     </div>
                   </div>
 
+                  {/* Payment methods */}
                   <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Forma de pagamento</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Como deseja pagar?</p>
                     <div className="space-y-2">
                       {availablePaymentMethods.map(method => {
                         const cfg = PAYMENT_METHOD_LABELS[method];
@@ -516,13 +632,21 @@ export default function PublicMenuPage() {
                           <button
                             key={method}
                             onClick={() => setSelectedPayment(method)}
-                            className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left"
-                            style={active ? { borderColor: accent, backgroundColor: accent + '08' } : { borderColor: '#e2e8f0' }}
+                            className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all duration-200 text-left"
+                            style={active
+                              ? { borderColor: accent, backgroundColor: accent + '08' }
+                              : { borderColor: '#f1f5f9', backgroundColor: '#f8fafc' }}
                           >
-                            <span className="text-xl">{cfg.emoji}</span>
-                            <span className="text-sm font-semibold flex-1" style={active ? { color: accent } : { color: '#374151' }}>{cfg.label}</span>
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${active ? '' : 'border-slate-200'}`}
-                              style={active ? { borderColor: accent, backgroundColor: accent } : {}}>
+                            <span className="text-2xl w-8 text-center">{cfg.emoji}</span>
+                            <span className="text-sm font-bold flex-1" style={active ? { color: accent } : { color: '#374151' }}>
+                              {cfg.label}
+                            </span>
+                            <div
+                              className="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200"
+                              style={active
+                                ? { borderColor: accent, backgroundColor: accent }
+                                : { borderColor: '#e2e8f0' }}
+                            >
                               {active && <Check className="w-3 h-3 text-white" />}
                             </div>
                           </button>
@@ -532,130 +656,146 @@ export default function PublicMenuPage() {
                   </div>
 
                   {selectedPayment === 'cash' && (
-                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                      <label className="block text-xs font-semibold text-amber-700 mb-2 uppercase tracking-wide">Troco para quanto?</label>
-                      <input type="text" value={cashChange} onChange={e => setCashChange(e.target.value)} className="input-field" placeholder="Ex: R$ 100,00" />
+                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                      <label className="block text-xs font-bold text-amber-700 mb-2 uppercase tracking-wider">Troco para quanto?</label>
+                      <input type="text" value={cashChange} onChange={e => setCashChange(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-amber-200 bg-white text-sm font-medium placeholder:text-amber-300 focus:outline-none"
+                        placeholder="Ex: R$ 50,00 (deixe vazio se não precisar)" />
                     </div>
                   )}
                 </div>
               )}
 
-              {/* PAYING */}
+              {/* ── STEP: PAYING ── */}
               {step === 'paying' && (
                 <div className="flex flex-col items-center justify-center py-20 px-6">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5" style={{ backgroundColor: accent + '15' }}>
-                    <Loader2 className="w-8 h-8 animate-spin" style={{ color: accent }} />
+                  <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-6" style={{ backgroundColor: accent + '15' }}>
+                    <Loader2 className="w-9 h-9 animate-spin" style={{ color: accent }} />
                   </div>
-                  <p className="font-bold text-slate-900 text-base">Gerando cobrança PIX...</p>
-                  <p className="text-sm text-slate-400 mt-1">Aguarde um momento</p>
+                  <p className="font-extrabold text-slate-900 text-xl">Gerando PIX...</p>
+                  <p className="text-slate-400 mt-2 text-sm">Só um momento</p>
                 </div>
               )}
 
-              {/* PIX */}
+              {/* ── STEP: PIX ── */}
               {step === 'pix' && (
                 <div className="flex flex-col items-center px-5 py-6">
-                  <div className="p-4 rounded-2xl border-2 border-slate-100 shadow-sm mb-5">
+                  <div className="p-4 bg-white rounded-2xl border-2 border-slate-100 shadow-sm mb-4">
                     {pixQrCode
                       ? <img src={pixQrCode} alt="QR Code PIX" className="w-52 h-52" />
-                      : <div className="w-52 h-52 flex items-center justify-center bg-slate-50 rounded-xl"><QrCode className="w-20 h-20 text-slate-200" /></div>
+                      : <div className="w-52 h-52 flex items-center justify-center rounded-xl bg-slate-50"><QrCode className="w-24 h-24 text-slate-200" /></div>
                     }
                   </div>
-                  <p className="text-2xl font-bold text-slate-900 tracking-tight">R$ {pixAmount.toFixed(2).replace('.', ',')}</p>
-                  <p className="text-sm text-slate-400 mt-1 mb-5">Escaneie o QR Code ou copie o código</p>
+                  <p className="text-3xl font-extrabold text-slate-900 tracking-tight">R$ {pixAmount.toFixed(2).replace('.', ',')}</p>
+                  <p className="text-sm text-slate-400 mt-1 mb-5 font-medium">Escaneie ou copie o código PIX</p>
 
-                  <div className="w-full bg-slate-50 rounded-2xl p-3.5 mb-3 border border-slate-200">
-                    <code className="text-[11px] text-slate-500 break-all line-clamp-3 font-mono block">{pixCopyPaste}</code>
+                  <div className="w-full bg-slate-50 rounded-2xl p-4 mb-3 border border-slate-200">
+                    <code className="text-[11px] text-slate-500 break-all line-clamp-3 font-mono leading-relaxed">{pixCopyPaste}</code>
                   </div>
+
                   <button
                     onClick={copyPixCode}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 font-semibold text-sm transition-all"
-                    style={{ borderColor: accent, color: accent }}
+                    className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition-all duration-200"
+                    style={copied
+                      ? { backgroundColor: '#10b981', color: '#fff' }
+                      : { backgroundColor: accent, color: '#fff' }}
                   >
                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    {copied ? 'Copiado!' : 'Copiar código PIX'}
+                    {copied ? 'Código copiado!' : 'Copiar código PIX'}
                   </button>
+
                   {polling && (
-                    <div className="flex items-center gap-2 mt-6 text-sm text-slate-400">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Aguardando confirmação do pagamento...
+                    <div className="flex items-center gap-2 mt-5 text-sm text-slate-400 font-medium">
+                      <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                      Aguardando pagamento...
                     </div>
                   )}
                 </div>
               )}
 
-              {/* SUCCESS */}
+              {/* ── STEP: SUCCESS ── */}
               {step === 'success' && (
                 <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                  <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mb-5">
-                    <Check className="w-10 h-10 text-emerald-500" />
+                  <div className="w-24 h-24 rounded-full bg-emerald-500 flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/30">
+                    <Check className="w-12 h-12 text-white" strokeWidth={3} />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900">Pagamento confirmado!</h3>
-                  <p className="text-slate-400 mt-2 text-sm leading-relaxed">Seu pedido foi recebido e está sendo preparado. Obrigado!</p>
+                  <h3 className="text-2xl font-extrabold text-slate-900">Pago!</h3>
+                  <p className="text-slate-400 mt-2 leading-relaxed">Seu pedido foi confirmado e está sendo preparado. Obrigado!</p>
                 </div>
               )}
 
-              {/* ORDER PLACED */}
+              {/* ── STEP: ORDER PLACED ── */}
               {step === 'order_placed' && (
                 <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                  <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5" style={{ backgroundColor: accent + '15' }}>
-                    <Check className="w-10 h-10" style={{ color: accent }} />
+                  <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-lg" style={{ backgroundColor: accent, boxShadow: `0 10px 40px ${accent}40` }}>
+                    <Check className="w-12 h-12 text-white" strokeWidth={3} />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900">Pedido realizado!</h3>
-                  <p className="text-slate-400 mt-2 text-sm leading-relaxed">
+                  <h3 className="text-2xl font-extrabold text-slate-900">Pedido feito!</h3>
+                  <p className="text-slate-400 mt-2 leading-relaxed text-sm">
                     {selectedPayment === 'cash'
                       ? `Pague em dinheiro na ${deliveryType === 'delivery' ? 'entrega' : 'retirada'}.${cashChange ? ` Troco para R$ ${cashChange}.` : ''}`
                       : selectedPayment === 'meal_voucher'
-                      ? `Apresente o vale na ${deliveryType === 'delivery' ? 'entrega' : 'retirada'}.`
+                      ? `Apresente o vale-refeição na ${deliveryType === 'delivery' ? 'entrega' : 'retirada'}.`
                       : `Pague com cartão na ${deliveryType === 'delivery' ? 'entrega' : 'retirada'}.`}
                   </p>
                 </div>
               )}
 
-              {/* ERROR */}
+              {/* ── STEP: ERROR ── */}
               {step === 'error' && (
                 <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                  <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center mb-5">
-                    <X className="w-10 h-10 text-red-500" />
+                  <div className="w-24 h-24 rounded-full bg-red-500 flex items-center justify-center mb-6 shadow-lg shadow-red-500/30">
+                    <X className="w-12 h-12 text-white" strokeWidth={3} />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900">Erro no pagamento</h3>
+                  <h3 className="text-2xl font-extrabold text-slate-900">Erro no PIX</h3>
                   <p className="text-red-400 mt-2 text-sm">{errorMsg}</p>
                 </div>
               )}
 
-              {/* NO XGATE */}
+              {/* ── STEP: NO XGATE ── */}
               {step === 'no-xgate' && (
                 <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                  <div className="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center mb-5">
-                    <QrCode className="w-10 h-10 text-amber-500" />
+                  <div className="w-24 h-24 rounded-full bg-amber-400 flex items-center justify-center mb-6 shadow-lg shadow-amber-400/30">
+                    <QrCode className="w-11 h-11 text-white" />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900">PIX indisponível</h3>
-                  <p className="text-slate-400 mt-2 text-sm">Este restaurante ainda não configurou PIX. Escolha outra forma de pagamento.</p>
+                  <h3 className="text-2xl font-extrabold text-slate-900">PIX indisponível</h3>
+                  <p className="text-slate-400 mt-2 text-sm">O restaurante ainda não configurou o PIX. Escolha outra forma de pagamento.</p>
                 </div>
               )}
 
-              {/* NO METHODS */}
+              {/* ── STEP: NO METHODS ── */}
               {step === 'no-methods' && (
                 <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                  <div className="w-20 h-20 rounded-full bg-amber-50 flex items-center justify-center mb-5">
-                    <ShoppingCart className="w-10 h-10 text-amber-500" />
+                  <div className="w-24 h-24 rounded-full bg-slate-200 flex items-center justify-center mb-6">
+                    <ShoppingCart className="w-11 h-11 text-slate-400" />
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900">Pagamento indisponível</h3>
+                  <h3 className="text-2xl font-extrabold text-slate-900">Sem pagamentos</h3>
                   <p className="text-slate-400 mt-2 text-sm">Nenhuma forma de pagamento foi configurada.</p>
                 </div>
               )}
             </div>
 
-            {/* Footer actions */}
-            <div className="px-5 pb-6 pt-4 border-t border-slate-100 space-y-2.5">
+            {/* ── FOOTER ACTIONS ── */}
+            <div className="px-5 pt-4 pb-6 flex-shrink-0 space-y-3 border-t border-slate-100">
+
               {step === 'cart' && cart.length > 0 && (
-                <button
-                  onClick={() => setStep('delivery')}
-                  className="w-full py-4 rounded-2xl text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-lg"
-                  style={{ backgroundColor: accent }}
-                >
-                  Continuar → Entrega
-                </button>
+                <>
+                  <div className="flex justify-between items-center px-1 pb-1">
+                    <span className="text-sm text-slate-400 font-medium">Total</span>
+                    <span className="text-lg font-extrabold tracking-tight" style={{ color: accent }}>
+                      R$ {cartTotal.toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setStep('delivery')}
+                    className="w-full py-4 rounded-2xl text-white font-extrabold text-base active:scale-[0.98] transition-transform shadow-lg"
+                    style={{ backgroundColor: accent, boxShadow: `0 8px 24px ${accent}40` }}
+                  >
+                    Continuar
+                  </button>
+                </>
               )}
+
               {step === 'delivery' && (
                 <button
                   onClick={() => {
@@ -666,37 +806,36 @@ export default function PublicMenuPage() {
                     setStep('payment');
                     if (availablePaymentMethods.length === 1) setSelectedPayment(availablePaymentMethods[0]);
                   }}
-                  className="w-full py-4 rounded-2xl text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-lg"
-                  style={{ backgroundColor: accent }}
+                  className="w-full py-4 rounded-2xl text-white font-extrabold text-base active:scale-[0.98] transition-transform shadow-lg"
+                  style={{ backgroundColor: accent, boxShadow: `0 8px 24px ${accent}40` }}
                 >
-                  Continuar → Pagamento
+                  Continuar
                 </button>
               )}
+
               {step === 'payment' && (
                 <button
                   onClick={handlePlaceOrder}
                   disabled={!selectedPayment}
-                  className="w-full py-4 rounded-2xl text-white font-bold text-[15px] active:scale-[0.98] transition-transform shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  style={{ backgroundColor: accent }}
+                  className="w-full py-4 rounded-2xl text-white font-extrabold text-base active:scale-[0.98] transition-transform flex items-center justify-center gap-2 disabled:opacity-40"
+                  style={selectedPayment ? { backgroundColor: accent, boxShadow: `0 8px 24px ${accent}40` } : { backgroundColor: '#94a3b8' }}
                 >
-                  {selectedPayment === 'pix' && <QrCode className="w-5 h-5" />}
-                  {selectedPayment === 'pix'
+                  {selectedPayment === 'pix' ? <QrCode className="w-5 h-5" /> : null}
+                  {!selectedPayment
+                    ? 'Selecione uma forma de pagamento'
+                    : selectedPayment === 'pix'
                     ? `Gerar PIX — R$ ${cartTotal.toFixed(2).replace('.', ',')}`
                     : `Confirmar pedido — R$ ${cartTotal.toFixed(2).replace('.', ',')}`}
                 </button>
               )}
+
               {['success', 'order_placed', 'error', 'no-xgate', 'no-methods'].includes(step) && (
-                <button onClick={closeAndReset} className="w-full py-4 rounded-2xl bg-slate-100 text-slate-700 font-bold text-[15px] active:scale-[0.98] transition-transform">
+                <button
+                  onClick={closeAndReset}
+                  className="w-full py-4 rounded-2xl bg-slate-100 text-slate-700 font-bold text-base active:scale-[0.98] transition-transform"
+                >
                   Fechar
                 </button>
-              )}
-
-              {/* Cart total in footer for cart step */}
-              {step === 'cart' && cart.length > 0 && (
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-sm text-slate-400">Total do pedido</span>
-                  <span className="font-bold text-base" style={{ color: accent }}>R$ {cartTotal.toFixed(2).replace('.', ',')}</span>
-                </div>
               )}
             </div>
           </div>
