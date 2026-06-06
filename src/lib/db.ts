@@ -396,7 +396,7 @@ export const db = {
       .maybeSingle();
     return {
       ownerId: opData.owner_id,
-      role: opData.role as 'admin' | 'waiter' | 'cashier',
+      role: opData.role as 'admin' | 'waiter' | 'cashier' | 'kitchen',
       restaurantName: (settingsData as { name: string } | null)?.name || 'Restaurante',
       operatorName: opData.name,
     };

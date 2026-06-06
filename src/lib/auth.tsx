@@ -6,7 +6,7 @@ import { db } from './db';
 
 export interface OperatorInfo {
   ownerId: string;
-  role: 'admin' | 'waiter' | 'cashier';
+  role: 'admin' | 'waiter' | 'cashier' | 'kitchen';
   restaurantName: string;
   operatorName: string;
 }

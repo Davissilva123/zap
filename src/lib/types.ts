@@ -176,7 +176,7 @@ export interface Operator {
   ownerId: string;
   email: string;
   name: string;
-  role: 'admin' | 'waiter' | 'cashier';
+  role: 'admin' | 'waiter' | 'cashier' | 'kitchen';
   active: boolean;
   notes: string;
   createdAt: string;

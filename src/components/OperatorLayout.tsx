@@ -2,16 +2,18 @@ import { Receipt, BarChart2, UtensilsCrossed, Tag, LogOut, Menu, Zap, X, LayoutG
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState } from 'react';
+import KitchenPage from '../pages/op/KitchenPage';
 
 const ROLE_LABELS = {
-  waiter: { label: 'Garçom', color: 'bg-blue-500/15 text-blue-300' },
-  cashier: { label: 'Caixa', color: 'bg-amber-500/15 text-amber-300' },
-  admin: { label: 'Admin', color: 'bg-violet-500/15 text-violet-300' },
+  waiter:  { label: 'Garçom',  color: 'bg-blue-500/15 text-blue-300' },
+  cashier: { label: 'Caixa',   color: 'bg-amber-500/15 text-amber-300' },
+  admin:   { label: 'Admin',   color: 'bg-violet-500/15 text-violet-300' },
+  kitchen: { label: 'Cozinha', color: 'bg-orange-500/15 text-orange-300' },
 };
 
 type NavItem = { to: string; icon: typeof Receipt; label: string };
 
-function getNavItems(role: 'waiter' | 'cashier' | 'admin'): NavItem[] {
+function getNavItems(role: 'waiter' | 'cashier' | 'admin' | 'kitchen'): NavItem[] {
   const orders: NavItem = { to: '/op/pedidos', icon: Receipt, label: 'Pedidos' };
   const tables: NavItem = { to: '/op/mesas', icon: LayoutGrid, label: 'Mesas' };
   const kitchen: NavItem = { to: '/op/cozinha', icon: ChefHat, label: 'Cozinha' };
@@ -21,6 +23,7 @@ function getNavItems(role: 'waiter' | 'cashier' | 'admin'): NavItem[] {
 
   if (role === 'waiter') return [orders, tables, kitchen];
   if (role === 'cashier') return [orders, tables, kitchen, reports];
+  if (role === 'kitchen') return [kitchen];
   return [orders, tables, kitchen, menu, reports, coupons]; // admin
 }
 
@@ -34,6 +37,34 @@ export default function OperatorLayout() {
   if (!operatorInfo) return null;
   const role = operatorInfo.role;
   const roleCfg = ROLE_LABELS[role];
+
+  // Kitchen operators: full-screen KDS, sem sidebar
+  if (role === 'kitchen') {
+    return (
+      <div className="min-h-screen bg-slate-100 flex flex-col">
+        <header className="sticky top-0 z-30 bg-[#0d1117] border-b border-white/[0.06] px-5 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm leading-none tracking-tight">{operatorInfo.restaurantName}</p>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-300 mt-0.5 inline-block">Cozinha</span>
+            </div>
+          </div>
+          <button
+            onClick={async () => { await logout(); navigate('/login'); }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all text-xs font-medium"
+          >
+            <LogOut className="w-3.5 h-3.5" /> Sair
+          </button>
+        </header>
+        <main className="flex-1 p-4 sm:p-6 max-w-5xl mx-auto w-full">
+          <KitchenPage />
+        </main>
+      </div>
+    );
+  }
   const navItems = getNavItems(role);
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>

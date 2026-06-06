@@ -4,12 +4,13 @@ import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { supabaseNoSession } from '../lib/supabaseNoSession';
 import type { Operator } from '../lib/types';
-import { Plus, Trash2, ToggleLeft, ToggleRight, Users, Shield, UtensilsCrossed, CreditCard, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff, Send, Copy, Check, X } from 'lucide-react';
+import { Plus, Trash2, ToggleLeft, ToggleRight, Users, Shield, UtensilsCrossed, CreditCard, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff, Send, Copy, Check, X, ChefHat } from 'lucide-react';
 
 const ROLES: { value: Operator['role']; label: string; desc: string; icon: typeof Shield }[] = [
-  { value: 'admin',   label: 'Admin',  desc: 'Acesso completo ao painel', icon: Shield },
-  { value: 'waiter',  label: 'Garçom', desc: 'Visualiza e atualiza pedidos', icon: UtensilsCrossed },
-  { value: 'cashier', label: 'Caixa',  desc: 'Confirma pagamentos e relatórios', icon: CreditCard },
+  { value: 'admin',   label: 'Admin',   desc: 'Acesso completo ao painel', icon: Shield },
+  { value: 'waiter',  label: 'Garçom',  desc: 'Pedidos, mesas e cozinha', icon: UtensilsCrossed },
+  { value: 'cashier', label: 'Caixa',   desc: 'Pagamentos e relatórios', icon: CreditCard },
+  { value: 'kitchen', label: 'Cozinha', desc: 'Somente tela da cozinha (KDS)', icon: ChefHat },
 ];
 
 const emptyForm = { email: '', name: '', role: 'waiter' as Operator['role'], notes: '', password: '' };
@@ -114,7 +115,7 @@ export default function OperatorsPage() {
       </div>
 
       {/* Roles legend */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {ROLES.map(r => (
           <div key={r.value} className="card p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -178,7 +179,7 @@ export default function OperatorsPage() {
 
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Função *</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {ROLES.map(r => (
                 <button
                   key={r.value}
