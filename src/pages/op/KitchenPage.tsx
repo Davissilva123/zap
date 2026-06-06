@@ -125,11 +125,20 @@ export default function KitchenPage() {
   useEffect(() => {
     if (!restaurantId) return;
     load();
+
+    // Polling a cada 10s — garante atualização mesmo quando real-time falha por RLS do operador
+    const poll = setInterval(() => load(), 10000);
+
+    // Real-time como bônus (funciona quando o dono está logado)
     const channel = supabase
       .channel(`kitchen:${restaurantId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `user_id=eq.${restaurantId}` }, () => load())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    return () => {
+      clearInterval(poll);
+      supabase.removeChannel(channel);
+    };
   }, [restaurantId, load]);
 
   const accept = async (order: Order) => {
@@ -188,7 +197,7 @@ export default function KitchenPage() {
           </div>
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Tempo real
+            Atualiza a cada 10s
           </div>
         </div>
       </div>
