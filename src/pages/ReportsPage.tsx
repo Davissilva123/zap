@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
-import { useAuth } from '../lib/auth';
+import { useAuth, useRestaurantId } from '../lib/auth';
 import type { Order } from '../lib/types';
 import { TrendingUp, ShoppingBag, DollarSign, Clock, Star } from 'lucide-react';
 
@@ -23,13 +23,14 @@ function StatCard({ icon: Icon, label, value, sub, color }: { icon: typeof Trend
 
 export default function ReportsPage() {
   const { user } = useAuth();
+  const restaurantId = useRestaurantId();
   const [orders, setOrders] = useState<Order[]>([]);
   const [range, setRange] = useState<'7' | '30' | '90'>('30');
 
   useEffect(() => {
-    if (!user) return;
-    db.getOrders(user.id).then(setOrders);
-  }, [user]);
+    if (!restaurantId) return;
+    db.getOrders(restaurantId).then(setOrders);
+  }, [restaurantId]);
 
   const days = Number(range);
   const since = new Date(Date.now() - days * 86400000).toISOString();

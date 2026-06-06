@@ -4,9 +4,18 @@ import type { User } from './types';
 import { supabase } from './supabase';
 import { db } from './db';
 
+export interface OperatorInfo {
+  ownerId: string;
+  role: 'admin' | 'waiter' | 'cashier';
+  restaurantName: string;
+  operatorName: string;
+}
+
 interface AuthCtx {
   user: User | null;
   loading: boolean;
+  isOperator: boolean;
+  operatorInfo: OperatorInfo | null;
   login: (email: string, password: string) => Promise<string | null>;
   register: (name: string, email: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
@@ -24,16 +33,36 @@ function toUser(su: SupabaseUser): User {
   };
 }
 
+async function detectAndSetup(su: SupabaseUser): Promise<{ isOperator: boolean; operatorInfo: OperatorInfo | null }> {
+  const opInfo = await db.getOperatorByEmail(su.email ?? '');
+  if (opInfo) {
+    // Link user_id to operator record if not yet set
+    await supabase
+      .from('operators')
+      .update({ user_id: su.id })
+      .eq('email', (su.email ?? '').toLowerCase())
+      .is('user_id', null);
+    return { isOperator: true, operatorInfo: opInfo };
+  }
+  // Owner flow
+  await db.ensureSettings(su.id, (su.user_metadata?.name as string) ?? su.email ?? '');
+  return { isOperator: false, operatorInfo: null };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isOperator, setIsOperator] = useState(false);
+  const [operatorInfo, setOperatorInfo] = useState<OperatorInfo | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error) console.error('[Auth] getSession error:', error);
       if (session?.user) {
         const u = toUser(session.user);
-        await db.ensureSettings(u.id, u.name);
+        const { isOperator: op, operatorInfo: opInfo } = await detectAndSetup(session.user);
+        setIsOperator(op);
+        setOperatorInfo(opInfo);
         setUser(u);
       }
       setLoading(false);
@@ -44,13 +73,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let subscription: { unsubscribe: () => void } | null = null;
     try {
-      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
           const u = toUser(session.user);
-          db.ensureSettings(u.id, u.name); // fire-and-forget, callback não suporta async
+          const { isOperator: op, operatorInfo: opInfo } = await detectAndSetup(session.user);
+          setIsOperator(op);
+          setOperatorInfo(opInfo);
           setUser(u);
         } else {
           setUser(null);
+          setIsOperator(false);
+          setOperatorInfo(null);
         }
       });
       subscription = data.subscription;
@@ -76,13 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!name.trim()) return 'Nome é obrigatório';
     if (!email.trim()) return 'E-mail é obrigatório';
     if (password.length < 6) return 'Senha deve ter pelo menos 6 caracteres';
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
-    });
-
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
     if (error) {
       if (error.message.toLowerCase().includes('already registered')) return 'Este e-mail já está cadastrado';
       return error.message;
@@ -95,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, isOperator, operatorInfo, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -105,4 +132,11 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be within AuthProvider');
   return ctx;
+}
+
+/** Returns the restaurant owner's user_id regardless of whether the logged-in user is an owner or operator */
+export function useRestaurantId(): string | null {
+  const { user, isOperator, operatorInfo } = useAuth();
+  if (isOperator && operatorInfo) return operatorInfo.ownerId;
+  return user?.id ?? null;
 }

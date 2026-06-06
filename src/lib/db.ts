@@ -351,6 +351,28 @@ export const db = {
     await supabase.from('restaurant_tables').delete().eq('id', id);
   },
 
+  async getOperatorByEmail(email: string): Promise<import('./auth').OperatorInfo | null> {
+    if (!email) return null;
+    const { data: opData, error } = await supabase
+      .from('operators')
+      .select('owner_id, role, name')
+      .eq('email', email.toLowerCase())
+      .eq('active', true)
+      .maybeSingle();
+    if (error || !opData) return null;
+    const { data: settingsData } = await supabase
+      .from('restaurant_settings')
+      .select('name')
+      .eq('user_id', opData.owner_id)
+      .maybeSingle();
+    return {
+      ownerId: opData.owner_id,
+      role: opData.role as 'admin' | 'waiter' | 'cashier',
+      restaurantName: (settingsData as { name: string } | null)?.name || 'Restaurante',
+      operatorName: opData.name,
+    };
+  },
+
   // ---- Operators ----
   async getOperators(ownerId: string): Promise<Operator[]> {
     const { data, error } = await supabase.from('operators').select('*').eq('owner_id', ownerId).order('created_at', { ascending: true });

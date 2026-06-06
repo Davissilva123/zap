@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
-import { useAuth } from '../lib/auth';
+import { useAuth, useRestaurantId } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import type { Category, MenuItem } from '../lib/types';
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, X, ImagePlus, Loader2, ChevronDown, Settings2 } from 'lucide-react';
@@ -8,6 +8,7 @@ import ItemGroupsEditor from '../components/ItemGroupsEditor';
 
 export default function MenuPage() {
   const { user } = useAuth();
+  const restaurantId = useRestaurantId();
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [search, setSearch] = useState('');
@@ -22,13 +23,13 @@ export default function MenuPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
-    if (!user) return;
-    const [cats, its] = await Promise.all([db.getCategories(user.id), db.getMenuItems(user.id)]);
+    if (!restaurantId) return;
+    const [cats, its] = await Promise.all([db.getCategories(restaurantId), db.getMenuItems(restaurantId)]);
     setCategories(cats);
     setItems(its);
   };
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [restaurantId]);
   if (!user) return null;
 
   const filtered = items.filter(i => {
@@ -78,7 +79,7 @@ export default function MenuPage() {
       }
       const data = { name: form.name.trim(), description: form.description.trim(), price: parseFloat(form.price), emoji: form.emoji, imageUrl, categoryId: form.categoryId, available: form.available };
       if (editItem) await db.updateMenuItem(editItem.id, data);
-      else await db.addMenuItem(user.id, data);
+      else if (restaurantId) await db.addMenuItem(restaurantId, data);
       setShowModal(false);
       load();
     } finally {

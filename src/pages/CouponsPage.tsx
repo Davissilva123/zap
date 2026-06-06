@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
-import { useAuth } from '../lib/auth';
+import { useAuth, useRestaurantId } from '../lib/auth';
 import type { Coupon } from '../lib/types';
 import { Plus, Trash2, ToggleLeft, ToggleRight, Tag, Copy, Check } from 'lucide-react';
 
@@ -8,21 +8,22 @@ const emptyForm = { code: '', discountType: 'percent' as 'percent' | 'fixed', di
 
 export default function CouponsPage() {
   const { user } = useAuth();
+  const restaurantId = useRestaurantId();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
-  const load = () => { if (user) db.getCoupons(user.id).then(setCoupons); };
-  useEffect(() => { load(); }, [user]);
+  const load = () => { if (restaurantId) db.getCoupons(restaurantId).then(setCoupons); };
+  useEffect(() => { load(); }, [restaurantId]);
   if (!user) return null;
 
   const save = async () => {
-    if (!form.code.trim() || !form.discountValue) return;
+    if (!form.code.trim() || !form.discountValue || !restaurantId) return;
     setSaving(true);
     try {
-      await db.addCoupon(user.id, {
+      await db.addCoupon(restaurantId, {
         code: form.code,
         discountType: form.discountType,
         discountValue: parseFloat(form.discountValue),
