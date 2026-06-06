@@ -149,7 +149,7 @@ export const db = {
   },
 
   async addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<Order> {
-    const row: Record<string, unknown> = {
+    const baseRow: Record<string, unknown> = {
       user_id: order.userId,
       items: order.items, total: order.total, status: order.status,
       customer_name: order.customerName, customer_phone: order.customerPhone,
@@ -157,9 +157,14 @@ export const db = {
       delivery_type: order.deliveryType, pix_tx_id: order.pixTxId,
       pix_qr_code: order.pixQrCode, pix_copy_paste: order.pixCopyPaste, paid_at: order.paidAt,
     };
-    // Only include customer_user_id after supabase-customer-setup.sql has been run
-    if (order.customerUserId) row.customer_user_id = order.customerUserId;
+    const row = order.customerUserId ? { ...baseRow, customer_user_id: order.customerUserId } : baseRow;
     const { data, error } = await supabase.from('orders').insert(row).select().single();
+    // If the column doesn't exist yet (migration not run), retry without it
+    if (error?.message?.includes('customer_user_id')) {
+      const { data: d2, error: e2 } = await supabase.from('orders').insert(baseRow).select().single();
+      if (e2) throw new Error(e2.message || JSON.stringify(e2));
+      return toOrder(d2 as OrderRow);
+    }
     if (error) throw new Error(error.message || JSON.stringify(error));
     return toOrder(data as OrderRow);
   },
