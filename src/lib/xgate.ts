@@ -71,10 +71,12 @@ export async function createOrder(
   paymentMethod: PaymentMethod,
   deliveryType: 'pickup' | 'delivery',
   deliveryAddress: DeliveryAddress | null,
-  pixResult: PixChargeResult | null
+  pixResult: PixChargeResult | null,
+  customerUserId?: string
 ): Promise<Order> {
   return db.addOrder({
     userId,
+    customerUserId,
     items,
     total,
     status: paymentMethod === 'cash' ? 'PAID' : 'PENDING',

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
+import { CustomerAuthProvider } from './lib/customerAuth';
 import LoginPage from './pages/LoginPage';
 import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
@@ -9,6 +10,7 @@ import OrdersPage from './pages/OrdersPage';
 import QRCodePage from './pages/QRCodePage';
 import SettingsPage from './pages/SettingsPage';
 import PublicMenuPage from './pages/PublicMenuPage';
+import CustomerPortalPage from './pages/CustomerPortalPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -39,7 +41,15 @@ export default function App() {
             <Route path="qrcode" element={<QRCodePage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
-          <Route path="/m/:slug" element={<PublicMenuPage />} />
+          {/* Public customer routes share the customer auth context */}
+          <Route path="/m/:slug/*" element={
+            <CustomerAuthProvider>
+              <Routes>
+                <Route index element={<PublicMenuPage />} />
+                <Route path="conta" element={<CustomerPortalPage />} />
+              </Routes>
+            </CustomerAuthProvider>
+          } />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

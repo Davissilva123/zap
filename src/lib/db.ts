@@ -12,7 +12,7 @@ interface SettingsRow {
 interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; created_at: string; }
 interface MenuItemRow { id: string; user_id: string; category_id: string; name: string; description: string; emoji: string; image_url: string; price: number; available: boolean; order: number; created_at: string; }
 interface ScanRow { id: string; user_id: string; scanned_at: string; }
-interface OrderRow { id: string; user_id: string; items: OrderItem[]; total: number; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; created_at: string; paid_at: string | null; }
+interface OrderRow { id: string; user_id: string; customer_user_id: string | null; items: OrderItem[]; total: number; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; created_at: string; paid_at: string | null; }
 
 // ---- Mappers ----
 function toSettings(r: SettingsRow): RestaurantSettings {
@@ -21,7 +21,7 @@ function toSettings(r: SettingsRow): RestaurantSettings {
 function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, createdAt: r.created_at }; }
 function toMenuItem(r: MenuItemRow): MenuItem { return { id: r.id, userId: r.user_id, categoryId: r.category_id, name: r.name, description: r.description, emoji: r.emoji, imageUrl: r.image_url ?? '', price: Number(r.price), available: r.available, order: r.order, createdAt: r.created_at }; }
 function toScan(r: ScanRow): Scan { return { id: r.id, userId: r.user_id, scannedAt: r.scanned_at }; }
-function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, items: r.items, total: Number(r.total), status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as 'pickup' | 'delivery', pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, createdAt: r.created_at, paidAt: r.paid_at }; }
+function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, customerUserId: r.customer_user_id ?? undefined, items: r.items, total: Number(r.total), status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as 'pickup' | 'delivery', pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, createdAt: r.created_at, paidAt: r.paid_at }; }
 
 export const db = {
   // ---- Settings ----
@@ -150,7 +150,8 @@ export const db = {
 
   async addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<Order> {
     const { data, error } = await supabase.from('orders').insert({
-      user_id: order.userId, items: order.items, total: order.total, status: order.status,
+      user_id: order.userId, customer_user_id: order.customerUserId ?? null,
+      items: order.items, total: order.total, status: order.status,
       customer_name: order.customerName, customer_phone: order.customerPhone,
       payment_method: order.paymentMethod, delivery_address: order.deliveryAddress,
       delivery_type: order.deliveryType, pix_tx_id: order.pixTxId,

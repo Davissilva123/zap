@@ -1,16 +1,19 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../lib/db';
 import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS } from '../lib/xgate';
+import { useCustomerAuth } from '../lib/customerAuth';
 import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress } from '../lib/types';
-import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart } from 'lucide-react';
+import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff } from 'lucide-react';
 
 interface CartItem extends OrderItem { categoryId: string; }
-type CheckoutStep = 'cart' | 'delivery' | 'payment' | 'paying' | 'pix' | 'success' | 'error' | 'no-xgate' | 'no-methods' | 'order_placed';
+type CheckoutStep = 'cart' | 'auth' | 'delivery' | 'payment' | 'paying' | 'pix' | 'success' | 'error' | 'no-xgate' | 'no-methods' | 'order_placed';
 const emptyAddress: DeliveryAddress = { street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zip: '' };
 
 export default function PublicMenuPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const { customer, signIn, signUp } = useCustomerAuth();
   const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -34,6 +37,16 @@ export default function PublicMenuPage() {
   const [cashChange, setCashChange] = useState('');
   const catBarRef = useRef<HTMLDivElement>(null);
 
+  // Customer auth form state
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authPhone, setAuthPhone] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   useEffect(() => {
     if (!slug) return;
     const load = async () => {
@@ -47,6 +60,12 @@ export default function PublicMenuPage() {
     };
     load();
   }, [slug]);
+
+  // Pre-fill name/phone from customer account
+  useEffect(() => {
+    if (customer?.user_metadata?.name) setCustomerName(customer.user_metadata.name);
+    if (customer?.user_metadata?.phone) setCustomerPhone(customer.user_metadata.phone);
+  }, [customer]);
 
   const cartTotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
@@ -87,7 +106,7 @@ export default function PublicMenuPage() {
       try {
         const txId = `cardapio_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
         const result = await createPixCharge(settings.xgateEmail, settings.xgatePassword, cartTotal, txId, customerName.trim());
-        await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, deliveryType === 'delivery' ? address : null, result);
+        await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, deliveryType === 'delivery' ? address : null, result, customer?.id);
         setPixCopyPaste(result.pixCopyPaste);
         setPixQrCode(result.qrCodeImage || result.qrCode);
         setPixTxId(result.txId);
@@ -100,7 +119,7 @@ export default function PublicMenuPage() {
       }
       return;
     }
-    await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, deliveryType === 'delivery' ? address : null, null);
+    await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, deliveryType === 'delivery' ? address : null, null, customer?.id);
     setStep('order_placed');
   }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address]);
 
@@ -121,6 +140,40 @@ export default function PublicMenuPage() {
     setCart([]); setShowCart(false); setStep('cart'); setCustomerName(''); setCustomerPhone('');
     setAddress(emptyAddress); setSelectedPayment(''); setDeliveryType('pickup');
     setPixCopyPaste(''); setPixQrCode(''); setPixTxId(''); setCashChange('');
+  };
+
+  const handleAuthSubmit = async () => {
+    setAuthError('');
+    if (!authEmail.trim() || !authPassword.trim()) { setAuthError('Preencha e-mail e senha'); return; }
+    if (authMode === 'register' && !authName.trim()) { setAuthError('Informe seu nome'); return; }
+    setAuthLoading(true);
+    try {
+      const result = authMode === 'login'
+        ? await signIn(authEmail, authPassword)
+        : await signUp(authEmail, authPassword, authName.trim(), authPhone.trim());
+      if (result.error) {
+        const msgs: Record<string, string> = {
+          'Invalid login credentials': 'E-mail ou senha incorretos',
+          'User already registered': 'E-mail já cadastrado. Faça login.',
+          'Password should be at least 6 characters': 'Senha deve ter pelo menos 6 caracteres',
+          'Email not confirmed': 'Confirme seu e-mail antes de entrar',
+        };
+        setAuthError(msgs[result.error] || result.error);
+        return;
+      }
+      if (authMode === 'register') {
+        setAuthError('');
+        // Supabase may require email confirmation; inform user
+        // But if auto-confirm is on, user is already logged in
+        setAuthError('Cadastro realizado! Se solicitado, confirme seu e-mail e então faça login.');
+        setAuthMode('login');
+        return;
+      }
+      // Login OK — proceed to delivery
+      setStep('delivery');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const formatAddress = (a: DeliveryAddress) => {
@@ -193,6 +246,27 @@ export default function PublicMenuPage() {
         )}
 
         <div className="relative max-w-xl mx-auto px-5 pt-12 pb-20">
+          {/* Customer account button */}
+          <div className="absolute top-3 right-5">
+            {customer ? (
+              <button
+                onClick={() => navigate(`/m/${slug}/conta`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/30 transition-colors"
+              >
+                <User className="w-3.5 h-3.5" />
+                Meus pedidos
+              </button>
+            ) : (
+              <button
+                onClick={() => { setShowCart(true); setStep('auth'); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/30 transition-colors"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                Entrar
+              </button>
+            )}
+          </div>
+
           <div className="flex items-center gap-5">
             {settings.logoUrl ? (
               <img src={settings.logoUrl} alt={settings.name} className="w-20 h-20 rounded-2xl object-cover shadow-xl ring-4 ring-white/25 flex-shrink-0" />
@@ -399,9 +473,9 @@ export default function PublicMenuPage() {
 
             {/* Header */}
             <div className="flex items-center gap-3 px-5 pt-3 pb-4 flex-shrink-0">
-              {['delivery', 'payment'].includes(step) && (
+              {['auth', 'delivery', 'payment'].includes(step) && (
                 <button
-                  onClick={() => setStep(step === 'payment' ? 'delivery' : 'cart')}
+                  onClick={() => setStep(step === 'payment' ? 'delivery' : step === 'delivery' ? (customer ? 'cart' : 'auth') : 'cart')}
                   className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0"
                 >
                   <ArrowLeft className="w-4 h-4 text-slate-600" />
@@ -410,6 +484,7 @@ export default function PublicMenuPage() {
               <div className="flex-1">
                 <h3 className="font-extrabold text-slate-900 text-lg leading-tight">
                   {step === 'cart' && 'Meu Pedido'}
+                  {step === 'auth' && 'Entre ou Cadastre-se'}
                   {step === 'delivery' && 'Informações'}
                   {step === 'payment' && 'Pagamento'}
                   {step === 'paying' && 'Aguarde...'}
@@ -424,7 +499,7 @@ export default function PublicMenuPage() {
                   <p className="text-xs text-slate-400 font-medium mt-0.5">{cartCount} {cartCount === 1 ? 'item' : 'itens'} selecionados</p>
                 )}
               </div>
-              {(step === 'cart' || ['success', 'order_placed', 'error', 'no-xgate', 'no-methods'].includes(step)) && (
+              {(['cart', 'auth'].includes(step) || ['success', 'order_placed', 'error', 'no-xgate', 'no-methods'].includes(step)) && (
                 <button
                   onClick={() => ['success', 'order_placed', 'error', 'no-xgate', 'no-methods'].includes(step) ? closeAndReset() : setShowCart(false)}
                   className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0"
@@ -435,11 +510,12 @@ export default function PublicMenuPage() {
             </div>
 
             {/* Step progress */}
-            {['cart', 'delivery', 'payment'].includes(step) && (
+            {['cart', 'auth', 'delivery', 'payment'].includes(step) && (
               <div className="px-5 pb-4 flex-shrink-0">
                 <div className="flex items-center gap-0">
-                  {(['cart', 'delivery', 'payment'] as const).map((s, i) => {
-                    const idx = ['cart', 'delivery', 'payment'].indexOf(step);
+                  {(['cart', 'auth', 'delivery', 'payment'] as const).map((s, i) => {
+                    const allSteps = ['cart', 'auth', 'delivery', 'payment'];
+                    const idx = allSteps.indexOf(step);
                     const done = i < idx;
                     const active = step === s;
                     return (
@@ -465,8 +541,8 @@ export default function PublicMenuPage() {
                   })}
                 </div>
                 <div className="flex justify-between mt-1.5 px-0.5">
-                  {['Pedido', 'Dados', 'Pagamento'].map((l, i) => {
-                    const idx = ['cart', 'delivery', 'payment'].indexOf(step);
+                  {['Pedido', 'Conta', 'Dados', 'Pgto'].map((l, i) => {
+                    const idx = ['cart', 'auth', 'delivery', 'payment'].indexOf(step);
                     return <span key={l} className="text-[10px] font-semibold" style={{ color: i <= idx ? accent : '#cbd5e1' }}>{l}</span>;
                   })}
                 </div>
@@ -521,6 +597,97 @@ export default function PublicMenuPage() {
                         </div>
                       ))}
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── STEP: AUTH ── */}
+              {step === 'auth' && (
+                <div className="px-5 py-5 space-y-5">
+                  {/* Already logged in banner */}
+                  {customer ? (
+                    <div className="flex flex-col items-center py-6 text-center gap-3">
+                      <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ backgroundColor: accent + '20' }}>
+                        <User className="w-7 h-7" style={{ color: accent }} />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900">{customer.user_metadata?.name || customer.email}</p>
+                        <p className="text-sm text-slate-400 mt-0.5">{customer.email}</p>
+                      </div>
+                      <p className="text-sm text-slate-500">Você já está conectado. Clique em continuar.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Login / Register tabs */}
+                      <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-2xl">
+                        {(['login', 'register'] as const).map(mode => (
+                          <button
+                            key={mode}
+                            onClick={() => { setAuthMode(mode); setAuthError(''); }}
+                            className="py-2.5 rounded-xl text-sm font-bold transition-all duration-200"
+                            style={authMode === mode
+                              ? { backgroundColor: '#fff', color: accent, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }
+                              : { color: '#94a3b8' }}
+                          >
+                            {mode === 'login' ? 'Entrar' : 'Cadastrar'}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="space-y-3">
+                        {authMode === 'register' && (
+                          <>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nome *</label>
+                              <input
+                                type="text" value={authName} onChange={e => setAuthName(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium bg-slate-50 placeholder:text-slate-300 focus:outline-none focus:border-slate-400"
+                                placeholder="Seu nome completo"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Telefone</label>
+                              <input
+                                type="tel" value={authPhone} onChange={e => setAuthPhone(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium bg-slate-50 placeholder:text-slate-300 focus:outline-none focus:border-slate-400"
+                                placeholder="(11) 99999-0000"
+                              />
+                            </div>
+                          </>
+                        )}
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">E-mail *</label>
+                          <input
+                            type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium bg-slate-50 placeholder:text-slate-300 focus:outline-none focus:border-slate-400"
+                            placeholder="seu@email.com"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Senha *</label>
+                          <div className="relative">
+                            <input
+                              type={showPassword ? 'text' : 'password'} value={authPassword} onChange={e => setAuthPassword(e.target.value)}
+                              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium bg-slate-50 placeholder:text-slate-300 focus:outline-none focus:border-slate-400 pr-10"
+                              placeholder={authMode === 'register' ? 'Mín. 6 caracteres' : '••••••••'}
+                              onKeyDown={e => { if (e.key === 'Enter') handleAuthSubmit(); }}
+                            />
+                            <button
+                              type="button" onClick={() => setShowPassword(s => !s)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {authError && (
+                        <div className="flex items-start gap-2 bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100 font-medium">
+                          <X className="w-4 h-4 flex-shrink-0 mt-0.5" /> {authError}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
@@ -732,18 +899,27 @@ export default function PublicMenuPage() {
 
               {/* ── STEP: SUCCESS ── */}
               {step === 'success' && (
-                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
                   <div className="w-24 h-24 rounded-full bg-emerald-500 flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/30">
                     <Check className="w-12 h-12 text-white" strokeWidth={3} />
                   </div>
                   <h3 className="text-2xl font-extrabold text-slate-900">Pago!</h3>
                   <p className="text-slate-400 mt-2 leading-relaxed">Seu pedido foi confirmado e está sendo preparado. Obrigado!</p>
+                  {customer && (
+                    <button
+                      onClick={() => { closeAndReset(); navigate(`/m/${slug}/conta`); }}
+                      className="mt-5 px-5 py-2.5 rounded-2xl text-sm font-bold text-white"
+                      style={{ backgroundColor: accent }}
+                    >
+                      Acompanhar pedido
+                    </button>
+                  )}
                 </div>
               )}
 
               {/* ── STEP: ORDER PLACED ── */}
               {step === 'order_placed' && (
-                <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
                   <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-lg" style={{ backgroundColor: accent, boxShadow: `0 10px 40px ${accent}40` }}>
                     <Check className="w-12 h-12 text-white" strokeWidth={3} />
                   </div>
@@ -755,6 +931,15 @@ export default function PublicMenuPage() {
                       ? `Apresente o vale-refeição na ${deliveryType === 'delivery' ? 'entrega' : 'retirada'}.`
                       : `Pague com cartão na ${deliveryType === 'delivery' ? 'entrega' : 'retirada'}.`}
                   </p>
+                  {customer && (
+                    <button
+                      onClick={() => { closeAndReset(); navigate(`/m/${slug}/conta`); }}
+                      className="mt-5 px-5 py-2.5 rounded-2xl text-sm font-bold text-white"
+                      style={{ backgroundColor: accent }}
+                    >
+                      Acompanhar pedido
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -804,13 +989,35 @@ export default function PublicMenuPage() {
                     </span>
                   </div>
                   <button
-                    onClick={() => setStep('delivery')}
+                    onClick={() => setStep(customer ? 'delivery' : 'auth')}
                     className="w-full py-4 rounded-2xl text-white font-extrabold text-base active:scale-[0.98] transition-transform shadow-lg"
                     style={{ backgroundColor: accent, boxShadow: `0 8px 24px ${accent}40` }}
                   >
                     Continuar
                   </button>
                 </>
+              )}
+
+              {step === 'auth' && (
+                customer ? (
+                  <button
+                    onClick={() => setStep('delivery')}
+                    className="w-full py-4 rounded-2xl text-white font-extrabold text-base active:scale-[0.98] transition-transform shadow-lg"
+                    style={{ backgroundColor: accent, boxShadow: `0 8px 24px ${accent}40` }}
+                  >
+                    Continuar
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleAuthSubmit}
+                    disabled={authLoading}
+                    className="w-full py-4 rounded-2xl text-white font-extrabold text-base active:scale-[0.98] transition-transform shadow-lg disabled:opacity-60 flex items-center justify-center gap-2"
+                    style={{ backgroundColor: accent, boxShadow: `0 8px 24px ${accent}40` }}
+                  >
+                    {authLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+                    {authLoading ? 'Aguarde...' : authMode === 'login' ? 'Entrar' : 'Criar conta'}
+                  </button>
+                )
               )}
 
               {step === 'delivery' && (

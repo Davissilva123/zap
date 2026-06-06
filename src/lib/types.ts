@@ -76,6 +76,7 @@ export interface DeliveryAddress {
 export interface Order {
   id: string;
   userId: string;
+  customerUserId?: string;
   items: OrderItem[];
   total: number;
   status: 'PENDING' | 'PAID' | 'CANCELLED' | 'PREPARING' | 'DELIVERING' | 'COMPLETED';
