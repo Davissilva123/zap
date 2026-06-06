@@ -254,8 +254,8 @@ export const db = {
       customer_name: order.customerName, customer_phone: order.customerPhone,
       payment_method: order.paymentMethod, delivery_address: order.deliveryAddress,
       delivery_type: order.deliveryType, table_name: order.tableName ?? null,
-      pix_tx_id: order.pixTxId,
-      pix_qr_code: order.pixQrCode, pix_copy_paste: order.pixCopyPaste, paid_at: order.paidAt,
+      pix_tx_id: order.pixTxId ?? '',
+      pix_qr_code: order.pixQrCode ?? '', pix_copy_paste: order.pixCopyPaste ?? '', paid_at: order.paidAt,
     };
     const row = order.customerUserId ? { ...baseRow, customer_user_id: order.customerUserId } : baseRow;
     const { data, error } = await supabase.from('orders').insert(row).select().single();
@@ -268,12 +268,14 @@ export const db = {
     return toOrder(data as OrderRow);
   },
 
-  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt' | 'rating' | 'ratingComment'>>): Promise<void> {
+  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt' | 'rating' | 'ratingComment' | 'items' | 'total'>>): Promise<void> {
     const row: Record<string, unknown> = {};
     if (updates.status !== undefined) row.status = updates.status;
     if (updates.paidAt !== undefined) row.paid_at = updates.paidAt;
     if (updates.rating !== undefined) row.rating = updates.rating;
     if (updates.ratingComment !== undefined) row.rating_comment = updates.ratingComment;
+    if (updates.items !== undefined) row.items = updates.items;
+    if (updates.total !== undefined) row.total = updates.total;
     await supabase.from('orders').update(row).eq('id', id);
   },
 
