@@ -43,12 +43,15 @@ function OrderCard({ order, updating, onAction, actionLabel, actionColor, border
       <div className={`${headerColor} px-4 py-3 flex items-start justify-between gap-2`}>
         <div className="min-w-0">
           <p className="font-bold text-slate-900 text-base leading-tight truncate">{order.customerName}</p>
-          <p className="text-slate-600 text-xs mt-0.5 flex items-center gap-1">
+          <p className="text-slate-600 text-xs mt-0.5 flex items-center gap-1 flex-wrap">
             {order.deliveryType === 'delivery' ? <Truck className="w-3 h-3 flex-shrink-0" /> :
              order.deliveryType === 'table' ? <LayoutGrid className="w-3 h-3 flex-shrink-0" /> :
              <ShoppingBag className="w-3 h-3 flex-shrink-0" />}
             {order.deliveryType === 'delivery' ? 'Delivery' :
              order.deliveryType === 'table' ? `Mesa ${order.tableName}` : 'Retirada'}
+            {order.status === 'PAID' && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 font-bold text-[10px]">✓ Pago</span>
+            )}
             {order.scheduledFor && (
               <span className="ml-1 font-semibold text-violet-600">
                 · Agendado {new Date(order.scheduledFor).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -116,7 +119,7 @@ export default function KitchenPage() {
     const [all, st] = await Promise.all([db.getOrders(restaurantId), db.getSettings(restaurantId)]);
     const since = new Date(Date.now() - 86400000).toISOString();
     setOrders(all.filter(o =>
-      (o.status === 'PENDING' || o.status === 'PREPARING') && o.createdAt >= since
+      (o.status === 'PENDING' || o.status === 'PAID' || o.status === 'PREPARING') && o.createdAt >= since
     ));
     setSettings(st);
     setLoading(false);
@@ -156,7 +159,7 @@ export default function KitchenPage() {
     setUpdating(null);
   };
 
-  const pending = orders.filter(o => o.status === 'PENDING').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const pending = orders.filter(o => o.status === 'PENDING' || o.status === 'PAID').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const preparing = orders.filter(o => o.status === 'PREPARING').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   // Estimated wait: base delivery time + queue pressure
