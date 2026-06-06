@@ -176,4 +176,5 @@ export interface Operator {
   active: boolean;
   notes: string;
   createdAt: string;
+  userId?: string | null;
 }
