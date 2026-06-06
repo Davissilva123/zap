@@ -33,10 +33,16 @@ function toUser(su: SupabaseUser): User {
   };
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 async function detectAndSetup(su: SupabaseUser): Promise<{ isOperator: boolean; operatorInfo: OperatorInfo | null }> {
   const opInfo = await db.getOperatorByEmail(su.email ?? '');
   if (opInfo) {
-    // Link user_id to operator record if not yet set
     await supabase
       .from('operators')
       .update({ user_id: su.id })
@@ -44,9 +50,19 @@ async function detectAndSetup(su: SupabaseUser): Promise<{ isOperator: boolean; 
       .is('user_id', null);
     return { isOperator: true, operatorInfo: opInfo };
   }
-  // Owner flow
   await db.ensureSettings(su.id, (su.user_metadata?.name as string) ?? su.email ?? '');
   return { isOperator: false, operatorInfo: null };
+}
+
+const FALLBACK = { isOperator: false, operatorInfo: null };
+
+async function safeDetectAndSetup(su: SupabaseUser) {
+  try {
+    return await withTimeout(detectAndSetup(su), 6000, FALLBACK);
+  } catch (err) {
+    console.error('[Auth] detectAndSetup error:', err);
+    return FALLBACK;
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -56,18 +72,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [operatorInfo, setOperatorInfo] = useState<OperatorInfo | null>(null);
 
   useEffect(() => {
+    // Safety net: always clear loading after 8s no matter what
+    const safetyTimer = setTimeout(() => setLoading(false), 8000);
+
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error) console.error('[Auth] getSession error:', error);
       if (session?.user) {
         const u = toUser(session.user);
-        const { isOperator: op, operatorInfo: opInfo } = await detectAndSetup(session.user);
+        const { isOperator: op, operatorInfo: opInfo } = await safeDetectAndSetup(session.user);
         setIsOperator(op);
         setOperatorInfo(opInfo);
         setUser(u);
       }
+      clearTimeout(safetyTimer);
       setLoading(false);
     }).catch(err => {
       console.error('[Auth] getSession threw:', err);
+      clearTimeout(safetyTimer);
       setLoading(false);
     });
 
@@ -76,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
           const u = toUser(session.user);
-          const { isOperator: op, operatorInfo: opInfo } = await detectAndSetup(session.user);
+          const { isOperator: op, operatorInfo: opInfo } = await safeDetectAndSetup(session.user);
           setIsOperator(op);
           setOperatorInfo(opInfo);
           setUser(u);
@@ -91,7 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('[Auth] onAuthStateChange threw:', err);
     }
 
-    return () => subscription?.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<string | null> => {
