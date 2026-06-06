@@ -955,7 +955,7 @@ export default function PublicMenuPage() {
                   <div className="w-24 h-24 rounded-full bg-red-500 flex items-center justify-center mb-6 shadow-lg shadow-red-500/30">
                     <X className="w-12 h-12 text-white" strokeWidth={3} />
                   </div>
-                  <h3 className="text-2xl font-extrabold text-slate-900">Erro no PIX</h3>
+                  <h3 className="text-2xl font-extrabold text-slate-900">Erro ao processar pedido</h3>
                   <p className="text-red-400 mt-2 text-sm">{errorMsg}</p>
                 </div>
               )}

@@ -160,7 +160,7 @@ export const db = {
     // Only include customer_user_id after supabase-customer-setup.sql has been run
     if (order.customerUserId) row.customer_user_id = order.customerUserId;
     const { data, error } = await supabase.from('orders').insert(row).select().single();
-    if (error) throw error;
+    if (error) throw new Error(error.message || JSON.stringify(error));
     return toOrder(data as OrderRow);
   },
 
