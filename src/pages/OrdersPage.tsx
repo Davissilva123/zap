@@ -221,7 +221,7 @@ export default function OrdersPage() {
             const canCancel = order.status !== 'CANCELLED' && order.status !== 'COMPLETED';
             return (
               <div key={order.id} className="card-hover">
-                <div className="flex items-center gap-4 p-4">
+                <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 flex-wrap sm:flex-nowrap">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
                     <cfg.icon className={`w-5 h-5 ${cfg.color}`} />
                   </div>
@@ -245,7 +245,7 @@ export default function OrdersPage() {
                       )}
                     </div>
                   </div>
-                  <span className="text-[17px] font-bold text-slate-900 tracking-tight flex-shrink-0">R$ {order.total.toFixed(2).replace('.', ',')}</span>
+                  <span className="text-sm sm:text-[17px] font-bold text-slate-900 tracking-tight flex-shrink-0 ml-auto sm:ml-0">R$ {order.total.toFixed(2).replace('.', ',')}</span>
                   {isSending && <Loader2 className="w-5 h-5 animate-spin text-emerald-500 flex-shrink-0" />}
                   {whatsappConfigured && !wasSent && !isSending && (
                     <button onClick={(e) => { e.stopPropagation(); sendManualWhatsapp(order, order.status); }} className="p-2 rounded-xl hover:bg-emerald-50 transition-colors flex-shrink-0" title="Enviar notificação WhatsApp">

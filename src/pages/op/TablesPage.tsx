@@ -210,9 +210,9 @@ export default function OpTablesPage() {
           </div>
         )}
 
-        <div className="flex gap-5 items-start">
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
           {/* Left: categories + items */}
-          <div className="flex-1 min-w-0 space-y-4">
+          <div className="flex-1 min-w-0 space-y-4 w-full">
 
             {/* Existing order items */}
             {activeOrder && activeOrder.items.length > 0 && (
@@ -292,7 +292,7 @@ export default function OpTablesPage() {
           </div>
 
           {/* Right: cart + actions */}
-          <div className="w-64 flex-shrink-0 space-y-3 sticky top-4">
+          <div className="w-full lg:w-64 lg:flex-shrink-0 space-y-3 lg:sticky lg:top-4">
             {/* New items cart */}
             <div className="card p-4 space-y-3">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">

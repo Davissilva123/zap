@@ -178,7 +178,7 @@ export default function OperatorsPage() {
 
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Função *</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {ROLES.map(r => (
                 <button
                   key={r.value}

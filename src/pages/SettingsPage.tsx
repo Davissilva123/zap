@@ -174,15 +174,15 @@ export default function SettingsPage() {
       <SectionCard icon={Link2} title="URL do cardápio" description="Endereço público do seu cardápio">
         <div>
           <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Slug</label>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400 whitespace-nowrap shrink-0">{window.location.origin}/m/</span>
-            <input type="text" value={form.slug} onChange={e => setForm(f => ({ ...f!, slug: e.target.value }))} className="input-field" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <span className="text-xs text-slate-400 shrink-0 truncate max-w-full">{window.location.origin}/m/</span>
+            <input type="text" value={form.slug} onChange={e => setForm(f => ({ ...f!, slug: e.target.value }))} className="input-field w-full" />
           </div>
         </div>
       </SectionCard>
 
       <SectionCard icon={Palette} title="Cor de destaque" description="Usada no cardápio público e QR Code">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {accentColors.map(c => (
             <button
               key={c.value}

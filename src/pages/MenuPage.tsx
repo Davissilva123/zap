@@ -133,8 +133,8 @@ export default function MenuPage() {
             <div className="card overflow-hidden divide-y divide-slate-100">
               {catItems.map(item => (
                 <div key={item.id} className={`group ${!item.available ? 'opacity-60' : ''}`}>
-                  <div className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors">
-                    <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0 overflow-hidden">
+                  <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 hover:bg-slate-50 transition-colors">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0 overflow-hidden">
                       {item.imageUrl
                         ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                         : item.emoji}
@@ -145,13 +145,14 @@ export default function MenuPage() {
                         {!item.available && <span className="badge bg-red-50 text-red-600 text-[10px] py-0.5 font-bold">Esgotado</span>}
                       </div>
                       <p className="text-xs text-slate-400 truncate mt-0.5">{item.description}</p>
+                      <span className="sm:hidden text-xs font-bold text-emerald-600 mt-0.5">R$ {item.price.toFixed(2).replace('.', ',')}</span>
                     </div>
-                    <span className="text-base font-bold text-emerald-600 flex-shrink-0">R$ {item.price.toFixed(2).replace('.', ',')}</span>
+                    <span className="hidden sm:block text-base font-bold text-emerald-600 flex-shrink-0">R$ {item.price.toFixed(2).replace('.', ',')}</span>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
                       <button onClick={() => toggleAvailable(item)} title={item.available ? 'Marcar como Esgotado' : 'Marcar como Disponível'}
                         className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${item.available ? 'hover:bg-slate-100 text-slate-500' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}>
                         {item.available ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-red-400" />}
-                        {item.available ? 'Disponível' : 'Esgotado'}
+                        <span className="hidden sm:inline">{item.available ? 'Disponível' : 'Esgotado'}</span>
                       </button>
                       <button onClick={() => setShowGroupsFor(showGroupsFor === item.id ? null : item.id)} title="Adicionais/Complementos" className={`p-2 rounded-lg hover:bg-slate-100 transition-colors ${showGroupsFor === item.id ? 'bg-emerald-50' : ''}`}>
                         <Settings2 className={`w-4 h-4 ${showGroupsFor === item.id ? 'text-emerald-500' : 'text-slate-400'}`} />
