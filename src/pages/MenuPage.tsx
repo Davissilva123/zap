@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
+import { uploadImage } from '../lib/upload';
 import type { Category, MenuItem } from '../lib/types';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, X, ImagePlus, Loader2 } from 'lucide-react';
 
 export default function MenuPage() {
   const { user } = useAuth();
@@ -12,7 +13,11 @@ export default function MenuPage() {
   const [filterCat, setFilterCat] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
-  const [form, setForm] = useState({ name: '', description: '', price: '', emoji: '🍽️', categoryId: '', available: true });
+  const [form, setForm] = useState({ name: '', description: '', price: '', emoji: '🍽️', categoryId: '', available: true, imageUrl: '' });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     if (!user) return;
@@ -32,23 +37,51 @@ export default function MenuPage() {
 
   const openAdd = () => {
     setEditItem(null);
-    setForm({ name: '', description: '', price: '', emoji: '🍽️', categoryId: categories[0]?.id || '', available: true });
+    setForm({ name: '', description: '', price: '', emoji: '🍽️', categoryId: categories[0]?.id || '', available: true, imageUrl: '' });
+    setImageFile(null);
+    setImagePreview('');
     setShowModal(true);
   };
 
   const openEdit = (item: MenuItem) => {
     setEditItem(item);
-    setForm({ name: item.name, description: item.description, price: String(item.price), emoji: item.emoji, categoryId: item.categoryId, available: item.available });
+    setForm({ name: item.name, description: item.description, price: String(item.price), emoji: item.emoji, categoryId: item.categoryId, available: item.available, imageUrl: item.imageUrl || '' });
+    setImageFile(null);
+    setImagePreview(item.imageUrl || '');
     setShowModal(true);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview('');
+    setForm(f => ({ ...f, imageUrl: '' }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const save = async () => {
     if (!form.name.trim() || !form.price) return;
-    const data = { name: form.name.trim(), description: form.description.trim(), price: parseFloat(form.price), emoji: form.emoji, categoryId: form.categoryId, available: form.available };
-    if (editItem) await db.updateMenuItem(editItem.id, data);
-    else await db.addMenuItem(user.id, data);
-    setShowModal(false);
-    load();
+    setUploading(true);
+    try {
+      let imageUrl = form.imageUrl;
+      if (imageFile) {
+        const uploaded = await uploadImage(imageFile, 'items');
+        if (uploaded) imageUrl = uploaded;
+      }
+      const data = { name: form.name.trim(), description: form.description.trim(), price: parseFloat(form.price), emoji: form.emoji, imageUrl, categoryId: form.categoryId, available: form.available };
+      if (editItem) await db.updateMenuItem(editItem.id, data);
+      else await db.addMenuItem(user.id, data);
+      setShowModal(false);
+      load();
+    } finally {
+      setUploading(false);
+    }
   };
 
   const toggleAvailable = async (item: MenuItem) => {
@@ -97,7 +130,11 @@ export default function MenuPage() {
             <div className="card overflow-hidden divide-y divide-slate-100">
               {catItems.map(item => (
                 <div key={item.id} className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors group ${!item.available ? 'opacity-50' : ''}`}>
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">{item.emoji}</div>
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0 overflow-hidden">
+                    {item.imageUrl
+                      ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                      : item.emoji}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
@@ -147,6 +184,25 @@ export default function MenuPage() {
               </button>
             </div>
             <div className="px-6 py-5 space-y-4">
+              {/* Image upload */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Foto do Produto</label>
+                {imagePreview ? (
+                  <div className="relative w-full h-40 rounded-xl overflow-hidden bg-slate-100">
+                    <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+                    <button onClick={removeImage} className="absolute top-2 right-2 p-1.5 bg-black/50 rounded-lg text-white hover:bg-black/70 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-emerald-300 hover:text-emerald-500 transition-colors">
+                    <ImagePlus className="w-6 h-6" />
+                    <span className="text-[13px] font-medium">Clique para adicionar foto</span>
+                  </button>
+                )}
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+              </div>
+
               <div className="flex gap-3">
                 <div className="w-16">
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Emoji</label>
@@ -182,8 +238,8 @@ export default function MenuPage() {
               </label>
             </div>
             <div className="px-6 pb-5">
-              <button onClick={save} className="btn-primary w-full py-3">
-                {editItem ? 'Salvar alterações' : 'Adicionar item'}
+              <button onClick={save} disabled={uploading} className="btn-primary w-full py-3 disabled:opacity-60">
+                {uploading ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</> : editItem ? 'Salvar alterações' : 'Adicionar item'}
               </button>
             </div>
           </div>

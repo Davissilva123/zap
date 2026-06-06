@@ -23,6 +23,7 @@ export interface MenuItem {
   description: string;
   price: number;
   emoji: string;
+  imageUrl: string;
   available: boolean;
   order: number;
   createdAt: string;
@@ -45,6 +46,7 @@ export interface RestaurantSettings {
   address: string;
   phone: string;
   logoUrl: string;
+  coverUrl: string;
   xgateEmail: string;
   xgatePassword: string;
   paymentMethods: PaymentMethod[];

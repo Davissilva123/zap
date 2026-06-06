@@ -4,22 +4,22 @@ import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, Pa
 // ---- Supabase row shapes (snake_case) ----
 interface SettingsRow {
   user_id: string; name: string; slug: string; accent_color: string;
-  description: string; address: string; phone: string; logo_url: string;
+  description: string; address: string; phone: string; logo_url: string; cover_url: string;
   xgate_email: string; xgate_password: string; payment_methods: string[];
   whatsapp_api_token: string; whatsapp_phone_number_id: string; whatsapp_enabled: boolean;
   created_at: string;
 }
 interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; created_at: string; }
-interface MenuItemRow { id: string; user_id: string; category_id: string; name: string; description: string; emoji: string; price: number; available: boolean; order: number; created_at: string; }
+interface MenuItemRow { id: string; user_id: string; category_id: string; name: string; description: string; emoji: string; image_url: string; price: number; available: boolean; order: number; created_at: string; }
 interface ScanRow { id: string; user_id: string; scanned_at: string; }
 interface OrderRow { id: string; user_id: string; items: OrderItem[]; total: number; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; created_at: string; paid_at: string | null; }
 
 // ---- Mappers ----
 function toSettings(r: SettingsRow): RestaurantSettings {
-  return { userId: r.user_id, name: r.name, slug: r.slug, accentColor: r.accent_color, description: r.description, address: r.address, phone: r.phone, logoUrl: r.logo_url, xgateEmail: r.xgate_email, xgatePassword: r.xgate_password, paymentMethods: r.payment_methods as PaymentMethod[], whatsappApiToken: r.whatsapp_api_token, whatsappPhoneNumberId: r.whatsapp_phone_number_id, whatsappEnabled: r.whatsapp_enabled };
+  return { userId: r.user_id, name: r.name, slug: r.slug, accentColor: r.accent_color, description: r.description, address: r.address, phone: r.phone, logoUrl: r.logo_url, coverUrl: r.cover_url ?? '', xgateEmail: r.xgate_email, xgatePassword: r.xgate_password, paymentMethods: r.payment_methods as PaymentMethod[], whatsappApiToken: r.whatsapp_api_token, whatsappPhoneNumberId: r.whatsapp_phone_number_id, whatsappEnabled: r.whatsapp_enabled };
 }
 function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, createdAt: r.created_at }; }
-function toMenuItem(r: MenuItemRow): MenuItem { return { id: r.id, userId: r.user_id, categoryId: r.category_id, name: r.name, description: r.description, emoji: r.emoji, price: Number(r.price), available: r.available, order: r.order, createdAt: r.created_at }; }
+function toMenuItem(r: MenuItemRow): MenuItem { return { id: r.id, userId: r.user_id, categoryId: r.category_id, name: r.name, description: r.description, emoji: r.emoji, imageUrl: r.image_url ?? '', price: Number(r.price), available: r.available, order: r.order, createdAt: r.created_at }; }
 function toScan(r: ScanRow): Scan { return { id: r.id, userId: r.user_id, scannedAt: r.scanned_at }; }
 function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, items: r.items, total: Number(r.total), status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as 'pickup' | 'delivery', pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, createdAt: r.created_at, paidAt: r.paid_at }; }
 
@@ -28,7 +28,7 @@ export const db = {
   async ensureSettings(userId: string, name: string): Promise<void> {
     const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
     await supabase.from('restaurant_settings').upsert({
-      user_id: userId, name, slug, accent_color: '#059669', description: '', address: '', phone: '', logo_url: '',
+      user_id: userId, name, slug, accent_color: '#059669', description: '', address: '', phone: '', logo_url: '', cover_url: '',
       xgate_email: '', xgate_password: '', payment_methods: ['pix', 'cash'],
       whatsapp_api_token: '', whatsapp_phone_number_id: '', whatsapp_enabled: false,
     }, { onConflict: 'user_id', ignoreDuplicates: true });
@@ -49,6 +49,7 @@ export const db = {
     if (updates.address !== undefined) row.address = updates.address;
     if (updates.phone !== undefined) row.phone = updates.phone;
     if (updates.logoUrl !== undefined) row.logo_url = updates.logoUrl;
+    if (updates.coverUrl !== undefined) row.cover_url = updates.coverUrl;
     if (updates.xgateEmail !== undefined) row.xgate_email = updates.xgateEmail;
     if (updates.xgatePassword !== undefined) row.xgate_password = updates.xgatePassword;
     if (updates.paymentMethods !== undefined) row.payment_methods = updates.paymentMethods;
@@ -95,17 +96,18 @@ export const db = {
   async addMenuItem(userId: string, item: Omit<MenuItem, 'id' | 'userId' | 'createdAt' | 'order'>): Promise<MenuItem> {
     const { data: existing } = await supabase.from('menu_items').select('order').eq('user_id', userId).order('order', { ascending: false }).limit(1);
     const maxOrder = existing && existing.length > 0 ? (existing[0] as { order: number }).order : -1;
-    const { data, error } = await supabase.from('menu_items').insert({ user_id: userId, category_id: item.categoryId, name: item.name, description: item.description, emoji: item.emoji, price: item.price, available: item.available, order: maxOrder + 1 }).select().single();
+    const { data, error } = await supabase.from('menu_items').insert({ user_id: userId, category_id: item.categoryId, name: item.name, description: item.description, emoji: item.emoji, image_url: item.imageUrl ?? '', price: item.price, available: item.available, order: maxOrder + 1 }).select().single();
     if (error) throw error;
     return toMenuItem(data as MenuItemRow);
   },
 
-  async updateMenuItem(id: string, updates: Partial<Pick<MenuItem, 'name' | 'description' | 'price' | 'emoji' | 'available' | 'categoryId' | 'order'>>): Promise<void> {
+  async updateMenuItem(id: string, updates: Partial<Pick<MenuItem, 'name' | 'description' | 'price' | 'emoji' | 'imageUrl' | 'available' | 'categoryId' | 'order'>>): Promise<void> {
     const row: Record<string, unknown> = {};
     if (updates.name !== undefined) row.name = updates.name;
     if (updates.description !== undefined) row.description = updates.description;
     if (updates.price !== undefined) row.price = updates.price;
     if (updates.emoji !== undefined) row.emoji = updates.emoji;
+    if (updates.imageUrl !== undefined) row.image_url = updates.imageUrl;
     if (updates.available !== undefined) row.available = updates.available;
     if (updates.categoryId !== undefined) row.category_id = updates.categoryId;
     if (updates.order !== undefined) row.order = updates.order;

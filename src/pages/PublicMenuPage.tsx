@@ -177,9 +177,20 @@ export default function PublicMenuPage() {
 
       {/* ── HERO ── */}
       <div className="relative overflow-hidden" style={{ background: accent }}>
+        {/* Cover image */}
+        {settings.coverUrl && (
+          <>
+            <img src={settings.coverUrl} alt="capa" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0" style={{ background: `${accent}cc` }} />
+          </>
+        )}
         {/* decorative circles */}
-        <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full opacity-20" style={{ background: 'rgba(255,255,255,0.3)' }} />
-        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-10" style={{ background: 'rgba(255,255,255,0.4)' }} />
+        {!settings.coverUrl && (
+          <>
+            <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full opacity-20" style={{ background: 'rgba(255,255,255,0.3)' }} />
+            <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full opacity-10" style={{ background: 'rgba(255,255,255,0.4)' }} />
+          </>
+        )}
 
         <div className="relative max-w-xl mx-auto px-5 pt-12 pb-20">
           <div className="flex items-center gap-5">
@@ -271,12 +282,18 @@ export default function PublicMenuPage() {
                       <div className="w-1 flex-shrink-0" style={{ backgroundColor: inCart ? accent : 'transparent' }} />
 
                       <div className="flex items-center gap-4 px-4 py-4 flex-1 min-w-0">
-                        {/* Emoji */}
-                        <div
-                          className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0 transition-transform duration-200"
-                          style={{ backgroundColor: accent + '15' }}
-                        >
-                          {item.emoji}
+                        {/* Image or Emoji */}
+                        <div className="w-16 h-16 rounded-2xl flex-shrink-0 overflow-hidden">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div
+                              className="w-full h-full flex items-center justify-center text-3xl transition-transform duration-200"
+                              style={{ backgroundColor: accent + '15' }}
+                            >
+                              {item.emoji}
+                            </div>
+                          )}
                         </div>
 
                         {/* Info */}

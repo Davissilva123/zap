@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
+import { uploadImage } from '../lib/upload';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { RestaurantSettings, PaymentMethod } from '../lib/types';
-import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle } from 'lucide-react';
+import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X } from 'lucide-react';
 
 const allPaymentMethods: PaymentMethod[] = ['pix', 'credit_card', 'debit_card', 'cash', 'meal_voucher'];
 
@@ -35,24 +36,89 @@ function SectionCard({ icon: Icon, title, description, children }: { icon: typeo
   );
 }
 
+function ImageUploadField({ label, preview, onFileChange, onRemove, inputRef, hint }: {
+  label: string; preview: string; onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemove: () => void; inputRef: React.RefObject<HTMLInputElement | null>; hint?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">{label}</label>
+      {preview ? (
+        <div className="relative w-full h-36 rounded-xl overflow-hidden bg-slate-100">
+          <img src={preview} alt={label} className="w-full h-full object-cover" />
+          <button type="button" onClick={onRemove} className="absolute top-2 right-2 p-1.5 bg-black/50 rounded-lg text-white hover:bg-black/70 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => inputRef.current?.click()} className="w-full h-28 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-emerald-300 hover:text-emerald-500 transition-colors">
+          <ImagePlus className="w-5 h-5" />
+          <span className="text-[13px] font-medium">Clique para adicionar</span>
+        </button>
+      )}
+      {hint && <p className="text-[11px] text-slate-400 mt-1">{hint}</p>}
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const [form, setForm] = useState<RestaurantSettings | null>(null);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState('');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState('');
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
-    db.getSettings(user.id).then(s => { if (s) setForm({ ...s }); });
+    db.getSettings(user.id).then(s => {
+      if (s) {
+        setForm({ ...s });
+        setLogoPreview(s.logoUrl || '');
+        setCoverPreview(s.coverUrl || '');
+      }
+    });
   }, [user]);
 
   if (!user || !form) return null;
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
   const save = async () => {
-    const slug = form.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    await db.updateSettings(user.id, { ...form, slug });
-    setForm(f => ({ ...f!, slug }));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    setSaving(true);
+    try {
+      const slug = form.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      let logoUrl = form.logoUrl;
+      let coverUrl = form.coverUrl;
+      if (logoFile) { const u = await uploadImage(logoFile, 'logos'); if (u) logoUrl = u; }
+      if (coverFile) { const u = await uploadImage(coverFile, 'covers'); if (u) coverUrl = u; }
+      await db.updateSettings(user.id, { ...form, slug, logoUrl, coverUrl });
+      setForm(f => ({ ...f!, slug, logoUrl, coverUrl }));
+      setLogoFile(null);
+      setCoverFile(null);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -80,6 +146,27 @@ export default function SettingsPage() {
             <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Telefone</label>
             <input type="text" value={form.phone} onChange={e => setForm(f => ({ ...f!, phone: e.target.value }))} className="input-field" />
           </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard icon={ImagePlus} title="Imagens do restaurante" description="Logo e imagem de capa exibidos no cardápio público">
+        <div className="grid sm:grid-cols-2 gap-5">
+          <ImageUploadField
+            label="Logo"
+            preview={logoPreview}
+            onFileChange={handleLogoChange}
+            onRemove={() => { setLogoFile(null); setLogoPreview(''); setForm(f => ({ ...f!, logoUrl: '' })); if (logoInputRef.current) logoInputRef.current.value = ''; }}
+            inputRef={logoInputRef}
+            hint="Aparece no topo do cardápio (quadrado, mín. 200×200px)"
+          />
+          <ImageUploadField
+            label="Imagem de capa"
+            preview={coverPreview}
+            onFileChange={handleCoverChange}
+            onRemove={() => { setCoverFile(null); setCoverPreview(''); setForm(f => ({ ...f!, coverUrl: '' })); if (coverInputRef.current) coverInputRef.current.value = ''; }}
+            inputRef={coverInputRef}
+            hint="Banner do hero no topo do cardápio (16:9 recomendado)"
+          />
         </div>
       </SectionCard>
 
@@ -154,7 +241,7 @@ export default function SettingsPage() {
         {!form.xgateEmail && (
           <div className="flex items-start gap-3 bg-amber-50 rounded-xl p-4 text-sm text-amber-700 border border-amber-100">
             <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>Sem as credenciais XGate os clientes não poderão pagar via PIX. Cadastre-se em <a href="https://www.xgateglobal.com" target="_blank" rel="noopener noreferrer" className="underline font-semibold">xgateglobal.com</a>.</span>
+            <span>Sem as credenciais XGate os clientes não poderão pagar via PIX.</span>
           </div>
         )}
       </SectionCard>
@@ -184,9 +271,9 @@ export default function SettingsPage() {
         )}
       </SectionCard>
 
-      <button onClick={save} className={`btn-primary px-8 py-3 ${saved ? '!bg-emerald-600' : ''}`}>
-        {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-        {saved ? 'Salvo com sucesso!' : 'Salvar configurações'}
+      <button onClick={save} disabled={saving} className={`btn-primary px-8 py-3 disabled:opacity-60 ${saved ? '!bg-emerald-600' : ''}`}>
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+        {saving ? 'Salvando...' : saved ? 'Salvo com sucesso!' : 'Salvar configurações'}
       </button>
     </div>
   );

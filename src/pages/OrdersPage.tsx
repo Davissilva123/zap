@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import { sendWhatsAppNotification } from '../lib/whatsapp';
+import { playNewOrderSound, unlockAudio } from '../lib/sound';
+import { printOrder } from '../lib/print';
+import { supabase } from '../lib/supabase';
 import type { Order, RestaurantSettings } from '../lib/types';
-import { Clock, CheckCircle, XCircle, Eye, X, Truck, ShoppingBag, MapPin, Inbox, MessageCircle, Loader2 } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Eye, X, Truck, ShoppingBag, MapPin, Inbox, MessageCircle, Loader2, Printer, Volume2, VolumeX, Ban } from 'lucide-react';
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string }> = {
   PENDING: { label: 'Pendente', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
@@ -32,15 +35,70 @@ export default function OrdersPage() {
   const [sendingWhatsapp, setSendingWhatsapp] = useState<string | null>(null);
   const [whatsappSent, setWhatsappSent] = useState<Record<string, boolean>>({});
   const [whatsappError, setWhatsappError] = useState<string>('');
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [autoPrint, setAutoPrint] = useState(false);
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  const settingsRef = useRef<RestaurantSettings | null>(null);
 
   const load = async () => {
     if (!user) return;
     const [o, s] = await Promise.all([db.getOrders(user.id), db.getSettings(user.id)]);
     setOrders(o);
     setSettings(s);
+    settingsRef.current = s;
+    knownIdsRef.current = new Set(o.map(x => x.id));
   };
 
-  useEffect(() => { load(); }, [user]);
+  // Unlock audio on first interaction
+  useEffect(() => {
+    const handler = () => unlockAudio();
+    window.addEventListener('click', handler, { once: true });
+    return () => window.removeEventListener('click', handler);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    load();
+
+    // Real-time subscription for new orders
+    const channel = supabase
+      .channel(`orders:${user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` }, (payload) => {
+        const newOrder = payload.new as Order & { user_id: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: unknown; delivery_type: string; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; created_at: string; paid_at: string | null };
+        if (knownIdsRef.current.has(newOrder.id)) return;
+        knownIdsRef.current.add(newOrder.id);
+
+        if (soundEnabled) playNewOrderSound();
+
+        const mapped: Order = {
+          id: newOrder.id,
+          userId: newOrder.user_id,
+          items: newOrder.items,
+          total: Number(newOrder.total),
+          status: newOrder.status as Order['status'],
+          customerName: newOrder.customer_name,
+          customerPhone: newOrder.customer_phone,
+          paymentMethod: newOrder.payment_method as Order['paymentMethod'],
+          deliveryAddress: newOrder.delivery_address as Order['deliveryAddress'],
+          deliveryType: newOrder.delivery_type as Order['deliveryType'],
+          pixTxId: newOrder.pix_tx_id,
+          pixQrCode: newOrder.pix_qr_code,
+          pixCopyPaste: newOrder.pix_copy_paste,
+          createdAt: newOrder.created_at,
+          paidAt: newOrder.paid_at,
+        };
+
+        setOrders(prev => [mapped, ...prev]);
+
+        if (autoPrint && settingsRef.current) {
+          printOrder(mapped, settingsRef.current);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user, soundEnabled, autoPrint]);
+
   if (!user) return null;
 
   const filtered = orders.filter(o => !filter || o.status === filter);
@@ -68,6 +126,15 @@ export default function OrdersPage() {
     }
   };
 
+  const cancelOrder = async (orderId: string) => {
+    if (!confirm('Cancelar este pedido?')) return;
+    await db.updateOrder(orderId, { status: 'CANCELLED' });
+    load();
+    if (selectedOrder?.id === orderId) {
+      setSelectedOrder(prev => prev ? { ...prev, status: 'CANCELLED' } : null);
+    }
+  };
+
   const sendManualWhatsapp = async (order: Order, status: string) => {
     if (!whatsappConfigured || !settings) return;
     setSendingWhatsapp(order.id);
@@ -84,16 +151,33 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pedidos</h1>
           <p className="text-slate-500 mt-0.5 text-sm">{orders.length} pedidos recebidos</p>
         </div>
-        {whatsappConfigured && (
-          <div className="badge bg-emerald-50 text-emerald-700 py-1.5 px-3 gap-1.5">
-            <MessageCircle className="w-3.5 h-3.5" /> WhatsApp ativo
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSoundEnabled(s => !s)}
+            title={soundEnabled ? 'Silenciar notificações' : 'Ativar notificações sonoras'}
+            className={`p-2 rounded-xl border transition-colors ${soundEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'}`}
+          >
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={() => setAutoPrint(a => !a)}
+            title={autoPrint ? 'Desativar impressão automática' : 'Ativar impressão automática'}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[13px] font-medium transition-colors ${autoPrint ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'}`}
+          >
+            <Printer className="w-4 h-4" />
+            {autoPrint ? 'Auto-imprimir ON' : 'Auto-imprimir OFF'}
+          </button>
+          {whatsappConfigured && (
+            <div className="badge bg-emerald-50 text-emerald-700 py-1.5 px-3 gap-1.5">
+              <MessageCircle className="w-3.5 h-3.5" /> WhatsApp ativo
+            </div>
+          )}
+        </div>
       </div>
 
       {whatsappError && (
@@ -134,6 +218,7 @@ export default function OrdersPage() {
             const payCfg = PAYMENT_METHOD_LABELS[order.paymentMethod];
             const isSending = sendingWhatsapp === order.id;
             const wasSent = whatsappSent[order.id];
+            const canCancel = order.status !== 'CANCELLED' && order.status !== 'COMPLETED';
             return (
               <div key={order.id} className="card-hover">
                 <div className="flex items-center gap-4 p-4">
@@ -163,6 +248,16 @@ export default function OrdersPage() {
                   {whatsappConfigured && !wasSent && !isSending && (
                     <button onClick={(e) => { e.stopPropagation(); sendManualWhatsapp(order, order.status); }} className="p-2 rounded-xl hover:bg-emerald-50 transition-colors flex-shrink-0" title="Enviar notificação WhatsApp">
                       <MessageCircle className="w-4 h-4 text-emerald-500" />
+                    </button>
+                  )}
+                  {settings && (
+                    <button onClick={(e) => { e.stopPropagation(); printOrder(order, settings); }} className="p-2 rounded-xl hover:bg-blue-50 transition-colors flex-shrink-0" title="Imprimir cupom">
+                      <Printer className="w-4 h-4 text-blue-400" />
+                    </button>
+                  )}
+                  {canCancel && (
+                    <button onClick={(e) => { e.stopPropagation(); cancelOrder(order.id); }} className="p-2 rounded-xl hover:bg-red-50 transition-colors flex-shrink-0" title="Cancelar pedido">
+                      <Ban className="w-4 h-4 text-red-400" />
                     </button>
                   )}
                   <button onClick={() => setSelectedOrder(order)} className="p-2 rounded-xl hover:bg-slate-100/80 transition-colors flex-shrink-0">
@@ -204,8 +299,23 @@ export default function OrdersPage() {
                   {selectedOrder.status === 'PREPARING' && selectedOrder.deliveryType === 'delivery' && <button onClick={() => updateStatus(selectedOrder.id, 'DELIVERING')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-100/80 transition-colors">Saiu para entrega</button>}
                   {selectedOrder.status === 'PREPARING' && selectedOrder.deliveryType === 'pickup' && <button onClick={() => updateStatus(selectedOrder.id, 'COMPLETED')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200/80 transition-colors">Entregue</button>}
                   {selectedOrder.status === 'DELIVERING' && <button onClick={() => updateStatus(selectedOrder.id, 'COMPLETED')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200/80 transition-colors">Entregue</button>}
+                  {selectedOrder.status !== 'CANCELLED' && selectedOrder.status !== 'COMPLETED' && (
+                    <button onClick={() => cancelOrder(selectedOrder.id)} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-red-50 text-red-500 hover:bg-red-100/80 transition-colors flex items-center gap-1">
+                      <Ban className="w-3.5 h-3.5" /> Cancelar
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Print button */}
+              {settings && (
+                <button
+                  onClick={() => printOrder(selectedOrder, settings)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-600 text-sm font-semibold hover:bg-blue-100/80 transition-colors"
+                >
+                  <Printer className="w-4 h-4" /> Imprimir Cupom
+                </button>
+              )}
 
               {whatsappConfigured && (
                 <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100/50 space-y-2.5">
