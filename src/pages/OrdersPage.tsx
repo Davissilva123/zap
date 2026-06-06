@@ -101,8 +101,8 @@ export default function OrdersPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Pedidos</h1>
-          <p className="text-slate-500 mt-1 text-sm">{orders.length} pedidos recebidos</p>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pedidos</h1>
+          <p className="text-slate-500 mt-0.5 text-sm">{orders.length} pedidos recebidos</p>
         </div>
         {whatsappConfigured && (
           <div className="badge bg-emerald-50 text-emerald-700 py-1.5 px-3 gap-1.5">
@@ -111,15 +111,6 @@ export default function OrdersPage() {
         )}
       </div>
 
-      {!whatsappConfigured && (
-        <div className="card p-4 flex items-center gap-3 border-amber-100 bg-amber-50/50">
-          <MessageCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800">Notificações WhatsApp desativadas</p>
-            <p className="text-xs text-amber-600 mt-0.5">Configure na aba Configurações para enviar atualizações aos clientes</p>
-          </div>
-        </div>
-      )}
 
       {whatsappError && (
         <div className="card p-4 flex items-center gap-3 border-red-100 bg-red-50/50 animate-scale-in">
