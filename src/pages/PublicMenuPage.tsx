@@ -236,70 +236,73 @@ export default function PublicMenuPage() {
 
       {/* ── HERO ── */}
       {settings.coverUrl ? (
-        /* ── WITH COVER IMAGE ── */
+        /* ── WITH COVER IMAGE — logo + nome DENTRO da capa, sem overlap externo ── */
         <>
-          {/* Cover photo */}
-          <div className="relative overflow-hidden" style={{ height: 220 }}>
+          <div className="relative overflow-hidden" style={{ height: 280 }}>
             <img src={settings.coverUrl} alt="capa" className="w-full h-full object-cover" />
-            {/* Dark gradient bottom so logo/buttons stay readable */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/10" />
 
-            {/* Account button top-right */}
-            <div className="absolute top-4 right-4">
+            {/* Gradiente forte no bottom para legibilidade */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/5" />
+
+            {/* Botão conta — top right */}
+            <div className="absolute top-5 right-5">
               {customer ? (
-                <button onClick={() => navigate(`/m/${slug}/conta`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-sm text-white text-xs font-semibold">
+                <button onClick={() => navigate(`/m/${slug}/conta`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md text-white text-xs font-semibold border border-white/20 shadow">
                   <User className="w-3.5 h-3.5" /> Meus pedidos
                 </button>
               ) : (
-                <button onClick={() => { setShowCart(true); setStep('auth'); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-sm text-white text-xs font-semibold">
+                <button onClick={() => { setShowCart(true); setStep('auth'); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md text-white text-xs font-semibold border border-white/20 shadow">
                   <LogIn className="w-3.5 h-3.5" /> Entrar
                 </button>
               )}
             </div>
-          </div>
 
-          {/* White info card — logo pops out halfway from the cover */}
-          <div className="bg-white border-b border-slate-100">
-            <div className="max-w-xl mx-auto px-5 pb-5">
-              {/* Logo overlapping */}
-              <div className="-mt-10 mb-3 flex items-end gap-4">
+            {/* Logo + nome no rodapé da capa */}
+            <div className="absolute bottom-0 left-0 right-0 px-5 pb-5">
+              <div className="max-w-xl mx-auto flex items-end gap-4">
+                {/* Logo — fundo branco, sem cortes */}
                 {settings.logoUrl ? (
                   <img
                     src={settings.logoUrl}
                     alt={settings.name}
-                    className="w-20 h-20 rounded-2xl object-cover shadow-xl ring-4 ring-white flex-shrink-0"
+                    className="w-[76px] h-[76px] rounded-2xl object-contain bg-white shadow-2xl flex-shrink-0 border-2 border-white/30"
                   />
                 ) : (
                   <div
-                    className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-xl ring-4 ring-white flex-shrink-0"
+                    className="w-[76px] h-[76px] rounded-2xl flex items-center justify-center shadow-2xl flex-shrink-0 border-2 border-white/20"
                     style={{ backgroundColor: accent }}
                   >
                     <ChefHat className="w-9 h-9 text-white" />
                   </div>
                 )}
-                {/* Accent line under logo */}
-                <div className="flex-1 self-end pb-1">
-                  <div className="h-1 rounded-full w-12" style={{ backgroundColor: accent }} />
+
+                {/* Nome + descrição */}
+                <div className="flex-1 min-w-0 pb-1">
+                  <h1 className="text-xl font-extrabold text-white leading-tight tracking-tight drop-shadow-sm">
+                    {settings.name}
+                  </h1>
+                  {settings.description && (
+                    <p className="text-white/70 text-sm mt-1 line-clamp-2 leading-snug">
+                      {settings.description}
+                    </p>
+                  )}
                 </div>
               </div>
+            </div>
+          </div>
 
-              <h1 className="text-xl font-extrabold text-slate-900 leading-tight tracking-tight">{settings.name}</h1>
-              {settings.description && (
-                <p className="text-slate-500 mt-1 text-sm leading-relaxed">{settings.description}</p>
+          {/* Barra de info abaixo da capa */}
+          <div className="bg-white border-b border-slate-100 shadow-sm">
+            <div className="max-w-xl mx-auto px-5 py-3 flex flex-wrap gap-3">
+              {settings.address && (
+                <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" /> {settings.address}
+                </span>
               )}
-              {(settings.address || settings.phone) && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {settings.address && (
-                    <span className="flex items-center gap-1.5 bg-slate-100 rounded-full px-3 py-1.5 text-xs text-slate-600 font-medium">
-                      <MapPin className="w-3 h-3 text-slate-400" /> {settings.address}
-                    </span>
-                  )}
-                  {settings.phone && (
-                    <span className="flex items-center gap-1.5 bg-slate-100 rounded-full px-3 py-1.5 text-xs text-slate-600 font-medium">
-                      <Phone className="w-3 h-3 text-slate-400" /> {settings.phone}
-                    </span>
-                  )}
-                </div>
+              {settings.phone && (
+                <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                  <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" /> {settings.phone}
+                </span>
               )}
             </div>
           </div>
