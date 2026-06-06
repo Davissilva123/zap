@@ -88,7 +88,7 @@ export default function CouponsPage() {
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
                 {form.discountType === 'percent' ? 'Desconto (%)' : 'Desconto (R$)'} *

@@ -221,8 +221,8 @@ export default function OrdersPage() {
             const canCancel = order.status !== 'CANCELLED' && order.status !== 'COMPLETED';
             return (
               <div key={order.id} className="card-hover">
-                <div className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 flex-wrap sm:flex-nowrap">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
+                <div className="flex items-start gap-3 p-3 sm:p-4">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${cfg.bg}`}>
                     <cfg.icon className={`w-5 h-5 ${cfg.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -245,26 +245,28 @@ export default function OrdersPage() {
                       )}
                     </div>
                   </div>
-                  <span className="text-sm sm:text-[17px] font-bold text-slate-900 tracking-tight flex-shrink-0 ml-auto sm:ml-0">R$ {order.total.toFixed(2).replace('.', ',')}</span>
-                  {isSending && <Loader2 className="w-5 h-5 animate-spin text-emerald-500 flex-shrink-0" />}
-                  {whatsappConfigured && !wasSent && !isSending && (
-                    <button onClick={(e) => { e.stopPropagation(); sendManualWhatsapp(order, order.status); }} className="p-2 rounded-xl hover:bg-emerald-50 transition-colors flex-shrink-0" title="Enviar notificação WhatsApp">
-                      <MessageCircle className="w-4 h-4 text-emerald-500" />
+                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                    <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight mr-1">R$ {order.total.toFixed(2).replace('.', ',')}</span>
+                    {isSending && <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />}
+                    {whatsappConfigured && !wasSent && !isSending && (
+                      <button onClick={(e) => { e.stopPropagation(); sendManualWhatsapp(order, order.status); }} className="p-1.5 rounded-xl hover:bg-emerald-50 transition-colors" title="Enviar notificação WhatsApp">
+                        <MessageCircle className="w-4 h-4 text-emerald-500" />
+                      </button>
+                    )}
+                    {settings && (
+                      <button onClick={(e) => { e.stopPropagation(); printOrder(order, settings); }} className="p-1.5 rounded-xl hover:bg-blue-50 transition-colors" title="Imprimir cupom">
+                        <Printer className="w-4 h-4 text-blue-400" />
+                      </button>
+                    )}
+                    {canCancel && (
+                      <button onClick={(e) => { e.stopPropagation(); cancelOrder(order.id); }} className="p-1.5 rounded-xl hover:bg-red-50 transition-colors" title="Cancelar pedido">
+                        <Ban className="w-4 h-4 text-red-400" />
+                      </button>
+                    )}
+                    <button onClick={() => setSelectedOrder(order)} className="p-1.5 rounded-xl hover:bg-slate-100/80 transition-colors">
+                      <Eye className="w-4 h-4 text-slate-400" />
                     </button>
-                  )}
-                  {settings && (
-                    <button onClick={(e) => { e.stopPropagation(); printOrder(order, settings); }} className="p-2 rounded-xl hover:bg-blue-50 transition-colors flex-shrink-0" title="Imprimir cupom">
-                      <Printer className="w-4 h-4 text-blue-400" />
-                    </button>
-                  )}
-                  {canCancel && (
-                    <button onClick={(e) => { e.stopPropagation(); cancelOrder(order.id); }} className="p-2 rounded-xl hover:bg-red-50 transition-colors flex-shrink-0" title="Cancelar pedido">
-                      <Ban className="w-4 h-4 text-red-400" />
-                    </button>
-                  )}
-                  <button onClick={() => setSelectedOrder(order)} className="p-2 rounded-xl hover:bg-slate-100/80 transition-colors flex-shrink-0">
-                    <Eye className="w-4 h-4 text-slate-400" />
-                  </button>
+                  </div>
                 </div>
               </div>
             );
@@ -275,7 +277,7 @@ export default function OrdersPage() {
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => setSelectedOrder(null)} />
-          <div className="relative bg-white rounded-3xl shadow-elevated w-full max-w-lg p-7 z-10 max-h-[85vh] overflow-y-auto animate-scale-in">
+          <div className="relative bg-white rounded-3xl shadow-elevated w-full max-w-lg p-5 sm:p-7 z-10 max-h-[90vh] overflow-y-auto animate-scale-in">
             <div className="flex items-center justify-between mb-7">
               <h3 className="text-lg font-bold text-slate-900 tracking-tight">Detalhes do Pedido</h3>
               <button onClick={() => setSelectedOrder(null)} className="p-2 rounded-xl hover:bg-slate-100/80 transition-colors">

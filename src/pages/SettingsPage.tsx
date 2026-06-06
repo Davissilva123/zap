@@ -279,21 +279,21 @@ export default function SettingsPage() {
           const hours: DayHours = form.openingHours?.[day] ?? { open: false, from: '09:00', to: '22:00' };
           const setDay = (h: DayHours) => setForm(f => ({ ...f!, openingHours: { ...f!.openingHours, [day]: h } }));
           return (
-            <div key={day} className="flex items-center gap-3">
+            <div key={day} className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <div
                 onClick={() => setDay({ ...hours, open: !hours.open })}
                 className={`w-10 h-5 rounded-full flex items-center cursor-pointer flex-shrink-0 transition-colors ${hours.open ? 'bg-emerald-500' : 'bg-slate-200'}`}
               >
                 <div className={`w-4 h-4 bg-white rounded-full shadow-sm mx-0.5 transition-transform ${hours.open ? 'translate-x-5' : ''}`} />
               </div>
-              <span className={`text-sm w-20 flex-shrink-0 ${hours.open ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>{labels[Number(day)]}</span>
+              <span className={`text-sm w-16 sm:w-20 flex-shrink-0 ${hours.open ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>{labels[Number(day)]}</span>
               {hours.open ? (
-                <div className="flex items-center gap-2 flex-1">
+                <div className="flex items-center gap-2 flex-1 min-w-[180px]">
                   <input type="time" value={hours.from} onChange={e => setDay({ ...hours, from: e.target.value })}
-                    className="input-field py-1.5 text-sm" />
-                  <span className="text-slate-400 text-sm">até</span>
+                    className="input-field py-1.5 text-sm flex-1" />
+                  <span className="text-slate-400 text-sm flex-shrink-0">até</span>
                   <input type="time" value={hours.to} onChange={e => setDay({ ...hours, to: e.target.value })}
-                    className="input-field py-1.5 text-sm" />
+                    className="input-field py-1.5 text-sm flex-1" />
                 </div>
               ) : (
                 <span className="text-xs text-slate-400 italic">Fechado</span>
