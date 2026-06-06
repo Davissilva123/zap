@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { db } from '../../lib/db';
 import { useRestaurantId } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
-import type { Order } from '../../lib/types';
+import type { Order, RestaurantSettings } from '../../lib/types';
 import { Clock, ChefHat, CheckCircle2, Truck, ShoppingBag, LayoutGrid, Loader2, AlertCircle } from 'lucide-react';
 
 function elapsed(createdAt: string) {
@@ -106,17 +106,19 @@ function OrderCard({ order, updating, onAction, actionLabel, actionColor, border
 export default function KitchenPage() {
   const restaurantId = useRestaurantId();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   useTimerTick();
 
   const load = useCallback(async () => {
     if (!restaurantId) return;
-    const all = await db.getOrders(restaurantId);
+    const [all, st] = await Promise.all([db.getOrders(restaurantId), db.getSettings(restaurantId)]);
     const since = new Date(Date.now() - 86400000).toISOString();
     setOrders(all.filter(o =>
       (o.status === 'PENDING' || o.status === 'PREPARING') && o.createdAt >= since
     ));
+    setSettings(st);
     setLoading(false);
   }, [restaurantId]);
 
@@ -148,6 +150,14 @@ export default function KitchenPage() {
   const pending = orders.filter(o => o.status === 'PENDING').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const preparing = orders.filter(o => o.status === 'PREPARING').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
+  // Estimated wait: base delivery time + queue pressure
+  const baseMin = (() => {
+    const t = settings?.deliveryTime ?? '30';
+    const match = t.match(/\d+/);
+    return match ? Number(match[0]) : 30;
+  })();
+  const estimatedWait = baseMin + pending.length * 8 + preparing.length * 4;
+
   if (loading) return (
     <div className="flex items-center justify-center py-20">
       <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
@@ -171,9 +181,15 @@ export default function KitchenPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          Atualização em tempo real
+        <div className="flex items-center gap-3 flex-wrap justify-end">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-100">
+            <Clock className="w-3.5 h-3.5 text-blue-500" />
+            <span className="text-xs font-bold text-blue-700">~{estimatedWait}min espera</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Tempo real
+          </div>
         </div>
       </div>
 

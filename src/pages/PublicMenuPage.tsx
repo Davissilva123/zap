@@ -4,7 +4,7 @@ import { db } from '../lib/db';
 import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import { useCustomerAuth } from '../lib/customerAuth';
 import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption } from '../lib/types';
-import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift } from 'lucide-react';
+import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift, Search } from 'lucide-react';
 
 interface CartItem extends OrderItem { categoryId: string; }
 type CheckoutStep = 'cart' | 'auth' | 'delivery' | 'payment' | 'paying' | 'pix' | 'success' | 'error' | 'no-xgate' | 'no-methods' | 'order_placed';
@@ -12,6 +12,7 @@ const emptyAddress: DeliveryAddress = { street: '', number: '', complement: '', 
 
 
 function isRestaurantOpen(settings: RestaurantSettings): boolean {
+  if (settings.manualClosed) return false;
   if (!settings.openingHours || Object.keys(settings.openingHours).length === 0) return true;
   const now = new Date();
   const day = String(now.getDay());
@@ -69,6 +70,9 @@ export default function PublicMenuPage() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [appliedCouponId, setAppliedCouponId] = useState<string | null>(null);
   const [appliedCouponUses, setAppliedCouponUses] = useState(0);
+
+  // Busca no cardápio
+  const [menuSearch, setMenuSearch] = useState('');
 
   // Agendamento
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
@@ -357,6 +361,10 @@ export default function PublicMenuPage() {
   const accent = settings.accentColor;
   const visibleCategories = categories.filter(c => items.some(i => i.categoryId === c.id));
   const filteredCategories = activeCat ? visibleCategories.filter(c => c.id === activeCat) : visibleCategories;
+  const searchQuery = menuSearch.trim().toLowerCase();
+  const searchResults = searchQuery
+    ? items.filter(i => i.name.toLowerCase().includes(searchQuery) || i.description?.toLowerCase().includes(searchQuery))
+    : null;
 
   return (
     <div className="min-h-screen bg-[#f5f5f5]">
@@ -511,35 +519,92 @@ export default function PublicMenuPage() {
 
       {/* ── CATEGORY BAR ── */}
       <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-black/5 shadow-sm">
-        <div ref={catBarRef} className="max-w-xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-          <button
-            onClick={() => setActiveCat('')}
-            className="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border"
-            style={!activeCat
-              ? { backgroundColor: accent, color: '#fff', borderColor: accent }
-              : { backgroundColor: 'transparent', color: '#6b7280', borderColor: '#e5e7eb' }}
-          >
-            Todos
-          </button>
-          {visibleCategories.map(cat => (
+        {/* Search bar */}
+        <div className="max-w-xl mx-auto px-4 pt-3 pb-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={menuSearch}
+              onChange={e => setMenuSearch(e.target.value)}
+              placeholder="Buscar no cardápio..."
+              className="w-full pl-9 pr-9 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-slate-300 focus:bg-white transition-colors"
+            />
+            {menuSearch && (
+              <button onClick={() => setMenuSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Category pills — hidden while searching */}
+        {!menuSearch && (
+          <div ref={catBarRef} className="max-w-xl mx-auto px-4 pb-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             <button
-              key={cat.id}
-              onClick={() => setActiveCat(activeCat === cat.id ? '' : cat.id)}
-              className="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border flex items-center gap-1.5"
-              style={activeCat === cat.id
+              onClick={() => setActiveCat('')}
+              className="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border"
+              style={!activeCat
                 ? { backgroundColor: accent, color: '#fff', borderColor: accent }
                 : { backgroundColor: 'transparent', color: '#6b7280', borderColor: '#e5e7eb' }}
             >
-              <span>{cat.emoji}</span>
-              <span>{cat.name}</span>
+              Todos
             </button>
-          ))}
-        </div>
+            {visibleCategories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCat(activeCat === cat.id ? '' : cat.id)}
+                className="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border flex items-center gap-1.5"
+                style={activeCat === cat.id
+                  ? { backgroundColor: accent, color: '#fff', borderColor: accent }
+                  : { backgroundColor: 'transparent', color: '#6b7280', borderColor: '#e5e7eb' }}
+              >
+                <span>{cat.emoji}</span>
+                <span>{cat.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── MENU ITEMS ── */}
       <div className="max-w-xl mx-auto px-4 pb-36 pt-2">
-        {filteredCategories.map(cat => {
+        {/* Search results */}
+        {searchResults !== null && (
+          <div className="mt-4">
+            {searchResults.length === 0 ? (
+              <div className="text-center py-12">
+                <Search className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                <p className="text-slate-400 text-sm">Nenhum item encontrado para "<strong>{menuSearch}</strong>"</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-400 font-medium px-1">{searchResults.length} resultado{searchResults.length !== 1 ? 's' : ''} para "{menuSearch}"</p>
+                {searchResults.map(item => {
+                  const inCart = cart.find(c => c.menuItemId === item.id);
+                  return (
+                    <div key={item.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5 flex items-stretch cursor-pointer" onClick={() => openItemModal(item)}>
+                      <div className="w-1 flex-shrink-0" style={{ backgroundColor: inCart ? accent : 'transparent' }} />
+                      <div className="flex-1 p-3.5 flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-2xl" style={{ backgroundColor: accent + '15' }}>
+                          {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover rounded-xl" /> : item.emoji}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-900 text-sm">{item.name}</p>
+                          {item.description && <p className="text-xs text-slate-400 truncate mt-0.5">{item.description}</p>}
+                          <p className="font-extrabold text-sm mt-1" style={{ color: accent }}>R$ {item.price.toFixed(2).replace('.', ',')}</p>
+                        </div>
+                        {inCart && <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0" style={{ backgroundColor: accent }}>{inCart.quantity}x</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Normal category view */}
+        {searchResults === null && filteredCategories.map(cat => {
           const catItems = items.filter(i => i.categoryId === cat.id);
           if (catItems.length === 0) return null;
           return (
@@ -636,7 +701,7 @@ export default function PublicMenuPage() {
           );
         })}
 
-        {filteredCategories.length === 0 && (
+        {searchResults === null && filteredCategories.length === 0 && (
           <div className="text-center py-24">
             <div className="w-20 h-20 rounded-3xl bg-white shadow-sm flex items-center justify-center mx-auto mb-4">
               <ChefHat className="w-9 h-9 text-slate-200" />

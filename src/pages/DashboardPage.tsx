@@ -1,29 +1,42 @@
 import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
-import type { Scan, Category, MenuItem } from '../lib/types';
-import { Eye, UtensilsCrossed, Grid3X3, TrendingUp, ArrowUpRight } from 'lucide-react';
+import type { Scan, Category, MenuItem, RestaurantSettings } from '../lib/types';
+import { Eye, UtensilsCrossed, Grid3X3, TrendingUp, ArrowUpRight, PowerOff, Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [scans, setScans] = useState<Scan[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [settings, setSettings] = useState<RestaurantSettings | null>(null);
+  const [closingToggle, setClosingToggle] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const [s, c, i] = await Promise.all([
+      const [s, c, i, st] = await Promise.all([
         db.getScans(user.id),
         db.getCategories(user.id),
         db.getMenuItems(user.id),
+        db.getSettings(user.id),
       ]);
       setScans(s);
       setCategories(c);
       setItems(i);
+      setSettings(st);
     };
     load();
   }, [user]);
+
+  const toggleClosed = async () => {
+    if (!user || !settings) return;
+    setClosingToggle(true);
+    const next = !settings.manualClosed;
+    await db.updateSettings(user.id, { manualClosed: next });
+    setSettings(s => s ? { ...s, manualClosed: next } : s);
+    setClosingToggle(false);
+  };
 
   if (!user) return null;
 
@@ -55,9 +68,31 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
           <p className="text-slate-500 mt-0.5 text-sm">Visão geral do seu ZapMenu</p>
         </div>
-        <div className="hidden sm:flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-full px-3 py-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block animate-pulse" />
-          <span className="text-emerald-700 text-xs font-semibold">Cardápio online</span>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {settings && (
+            <button
+              onClick={toggleClosed}
+              disabled={closingToggle}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-sm font-semibold transition-all ${
+                settings.manualClosed
+                  ? 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+              }`}
+            >
+              {closingToggle ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <PowerOff className="w-4 h-4" />
+              )}
+              {settings.manualClosed ? 'Restaurante fechado' : 'Restaurante aberto'}
+            </button>
+          )}
+          <div className="hidden sm:flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-full px-3 py-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full block ${settings?.manualClosed ? 'bg-red-400' : 'bg-emerald-500 animate-pulse'}`} />
+            <span className={`text-xs font-semibold ${settings?.manualClosed ? 'text-red-600' : 'text-emerald-700'}`}>
+              {settings?.manualClosed ? 'Fechado agora' : 'Cardápio online'}
+            </span>
+          </div>
         </div>
       </div>
 

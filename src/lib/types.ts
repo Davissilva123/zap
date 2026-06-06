@@ -102,6 +102,7 @@ export interface RestaurantSettings {
   loyaltyEnabled: boolean;
   loyaltyOrdersNeeded: number;
   loyaltyReward: string;
+  manualClosed: boolean;
 }
 
 export interface OrderItem {

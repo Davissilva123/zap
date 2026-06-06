@@ -17,6 +17,7 @@ import OperatorsPage from './pages/OperatorsPage';
 import OpOrdersPage from './pages/op/OrdersPage';
 import OpTablesPage from './pages/op/TablesPage';
 import OpKitchenPage from './pages/op/KitchenPage';
+import ReviewsPage from './pages/ReviewsPage';
 import PublicMenuPage from './pages/PublicMenuPage';
 import CustomerPortalPage from './pages/CustomerPortalPage';
 
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="reviews" element={<ReviewsPage />} />
             <Route path="coupons" element={<CouponsPage />} />
             <Route path="tables" element={<TablesPage />} />
             <Route path="operators" element={<OperatorsPage />} />

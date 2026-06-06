@@ -10,6 +10,7 @@ interface SettingsRow {
   opening_hours: OpeningHours; delivery_time: string; delivery_fee: number;
   delivery_neighborhoods: DeliveryNeighborhood[];
   loyalty_enabled: boolean; loyalty_orders_needed: number; loyalty_reward: string;
+  manual_closed: boolean;
   created_at: string;
 }
 interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; created_at: string; }
@@ -39,6 +40,7 @@ function toSettings(r: SettingsRow): RestaurantSettings {
     loyaltyEnabled: r.loyalty_enabled ?? false,
     loyaltyOrdersNeeded: r.loyalty_orders_needed ?? 10,
     loyaltyReward: r.loyalty_reward ?? '',
+    manualClosed: r.manual_closed ?? false,
   };
 }
 function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, createdAt: r.created_at }; }
@@ -92,6 +94,7 @@ export const db = {
     if (updates.loyaltyEnabled !== undefined) row.loyalty_enabled = updates.loyaltyEnabled;
     if (updates.loyaltyOrdersNeeded !== undefined) row.loyalty_orders_needed = updates.loyaltyOrdersNeeded;
     if (updates.loyaltyReward !== undefined) row.loyalty_reward = updates.loyaltyReward;
+    if (updates.manualClosed !== undefined) row.manual_closed = updates.manualClosed;
     await supabase.from('restaurant_settings').update(row).eq('user_id', userId);
   },
 
