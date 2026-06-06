@@ -126,15 +126,54 @@ export interface Order {
   customerUserId?: string;
   items: OrderItem[];
   total: number;
+  discount: number;
+  couponCode?: string;
   status: 'PENDING' | 'PAID' | 'CANCELLED' | 'PREPARING' | 'DELIVERING' | 'COMPLETED';
   customerName: string;
   customerPhone: string;
   paymentMethod: PaymentMethod;
   deliveryAddress: DeliveryAddress | null;
-  deliveryType: 'pickup' | 'delivery';
+  deliveryType: 'pickup' | 'delivery' | 'table';
+  tableName?: string;
   pixTxId: string;
   pixQrCode: string;
   pixCopyPaste: string;
+  rating?: number;
+  ratingComment?: string;
   createdAt: string;
   paidAt: string | null;
+}
+
+export interface Coupon {
+  id: string;
+  userId: string;
+  code: string;
+  discountType: 'percent' | 'fixed';
+  discountValue: number;
+  minOrder: number;
+  maxUses: number | null;
+  usesCount: number;
+  active: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface RestaurantTable {
+  id: string;
+  userId: string;
+  name: string;
+  order: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface Operator {
+  id: string;
+  ownerId: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'waiter' | 'cashier';
+  active: boolean;
+  notes: string;
+  createdAt: string;
 }

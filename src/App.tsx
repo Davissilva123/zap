@@ -10,6 +10,9 @@ import OrdersPage from './pages/OrdersPage';
 import QRCodePage from './pages/QRCodePage';
 import SettingsPage from './pages/SettingsPage';
 import ReportsPage from './pages/ReportsPage';
+import CouponsPage from './pages/CouponsPage';
+import TablesPage from './pages/TablesPage';
+import OperatorsPage from './pages/OperatorsPage';
 import PublicMenuPage from './pages/PublicMenuPage';
 import CustomerPortalPage from './pages/CustomerPortalPage';
 
@@ -40,6 +43,9 @@ export default function App() {
             <Route path="categories" element={<CategoriesPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="coupons" element={<CouponsPage />} />
+            <Route path="tables" element={<TablesPage />} />
+            <Route path="operators" element={<OperatorsPage />} />
             <Route path="qrcode" element={<QRCodePage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

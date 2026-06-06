@@ -141,14 +141,16 @@ export default function MenuPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
-                        {!item.available && <span className="badge bg-red-50 text-red-500 text-[10px] py-0.5">Indisponível</span>}
+                        {!item.available && <span className="badge bg-red-50 text-red-600 text-[10px] py-0.5 font-bold">Esgotado</span>}
                       </div>
                       <p className="text-xs text-slate-400 truncate mt-0.5">{item.description}</p>
                     </div>
                     <span className="text-base font-bold text-emerald-600 flex-shrink-0">R$ {item.price.toFixed(2).replace('.', ',')}</span>
-                    <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => toggleAvailable(item)} title={item.available ? 'Desativar' : 'Ativar'} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
-                        {item.available ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5 text-slate-400" />}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      <button onClick={() => toggleAvailable(item)} title={item.available ? 'Marcar como Esgotado' : 'Marcar como Disponível'}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${item.available ? 'hover:bg-slate-100 text-slate-500' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}>
+                        {item.available ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-red-400" />}
+                        {item.available ? 'Disponível' : 'Esgotado'}
                       </button>
                       <button onClick={() => setShowGroupsFor(showGroupsFor === item.id ? null : item.id)} title="Adicionais/Complementos" className={`p-2 rounded-lg hover:bg-slate-100 transition-colors ${showGroupsFor === item.id ? 'bg-emerald-50' : ''}`}>
                         <Settings2 className={`w-4 h-4 ${showGroupsFor === item.id ? 'text-emerald-500' : 'text-slate-400'}`} />
@@ -156,7 +158,7 @@ export default function MenuPage() {
                       <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
                         <Pencil className="w-4 h-4 text-slate-400" />
                       </button>
-                      <button onClick={() => deleteItem(item.id)} className="p-2 rounded-lg hover:bg-red-50 transition-colors">
+                      <button onClick={() => deleteItem(item.id)} className="p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
                         <Trash2 className="w-4 h-4 text-red-400" />
                       </button>
                     </div>

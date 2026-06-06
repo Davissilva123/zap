@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, ItemOption, OpeningHours, DeliveryNeighborhood } from './types';
+import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, ItemOption, OpeningHours, DeliveryNeighborhood, Coupon, RestaurantTable, Operator } from './types';
 
 // ---- Supabase row shapes (snake_case) ----
 interface SettingsRow {
@@ -14,9 +14,12 @@ interface SettingsRow {
 interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; created_at: string; }
 interface MenuItemRow { id: string; user_id: string; category_id: string; name: string; description: string; emoji: string; image_url: string; price: number; available: boolean; order: number; created_at: string; }
 interface ScanRow { id: string; user_id: string; scanned_at: string; }
-interface OrderRow { id: string; user_id: string; customer_user_id: string | null; items: OrderItem[]; total: number; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; created_at: string; paid_at: string | null; }
+interface OrderRow { id: string; user_id: string; customer_user_id: string | null; items: OrderItem[]; total: number; discount: number; coupon_code: string | null; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; table_name: string | null; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; rating: number | null; rating_comment: string | null; created_at: string; paid_at: string | null; }
 interface ItemGroupRow { id: string; user_id: string; menu_item_id: string; name: string; required: boolean; min_choices: number; max_choices: number; order: number; created_at: string; }
 interface ItemOptionRow { id: string; user_id: string; group_id: string; name: string; price_delta: number; order: number; created_at: string; }
+interface CouponRow { id: string; user_id: string; code: string; discount_type: string; discount_value: number; min_order: number; max_uses: number | null; uses_count: number; active: boolean; expires_at: string | null; created_at: string; }
+interface RestaurantTableRow { id: string; user_id: string; name: string; order: number; active: boolean; created_at: string; }
+interface OperatorRow { id: string; owner_id: string; email: string; name: string; role: string; active: boolean; notes: string; created_at: string; }
 
 // ---- Mappers ----
 function toSettings(r: SettingsRow): RestaurantSettings {
@@ -37,9 +40,12 @@ function toSettings(r: SettingsRow): RestaurantSettings {
 function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, createdAt: r.created_at }; }
 function toMenuItem(r: MenuItemRow): MenuItem { return { id: r.id, userId: r.user_id, categoryId: r.category_id, name: r.name, description: r.description, emoji: r.emoji, imageUrl: r.image_url ?? '', price: Number(r.price), available: r.available, order: r.order, createdAt: r.created_at }; }
 function toScan(r: ScanRow): Scan { return { id: r.id, userId: r.user_id, scannedAt: r.scanned_at }; }
-function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, customerUserId: r.customer_user_id ?? undefined, items: r.items, total: Number(r.total), status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as 'pickup' | 'delivery', pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, createdAt: r.created_at, paidAt: r.paid_at }; }
+function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, customerUserId: r.customer_user_id ?? undefined, items: r.items, total: Number(r.total), discount: Number(r.discount ?? 0), couponCode: r.coupon_code ?? undefined, status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as Order['deliveryType'], tableName: r.table_name ?? undefined, pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, rating: r.rating ?? undefined, ratingComment: r.rating_comment ?? undefined, createdAt: r.created_at, paidAt: r.paid_at }; }
 function toItemGroup(r: ItemGroupRow, options: ItemOption[] = []): ItemGroup { return { id: r.id, userId: r.user_id, menuItemId: r.menu_item_id, name: r.name, required: r.required, minChoices: r.min_choices, maxChoices: r.max_choices, order: r.order, options }; }
 function toItemOption(r: ItemOptionRow): ItemOption { return { id: r.id, userId: r.user_id, groupId: r.group_id, name: r.name, priceDelta: Number(r.price_delta), order: r.order }; }
+function toCoupon(r: CouponRow): Coupon { return { id: r.id, userId: r.user_id, code: r.code, discountType: r.discount_type as 'percent' | 'fixed', discountValue: Number(r.discount_value), minOrder: Number(r.min_order), maxUses: r.max_uses, usesCount: r.uses_count, active: r.active, expiresAt: r.expires_at, createdAt: r.created_at }; }
+function toRestaurantTable(r: RestaurantTableRow): RestaurantTable { return { id: r.id, userId: r.user_id, name: r.name, order: r.order, active: r.active, createdAt: r.created_at }; }
+function toOperator(r: OperatorRow): Operator { return { id: r.id, ownerId: r.owner_id, email: r.email, name: r.name, role: r.role as Operator['role'], active: r.active, notes: r.notes || '', createdAt: r.created_at }; }
 
 export const db = {
   // ---- Settings ----
@@ -242,10 +248,13 @@ export const db = {
   async addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<Order> {
     const baseRow: Record<string, unknown> = {
       user_id: order.userId,
-      items: order.items, total: order.total, status: order.status,
+      items: order.items, total: order.total, discount: order.discount ?? 0,
+      coupon_code: order.couponCode ?? null,
+      status: order.status,
       customer_name: order.customerName, customer_phone: order.customerPhone,
       payment_method: order.paymentMethod, delivery_address: order.deliveryAddress,
-      delivery_type: order.deliveryType, pix_tx_id: order.pixTxId,
+      delivery_type: order.deliveryType, table_name: order.tableName ?? null,
+      pix_tx_id: order.pixTxId,
       pix_qr_code: order.pixQrCode, pix_copy_paste: order.pixCopyPaste, paid_at: order.paidAt,
     };
     const row = order.customerUserId ? { ...baseRow, customer_user_id: order.customerUserId } : baseRow;
@@ -259,10 +268,112 @@ export const db = {
     return toOrder(data as OrderRow);
   },
 
-  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt'>>): Promise<void> {
+  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt' | 'rating' | 'ratingComment'>>): Promise<void> {
     const row: Record<string, unknown> = {};
     if (updates.status !== undefined) row.status = updates.status;
     if (updates.paidAt !== undefined) row.paid_at = updates.paidAt;
+    if (updates.rating !== undefined) row.rating = updates.rating;
+    if (updates.ratingComment !== undefined) row.rating_comment = updates.ratingComment;
     await supabase.from('orders').update(row).eq('id', id);
+  },
+
+  // ---- Coupons ----
+  async getCoupons(userId: string): Promise<Coupon[]> {
+    const { data, error } = await supabase.from('coupons').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    if (error) { console.error('[db.getCoupons]', error); return []; }
+    return (data as CouponRow[]).map(toCoupon);
+  },
+
+  async addCoupon(userId: string, coupon: Omit<Coupon, 'id' | 'userId' | 'usesCount' | 'createdAt'>): Promise<Coupon> {
+    const { data, error } = await supabase.from('coupons').insert({
+      user_id: userId, code: coupon.code.toUpperCase(), discount_type: coupon.discountType,
+      discount_value: coupon.discountValue, min_order: coupon.minOrder,
+      max_uses: coupon.maxUses, active: coupon.active, expires_at: coupon.expiresAt,
+    }).select().single();
+    if (error) throw new Error(error.message);
+    return toCoupon(data as CouponRow);
+  },
+
+  async updateCoupon(id: string, updates: Partial<Omit<Coupon, 'id' | 'userId' | 'createdAt'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.active !== undefined) row.active = updates.active;
+    if (updates.discountValue !== undefined) row.discount_value = updates.discountValue;
+    if (updates.maxUses !== undefined) row.max_uses = updates.maxUses;
+    if (updates.expiresAt !== undefined) row.expires_at = updates.expiresAt;
+    await supabase.from('coupons').update(row).eq('id', id);
+  },
+
+  async deleteCoupon(id: string): Promise<void> {
+    await supabase.from('coupons').delete().eq('id', id);
+  },
+
+  async validateCoupon(userId: string, code: string, orderTotal: number): Promise<{ valid: boolean; discount: number; message?: string; coupon?: Coupon }> {
+    const { data, error } = await supabase.from('coupons').select('*').eq('user_id', userId).eq('code', code.toUpperCase().trim()).maybeSingle();
+    if (error || !data) return { valid: false, discount: 0, message: 'Cupom não encontrado' };
+    const coupon = toCoupon(data as CouponRow);
+    if (!coupon.active) return { valid: false, discount: 0, message: 'Cupom inativo' };
+    if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) return { valid: false, discount: 0, message: 'Cupom expirado' };
+    if (coupon.maxUses !== null && coupon.usesCount >= coupon.maxUses) return { valid: false, discount: 0, message: 'Cupom esgotado' };
+    if (orderTotal < coupon.minOrder) return { valid: false, discount: 0, message: `Pedido mínimo: R$ ${coupon.minOrder.toFixed(2).replace('.', ',')}` };
+    const discount = coupon.discountType === 'percent'
+      ? Math.round(orderTotal * (coupon.discountValue / 100) * 100) / 100
+      : Math.min(orderTotal, coupon.discountValue);
+    return { valid: true, discount, coupon };
+  },
+
+  async useCoupon(couponId: string, currentUses: number): Promise<void> {
+    await supabase.from('coupons').update({ uses_count: currentUses + 1 }).eq('id', couponId);
+  },
+
+  // ---- Tables (Mesas) ----
+  async getTables(userId: string): Promise<RestaurantTable[]> {
+    const { data, error } = await supabase.from('restaurant_tables').select('*').eq('user_id', userId).order('order', { ascending: true });
+    if (error) { console.error('[db.getTables]', error); return []; }
+    return (data as RestaurantTableRow[]).map(toRestaurantTable);
+  },
+
+  async addTable(userId: string, name: string): Promise<RestaurantTable> {
+    const { data: existing } = await supabase.from('restaurant_tables').select('order').eq('user_id', userId).order('order', { ascending: false }).limit(1);
+    const maxOrder = existing && existing.length > 0 ? (existing[0] as { order: number }).order : -1;
+    const { data, error } = await supabase.from('restaurant_tables').insert({ user_id: userId, name, order: maxOrder + 1 }).select().single();
+    if (error) throw new Error(error.message);
+    return toRestaurantTable(data as RestaurantTableRow);
+  },
+
+  async updateTable(id: string, updates: Partial<Pick<RestaurantTable, 'name' | 'active'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.name !== undefined) row.name = updates.name;
+    if (updates.active !== undefined) row.active = updates.active;
+    await supabase.from('restaurant_tables').update(row).eq('id', id);
+  },
+
+  async deleteTable(id: string): Promise<void> {
+    await supabase.from('restaurant_tables').delete().eq('id', id);
+  },
+
+  // ---- Operators ----
+  async getOperators(ownerId: string): Promise<Operator[]> {
+    const { data, error } = await supabase.from('operators').select('*').eq('owner_id', ownerId).order('created_at', { ascending: true });
+    if (error) { console.error('[db.getOperators]', error); return []; }
+    return (data as OperatorRow[]).map(toOperator);
+  },
+
+  async addOperator(ownerId: string, op: Omit<Operator, 'id' | 'ownerId' | 'createdAt'>): Promise<Operator> {
+    const { data, error } = await supabase.from('operators').insert({ owner_id: ownerId, email: op.email, name: op.name, role: op.role, active: op.active, notes: op.notes }).select().single();
+    if (error) throw new Error(error.message);
+    return toOperator(data as OperatorRow);
+  },
+
+  async updateOperator(id: string, updates: Partial<Pick<Operator, 'name' | 'role' | 'active' | 'notes'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.name !== undefined) row.name = updates.name;
+    if (updates.role !== undefined) row.role = updates.role;
+    if (updates.active !== undefined) row.active = updates.active;
+    if (updates.notes !== undefined) row.notes = updates.notes;
+    await supabase.from('operators').update(row).eq('id', id);
+  },
+
+  async deleteOperator(id: string): Promise<void> {
+    await supabase.from('operators').delete().eq('id', id);
   },
 };

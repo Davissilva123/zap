@@ -7,7 +7,7 @@ import { playNewOrderSound, unlockAudio } from '../lib/sound';
 import { printOrder } from '../lib/print';
 import { supabase } from '../lib/supabase';
 import type { Order, RestaurantSettings } from '../lib/types';
-import { Clock, CheckCircle, XCircle, Eye, X, Truck, ShoppingBag, MapPin, Inbox, MessageCircle, Loader2, Printer, Volume2, VolumeX, Ban } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Eye, X, Truck, ShoppingBag, MapPin, Inbox, MessageCircle, Loader2, Printer, Volume2, VolumeX, Ban, Star, LayoutGrid, Tag } from 'lucide-react';
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string }> = {
   PENDING: { label: 'Pendente', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
@@ -230,9 +230,11 @@ export default function OrdersPage() {
                       <span className="font-semibold text-slate-900 text-[15px]">{order.customerName}</span>
                       <span className="badge bg-slate-100 text-slate-500 py-0.5 text-[10px]">{payCfg?.emoji} {payCfg?.label}</span>
                       <span className="badge bg-slate-100 text-slate-500 py-0.5 text-[10px]">
-                        {order.deliveryType === 'delivery' ? <Truck className="w-3 h-3" /> : <ShoppingBag className="w-3 h-3" />}
-                        {order.deliveryType === 'delivery' ? 'Delivery' : 'Retirada'}
+                        {order.deliveryType === 'delivery' ? <Truck className="w-3 h-3" /> : order.deliveryType === 'table' ? <LayoutGrid className="w-3 h-3" /> : <ShoppingBag className="w-3 h-3" />}
+                        {order.deliveryType === 'delivery' ? 'Delivery' : order.deliveryType === 'table' ? (order.tableName || 'Mesa') : 'Retirada'}
                       </span>
+                      {order.couponCode && <span className="badge bg-emerald-50 text-emerald-600 py-0.5 text-[10px]"><Tag className="w-3 h-3" />{order.couponCode}</span>}
+                      {order.rating && <span className="badge bg-amber-50 text-amber-600 py-0.5 text-[10px]"><Star className="w-3 h-3" />{order.rating}</span>}
                       {wasSent && <span className="badge bg-emerald-50 text-emerald-600 py-0.5 text-[10px]"><MessageCircle className="w-3 h-3" />Enviado</span>}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
@@ -347,8 +349,8 @@ export default function OrdersPage() {
                 <div>
                   <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Entrega</p>
                   <p className="text-sm text-slate-700 font-medium flex items-center gap-1">
-                    {selectedOrder.deliveryType === 'delivery' ? <Truck className="w-3.5 h-3.5" /> : <ShoppingBag className="w-3.5 h-3.5" />}
-                    {selectedOrder.deliveryType === 'delivery' ? 'Delivery' : 'Retirada'}
+                    {selectedOrder.deliveryType === 'delivery' ? <Truck className="w-3.5 h-3.5" /> : selectedOrder.deliveryType === 'table' ? <LayoutGrid className="w-3.5 h-3.5" /> : <ShoppingBag className="w-3.5 h-3.5" />}
+                    {selectedOrder.deliveryType === 'delivery' ? 'Delivery' : selectedOrder.deliveryType === 'table' ? (selectedOrder.tableName || 'Mesa') : 'Retirada'}
                   </p>
                 </div>
               </div>
@@ -379,10 +381,28 @@ export default function OrdersPage() {
                 </div>
               </div>
 
+              {(selectedOrder.discount > 0 || selectedOrder.couponCode) && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400 flex items-center gap-1"><Tag className="w-3.5 h-3.5" /> Cupom {selectedOrder.couponCode && `(${selectedOrder.couponCode})`}</span>
+                  <span className="text-emerald-600 font-semibold">-R$ {(selectedOrder.discount || 0).toFixed(2).replace('.', ',')}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                 <span className="font-semibold text-slate-700">Total</span>
                 <span className="text-xl font-bold text-emerald-600 tracking-tight">R$ {selectedOrder.total.toFixed(2).replace('.', ',')}</span>
               </div>
+              {selectedOrder.rating && (
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-100">
+                  <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider mb-1.5">Avaliação do cliente</p>
+                  <div className="flex items-center gap-1 mb-1">
+                    {[1,2,3,4,5].map(s => (
+                      <Star key={s} className={`w-4 h-4 ${s <= selectedOrder.rating! ? 'fill-amber-400 text-amber-400' : 'text-amber-200'}`} />
+                    ))}
+                    <span className="text-xs text-amber-700 font-bold ml-1">{selectedOrder.rating}/5</span>
+                  </div>
+                  {selectedOrder.ratingComment && <p className="text-xs text-amber-700 italic">"{selectedOrder.ratingComment}"</p>}
+                </div>
+              )}
 
               {selectedOrder.pixTxId && (
                 <div className="p-3 bg-slate-50 rounded-xl">

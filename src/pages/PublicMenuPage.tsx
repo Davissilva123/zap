@@ -1,14 +1,15 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '../lib/db';
 import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import { useCustomerAuth } from '../lib/customerAuth';
 import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption } from '../lib/types';
-import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, AlertCircle } from 'lucide-react';
+import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid } from 'lucide-react';
 
 interface CartItem extends OrderItem { categoryId: string; }
 type CheckoutStep = 'cart' | 'auth' | 'delivery' | 'payment' | 'paying' | 'pix' | 'success' | 'error' | 'no-xgate' | 'no-methods' | 'order_placed';
 const emptyAddress: DeliveryAddress = { street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zip: '' };
+
 
 function isRestaurantOpen(settings: RestaurantSettings): boolean {
   if (!settings.openingHours || Object.keys(settings.openingHours).length === 0) return true;
@@ -24,6 +25,8 @@ function isRestaurantOpen(settings: RestaurantSettings): boolean {
 
 export default function PublicMenuPage() {
   const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  const mesaParam = searchParams.get('mesa'); // table mode
   const navigate = useNavigate();
   const { customer, signIn, signUp } = useCustomerAuth();
   const [settings, setSettings] = useState<RestaurantSettings | null>(null);
@@ -36,7 +39,7 @@ export default function PublicMenuPage() {
   const [step, setStep] = useState<CheckoutStep>('cart');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery' | 'table'>(mesaParam ? 'table' : 'pickup');
   const [address, setAddress] = useState<DeliveryAddress>(emptyAddress);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | ''>('');
   const [pixCopyPaste, setPixCopyPaste] = useState('');
@@ -57,6 +60,21 @@ export default function PublicMenuPage() {
 
   // Taxa de entrega
   const [deliveryFee, setDeliveryFee] = useState(0);
+
+  // Cupons
+  const [couponCode, setCouponCode] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponMsg, setCouponMsg] = useState('');
+  const [couponValid, setCouponValid] = useState(false);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [appliedCouponId, setAppliedCouponId] = useState<string | null>(null);
+  const [appliedCouponUses, setAppliedCouponUses] = useState(0);
+
+  // Avaliação
+  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
+  const [orderRating, setOrderRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
 
   // Customer auth form state
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -89,7 +107,7 @@ export default function PublicMenuPage() {
   }, [customer]);
 
   const cartSubtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const cartTotal = cartSubtotal + (deliveryType === 'delivery' ? deliveryFee : 0);
+  const cartTotal = cartSubtotal + (deliveryType === 'delivery' ? deliveryFee : 0) - couponDiscount;
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
   const availablePaymentMethods = settings?.paymentMethods?.filter(m => m) || [];
 
@@ -129,6 +147,34 @@ export default function PublicMenuPage() {
     setCart(prev => prev.map(c => c.menuItemId === menuItemId ? { ...c, quantity: qty } : c));
   };
 
+  const applyCoupon = async () => {
+    if (!settings || !couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponMsg('');
+    const result = await db.validateCoupon(settings.userId, couponCode, cartSubtotal);
+    setCouponLoading(false);
+    if (result.valid && result.coupon) {
+      setCouponValid(true);
+      setCouponDiscount(result.discount);
+      setAppliedCouponId(result.coupon.id);
+      setAppliedCouponUses(result.coupon.usesCount);
+      setCouponMsg(`✓ Cupom aplicado! Desconto de R$ ${result.discount.toFixed(2).replace('.', ',')}`);
+    } else {
+      setCouponValid(false);
+      setCouponDiscount(0);
+      setAppliedCouponId(null);
+      setCouponMsg(result.message || 'Cupom inválido');
+    }
+  };
+
+  const removeCoupon = () => {
+    setCouponCode('');
+    setCouponValid(false);
+    setCouponDiscount(0);
+    setAppliedCouponId(null);
+    setCouponMsg('');
+  };
+
   const handleNeighborhoodChange = (neighborhood: string) => {
     setAddress(a => ({ ...a, neighborhood }));
     if (!settings) return;
@@ -150,6 +196,11 @@ export default function PublicMenuPage() {
 
   const handlePlaceOrder = useCallback(async () => {
     if (!settings) return;
+    const delivAddr = deliveryType === 'delivery' ? address : null;
+    const tableName = deliveryType === 'table' ? (mesaParam ?? undefined) : undefined;
+    const couponCodeToSend = couponValid ? couponCode : undefined;
+    const discountToSend = couponValid ? couponDiscount : 0;
+
     if (selectedPayment === 'pix') {
       if (!settings.xgateEmail || !settings.xgatePassword) { setStep('no-xgate'); return; }
       setStep('paying');
@@ -157,7 +208,9 @@ export default function PublicMenuPage() {
       try {
         const txId = `cardapio_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
         const result = await createPixCharge(settings.xgateEmail, settings.xgatePassword, cartTotal, txId, customerName.trim());
-        await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, deliveryType === 'delivery' ? address : null, result, customer?.id);
+        const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, delivAddr, result, customer?.id, couponCodeToSend, discountToSend, tableName);
+        setPlacedOrderId(order.id);
+        if (appliedCouponId) await db.useCoupon(appliedCouponId, appliedCouponUses);
         setPixCopyPaste(result.pixCopyPaste);
         setPixQrCode(result.qrCodeImage || result.qrCode);
         setPixTxId(result.txId);
@@ -172,13 +225,15 @@ export default function PublicMenuPage() {
     }
     setErrorMsg('');
     try {
-      await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, deliveryType === 'delivery' ? address : null, null, customer?.id);
+      const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, delivAddr, null, customer?.id, couponCodeToSend, discountToSend, tableName);
+      setPlacedOrderId(order.id);
+      if (appliedCouponId) await db.useCoupon(appliedCouponId, appliedCouponUses);
       setStep('order_placed');
     } catch (err) {
       setErrorMsg(String(err));
       setStep('error');
     }
-  }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address, customer]);
+  }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address, customer, mesaParam, couponValid, couponCode, couponDiscount, appliedCouponId, appliedCouponUses]);
 
   useEffect(() => {
     if (!polling || !settings?.xgateEmail || !pixTxId) return;
@@ -195,8 +250,10 @@ export default function PublicMenuPage() {
 
   const closeAndReset = () => {
     setCart([]); setShowCart(false); setStep('cart'); setCustomerName(''); setCustomerPhone('');
-    setAddress(emptyAddress); setSelectedPayment(''); setDeliveryType('pickup');
+    setAddress(emptyAddress); setSelectedPayment(''); setDeliveryType(mesaParam ? 'table' : 'pickup');
     setPixCopyPaste(''); setPixQrCode(''); setPixTxId(''); setCashChange('');
+    setCouponCode(''); setCouponValid(false); setCouponDiscount(0); setAppliedCouponId(null); setCouponMsg('');
+    setPlacedOrderId(null); setOrderRating(0); setRatingComment(''); setRatingSubmitted(false);
   };
 
   const handleAuthSubmit = async () => {
@@ -354,6 +411,11 @@ export default function PublicMenuPage() {
                   </span>
                 );
               })()}
+              {mesaParam && (
+                <span className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-violet-50 text-violet-600">
+                  <LayoutGrid className="w-3.5 h-3.5 flex-shrink-0" /> {mesaParam}
+                </span>
+              )}
               {settings.deliveryTime && (
                 <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
                   <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" /> {settings.deliveryTime} min
@@ -502,14 +564,23 @@ export default function PublicMenuPage() {
                           {item.description && (
                             <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">{item.description}</p>
                           )}
-                          <p className="text-base font-extrabold mt-2 tracking-tight" style={{ color: accent }}>
-                            R$ {item.price.toFixed(2).replace('.', ',')}
-                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <p className="text-base font-extrabold tracking-tight" style={{ color: item.available ? accent : '#94a3b8' }}>
+                              R$ {item.price.toFixed(2).replace('.', ',')}
+                            </p>
+                            {!item.available && (
+                              <span className="text-[10px] font-bold bg-red-50 text-red-500 px-2 py-0.5 rounded-full border border-red-100">Esgotado</span>
+                            )}
+                          </div>
                         </div>
 
                         {/* Add / Qty */}
                         <div className="flex-shrink-0">
-                          {inCart ? (
+                          {!item.available ? (
+                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
+                              <X className="w-4 h-4 text-slate-400" />
+                            </div>
+                          ) : inCart ? (
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => updateQty(item.id, inCart.quantity - 1)}
@@ -840,6 +911,45 @@ export default function PublicMenuPage() {
                 </div>
               )}
 
+              {/* ── COUPON (cart step, below items) ── */}
+              {step === 'cart' && cart.length > 0 && (
+                <div className="px-5 pb-3">
+                  {couponValid ? (
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+                      <Tag className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="text-sm text-emerald-700 font-semibold flex-1">{couponMsg}</span>
+                      <button onClick={removeCoupon} className="text-emerald-600 hover:text-emerald-800 p-1 rounded-lg">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          value={couponCode}
+                          onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponMsg(''); }}
+                          onKeyDown={e => { if (e.key === 'Enter') applyCoupon(); }}
+                          className="flex-1 px-3 py-2.5 rounded-xl border border-slate-200 text-sm font-mono font-bold bg-slate-50 placeholder:text-slate-300 focus:outline-none focus:border-slate-400 tracking-widest"
+                          placeholder="Cupom de desconto"
+                        />
+                        <button
+                          onClick={applyCoupon}
+                          disabled={couponLoading || !couponCode.trim()}
+                          className="px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity disabled:opacity-40 flex items-center gap-1.5"
+                          style={{ backgroundColor: accent }}
+                        >
+                          {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Tag className="w-4 h-4" />}
+                          Aplicar
+                        </button>
+                      </div>
+                      {couponMsg && (
+                        <p className="text-xs text-red-500 font-medium px-1">{couponMsg}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ── STEP: AUTH ── */}
               {step === 'auth' && (
                 <div className="px-5 py-5 space-y-5">
@@ -934,15 +1044,16 @@ export default function PublicMenuPage() {
               {/* ── STEP: DELIVERY ── */}
               {step === 'delivery' && (
                 <div className="px-5 py-5 space-y-5">
-                  {/* Pickup / Delivery toggle */}
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+                  {/* Pickup / Delivery / Mesa toggle */}
+                  <div className={`grid gap-2 p-1 bg-slate-100 rounded-2xl ${mesaParam ? 'grid-cols-3' : 'grid-cols-2'}`}>
                     {([
                       { value: 'pickup' as const, label: 'Retirada', icon: ShoppingBag },
                       { value: 'delivery' as const, label: 'Delivery', icon: Truck },
+                      ...(mesaParam ? [{ value: 'table' as const, label: mesaParam, icon: LayoutGrid }] : []),
                     ] as const).map(opt => (
                       <button
                         key={opt.value}
-                        onClick={() => setDeliveryType(opt.value)}
+                        onClick={() => setDeliveryType(opt.value as 'pickup' | 'delivery' | 'table')}
                         className="py-3 rounded-xl flex flex-col items-center gap-1.5 transition-all duration-200 text-sm font-bold"
                         style={deliveryType === opt.value
                           ? { backgroundColor: '#fff', color: accent, boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }
@@ -1158,18 +1269,42 @@ export default function PublicMenuPage() {
 
               {/* ── STEP: SUCCESS ── */}
               {step === 'success' && (
-                <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-                  <div className="w-24 h-24 rounded-full bg-emerald-500 flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/30">
-                    <Check className="w-12 h-12 text-white" strokeWidth={3} />
+                <div className="flex flex-col items-center py-8 px-6 text-center">
+                  <div className="w-20 h-20 rounded-full bg-emerald-500 flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/30">
+                    <Check className="w-10 h-10 text-white" strokeWidth={3} />
                   </div>
                   <h3 className="text-2xl font-extrabold text-slate-900">Pago!</h3>
-                  <p className="text-slate-400 mt-2 leading-relaxed">Seu pedido foi confirmado e está sendo preparado. Obrigado!</p>
+                  <p className="text-slate-400 mt-2 leading-relaxed text-sm">Seu pedido foi confirmado e está sendo preparado.</p>
+                  {!ratingSubmitted && placedOrderId && (
+                    <div className="w-full mt-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <p className="text-sm font-bold text-slate-700 mb-3">Como foi sua experiência?</p>
+                      <div className="flex justify-center gap-1 mb-3">
+                        {[1,2,3,4,5].map(s => (
+                          <button key={s} onClick={() => setOrderRating(s)} className="p-1 transition-transform active:scale-90">
+                            <Star className={`w-8 h-8 ${s <= orderRating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                          </button>
+                        ))}
+                      </div>
+                      {orderRating > 0 && (
+                        <>
+                          <input value={ratingComment} onChange={e => setRatingComment(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white mb-2 focus:outline-none placeholder:text-slate-300"
+                            placeholder="Deixe um comentário (opcional)" />
+                          <button onClick={async () => {
+                            if (!placedOrderId) return;
+                            await db.updateOrder(placedOrderId, { rating: orderRating, ratingComment: ratingComment || undefined });
+                            setRatingSubmitted(true);
+                          }} className="w-full py-2.5 rounded-xl text-white text-sm font-bold" style={{ backgroundColor: accent }}>
+                            Enviar avaliação
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {ratingSubmitted && <p className="text-sm text-emerald-600 font-semibold mt-4">Obrigado pela avaliação! ⭐</p>}
                   {customer && (
-                    <button
-                      onClick={() => { closeAndReset(); navigate(`/m/${slug}/conta`); }}
-                      className="mt-5 px-5 py-2.5 rounded-2xl text-sm font-bold text-white"
-                      style={{ backgroundColor: accent }}
-                    >
+                    <button onClick={() => { closeAndReset(); navigate(`/m/${slug}/conta`); }}
+                      className="mt-4 px-5 py-2.5 rounded-2xl text-sm font-bold text-white" style={{ backgroundColor: accent }}>
                       Acompanhar pedido
                     </button>
                   )}
@@ -1178,24 +1313,50 @@ export default function PublicMenuPage() {
 
               {/* ── STEP: ORDER PLACED ── */}
               {step === 'order_placed' && (
-                <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-                  <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-lg" style={{ backgroundColor: accent, boxShadow: `0 10px 40px ${accent}40` }}>
-                    <Check className="w-12 h-12 text-white" strokeWidth={3} />
+                <div className="flex flex-col items-center py-8 px-6 text-center">
+                  <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5 shadow-lg" style={{ backgroundColor: accent, boxShadow: `0 10px 40px ${accent}40` }}>
+                    <Check className="w-10 h-10 text-white" strokeWidth={3} />
                   </div>
                   <h3 className="text-2xl font-extrabold text-slate-900">Pedido feito!</h3>
                   <p className="text-slate-400 mt-2 leading-relaxed text-sm">
-                    {selectedPayment === 'cash'
+                    {deliveryType === 'table'
+                      ? `Seu pedido foi recebido para ${mesaParam}.`
+                      : selectedPayment === 'cash'
                       ? `Pague em dinheiro na ${deliveryType === 'delivery' ? 'entrega' : 'retirada'}.${cashChange ? ` Troco para R$ ${cashChange}.` : ''}`
                       : selectedPayment === 'meal_voucher'
                       ? `Apresente o vale-refeição na ${deliveryType === 'delivery' ? 'entrega' : 'retirada'}.`
                       : `Pague com cartão na ${deliveryType === 'delivery' ? 'entrega' : 'retirada'}.`}
                   </p>
+                  {!ratingSubmitted && placedOrderId && (
+                    <div className="w-full mt-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <p className="text-sm font-bold text-slate-700 mb-3">Como foi sua experiência?</p>
+                      <div className="flex justify-center gap-1 mb-3">
+                        {[1,2,3,4,5].map(s => (
+                          <button key={s} onClick={() => setOrderRating(s)} className="p-1 transition-transform active:scale-90">
+                            <Star className={`w-8 h-8 ${s <= orderRating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                          </button>
+                        ))}
+                      </div>
+                      {orderRating > 0 && (
+                        <>
+                          <input value={ratingComment} onChange={e => setRatingComment(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white mb-2 focus:outline-none placeholder:text-slate-300"
+                            placeholder="Deixe um comentário (opcional)" />
+                          <button onClick={async () => {
+                            if (!placedOrderId) return;
+                            await db.updateOrder(placedOrderId, { rating: orderRating, ratingComment: ratingComment || undefined });
+                            setRatingSubmitted(true);
+                          }} className="w-full py-2.5 rounded-xl text-white text-sm font-bold" style={{ backgroundColor: accent }}>
+                            Enviar avaliação
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {ratingSubmitted && <p className="text-sm text-emerald-600 font-semibold mt-4">Obrigado pela avaliação! ⭐</p>}
                   {customer && (
-                    <button
-                      onClick={() => { closeAndReset(); navigate(`/m/${slug}/conta`); }}
-                      className="mt-5 px-5 py-2.5 rounded-2xl text-sm font-bold text-white"
-                      style={{ backgroundColor: accent }}
-                    >
+                    <button onClick={() => { closeAndReset(); navigate(`/m/${slug}/conta`); }}
+                      className="mt-4 px-5 py-2.5 rounded-2xl text-sm font-bold text-white" style={{ backgroundColor: accent }}>
                       Acompanhar pedido
                     </button>
                   )}
@@ -1252,10 +1413,16 @@ export default function PublicMenuPage() {
                         <span className="text-sm font-bold text-slate-700">R$ {deliveryFee.toFixed(2).replace('.', ',')}</span>
                       </div>
                     )}
+                    {couponDiscount > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-emerald-600 font-medium flex items-center gap-1"><Tag className="w-3.5 h-3.5" /> Desconto</span>
+                        <span className="text-sm font-bold text-emerald-600">-R$ {couponDiscount.toFixed(2).replace('.', ',')}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center pt-1.5 border-t border-slate-100">
                       <span className="text-sm font-bold text-slate-700">Total</span>
                       <span className="text-lg font-extrabold tracking-tight" style={{ color: accent }}>
-                        R$ {cartTotal.toFixed(2).replace('.', ',')}
+                        R$ {Math.max(0, cartTotal).toFixed(2).replace('.', ',')}
                       </span>
                     </div>
                   </div>
