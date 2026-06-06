@@ -119,9 +119,15 @@ export default function PublicMenuPage() {
       }
       return;
     }
-    await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, deliveryType === 'delivery' ? address : null, null, customer?.id);
-    setStep('order_placed');
-  }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address]);
+    setErrorMsg('');
+    try {
+      await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, deliveryType === 'delivery' ? address : null, null, customer?.id);
+      setStep('order_placed');
+    } catch (err) {
+      setErrorMsg(String(err));
+      setStep('error');
+    }
+  }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address, customer]);
 
   useEffect(() => {
     if (!polling || !settings?.xgateEmail || !pixTxId) return;

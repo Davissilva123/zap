@@ -149,14 +149,17 @@ export const db = {
   },
 
   async addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<Order> {
-    const { data, error } = await supabase.from('orders').insert({
-      user_id: order.userId, customer_user_id: order.customerUserId ?? null,
+    const row: Record<string, unknown> = {
+      user_id: order.userId,
       items: order.items, total: order.total, status: order.status,
       customer_name: order.customerName, customer_phone: order.customerPhone,
       payment_method: order.paymentMethod, delivery_address: order.deliveryAddress,
       delivery_type: order.deliveryType, pix_tx_id: order.pixTxId,
       pix_qr_code: order.pixQrCode, pix_copy_paste: order.pixCopyPaste, paid_at: order.paidAt,
-    }).select().single();
+    };
+    // Only include customer_user_id after supabase-customer-setup.sql has been run
+    if (order.customerUserId) row.customer_user_id = order.customerUserId;
+    const { data, error } = await supabase.from('orders').insert(row).select().single();
     if (error) throw error;
     return toOrder(data as OrderRow);
   },
