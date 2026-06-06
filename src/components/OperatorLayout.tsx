@@ -1,4 +1,4 @@
-import { Receipt, BarChart2, UtensilsCrossed, Tag, LogOut, Menu, Zap, X } from 'lucide-react';
+import { Receipt, BarChart2, UtensilsCrossed, Tag, LogOut, Menu, Zap, X, LayoutGrid } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState } from 'react';
