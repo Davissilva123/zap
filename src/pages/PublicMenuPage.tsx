@@ -486,7 +486,7 @@ export default function PublicMenuPage() {
       )}
 
       {/* Footer */}
-      <div className="text-center py-8 text-[11px] text-slate-400 font-medium">Cardápio Digital</div>
+      <div className="text-center py-8 text-[11px] text-slate-400 font-medium">ZapMenu</div>
     </div>
   );
 }

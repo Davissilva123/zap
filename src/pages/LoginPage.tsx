@@ -35,7 +35,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white mb-5 shadow-glow">
             <ChefHat className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Cardápio Digital</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">ZapMenu</h1>
           <p className="text-slate-500 mt-1.5 text-sm">Gerencie seu menu com QR Code</p>
         </div>
 

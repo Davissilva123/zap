@@ -33,7 +33,7 @@ export default function Layout() {
             <ChefHat className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
-            <h2 className="font-bold text-slate-900 text-[15px] tracking-tight">Cardápio Digital</h2>
+            <h2 className="font-bold text-slate-900 text-[15px] tracking-tight">ZapMenu</h2>
             <p className="text-[11px] text-slate-400 truncate max-w-[140px] leading-tight mt-0.5">{user?.name}</p>
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function Layout() {
             <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center">
               <ChefHat className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-bold text-slate-900 text-sm tracking-tight">Cardápio Digital</span>
+            <span className="font-bold text-slate-900 text-sm tracking-tight">ZapMenu</span>
           </div>
         </header>
 
