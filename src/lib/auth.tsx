@@ -29,11 +29,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error) console.error('[Auth] getSession error:', error);
       if (session?.user) {
         const u = toUser(session.user);
-        db.ensureSettings(u.id, u.name);
+        await db.ensureSettings(u.id, u.name);
         setUser(u);
       }
       setLoading(false);
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = supabase.auth.onAuthStateChange((_event, session) => {
         if (session?.user) {
           const u = toUser(session.user);
-          db.ensureSettings(u.id, u.name);
+          db.ensureSettings(u.id, u.name); // fire-and-forget, callback não suporta async
           setUser(u);
         } else {
           setUser(null);

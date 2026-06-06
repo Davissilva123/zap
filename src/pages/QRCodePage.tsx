@@ -14,7 +14,7 @@ export default function QRCodePage() {
 
   useEffect(() => {
     if (!user) return;
-    setSettings(db.getSettings(user.id));
+    db.getSettings(user.id).then(s => { if (s) setSettings(s); });
   }, [user]);
 
   if (!user || !settings) return null;
@@ -57,16 +57,9 @@ export default function QRCodePage() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-5">
-        {/* QR Code card */}
         <div className="card p-8 flex flex-col items-center">
           <div ref={qrRef} className="p-5 bg-white rounded-2xl border-2 border-slate-100 shadow-sm mb-5">
-            <QRCodeSVG
-              value={menuUrl}
-              size={200}
-              level="H"
-              fgColor={settings.accentColor}
-              bgColor="#ffffff"
-            />
+            <QRCodeSVG value={menuUrl} size={200} level="H" fgColor={settings.accentColor} bgColor="#ffffff" />
           </div>
           <p className="text-sm text-slate-400 mb-5 font-medium">Escaneie para ver o cardápio</p>
           <div className="flex gap-2.5 w-full">
@@ -79,7 +72,6 @@ export default function QRCodePage() {
           </div>
         </div>
 
-        {/* Info cards */}
         <div className="space-y-3">
           <div className="card p-5">
             <h3 className="font-semibold text-slate-900 text-sm mb-3 flex items-center gap-2">

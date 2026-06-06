@@ -16,7 +16,7 @@ const statusConfig: Record<string, { label: string; icon: typeof Clock; color: s
 };
 
 function formatAddress(addr: { street: string; number: string; complement: string; neighborhood: string; city: string; state: string }) {
-  let parts = [addr.street, addr.number].filter(Boolean);
+  const parts = [addr.street, addr.number].filter(Boolean);
   if (addr.complement) parts.push(`(${addr.complement})`);
   parts.push(addr.neighborhood, addr.city);
   if (addr.state) parts.push(addr.state);
@@ -33,41 +33,32 @@ export default function OrdersPage() {
   const [whatsappSent, setWhatsappSent] = useState<Record<string, boolean>>({});
   const [whatsappError, setWhatsappError] = useState<string>('');
 
-  const load = () => {
+  const load = async () => {
     if (!user) return;
-    setOrders(db.getOrders(user.id));
-    setSettings(db.getSettings(user.id));
+    const [o, s] = await Promise.all([db.getOrders(user.id), db.getSettings(user.id)]);
+    setOrders(o);
+    setSettings(s);
   };
 
-  useEffect(load, [user]);
-
+  useEffect(() => { load(); }, [user]);
   if (!user) return null;
 
   const filtered = orders.filter(o => !filter || o.status === filter);
   const formatDate = (d: string) => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-
   const whatsappConfigured = settings?.whatsappEnabled && settings?.whatsappApiToken && settings?.whatsappPhoneNumberId;
 
   const updateStatus = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
-    db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined });
+    await db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined });
     load();
     if (selectedOrder?.id === orderId) {
       setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
     }
-
-    // Send WhatsApp notification if configured
     if (whatsappConfigured && order && settings) {
       setSendingWhatsapp(orderId);
       setWhatsappError('');
       try {
-        await sendWhatsAppNotification(
-          settings.whatsappApiToken,
-          settings.whatsappPhoneNumberId,
-          { ...order, status: newStatus as Order['status'] },
-          settings.name,
-          newStatus
-        );
+        await sendWhatsAppNotification(settings.whatsappApiToken, settings.whatsappPhoneNumberId, { ...order, status: newStatus as Order['status'] }, settings.name, newStatus);
         setWhatsappSent(prev => ({ ...prev, [orderId]: true }));
       } catch (err) {
         setWhatsappError(String(err));
@@ -82,13 +73,7 @@ export default function OrdersPage() {
     setSendingWhatsapp(order.id);
     setWhatsappError('');
     try {
-      await sendWhatsAppNotification(
-        settings.whatsappApiToken,
-        settings.whatsappPhoneNumberId,
-        order,
-        settings.name,
-        status
-      );
+      await sendWhatsAppNotification(settings.whatsappApiToken, settings.whatsappPhoneNumberId, order, settings.name, status);
       setWhatsappSent(prev => ({ ...prev, [order.id]: true }));
     } catch (err) {
       setWhatsappError(String(err));
@@ -111,7 +96,6 @@ export default function OrdersPage() {
         )}
       </div>
 
-
       {whatsappError && (
         <div className="card p-4 flex items-center gap-3 border-red-100 bg-red-50/50 animate-scale-in">
           <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
@@ -123,19 +107,12 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Filters */}
       <div className="flex gap-1.5 flex-wrap">
         {[['', 'Todos'], ['PENDING', 'Pendente'], ['PAID', 'Pago'], ['PREPARING', 'Preparando'], ['DELIVERING', 'Entregando'], ['COMPLETED', 'Concluído'], ['CANCELLED', 'Cancelado']].map(([f, label]) => {
           const cfg = f ? statusConfig[f] : null;
           const active = filter === f;
           return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 ${
-                active ? `${cfg?.bg || 'bg-slate-100'} ${cfg?.color || 'text-slate-900'} shadow-sm` : 'text-slate-500 hover:bg-slate-100/60'
-              }`}
-            >
+            <button key={f} onClick={() => setFilter(f)} className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 ${active ? `${cfg?.bg || 'bg-slate-100'} ${cfg?.color || 'text-slate-900'} shadow-sm` : 'text-slate-500 hover:bg-slate-100/60'}`}>
               {f && cfg && <cfg.icon className="w-3.5 h-3.5" />}
               {label}
             </button>
@@ -184,11 +161,7 @@ export default function OrdersPage() {
                   <span className="text-[17px] font-bold text-slate-900 tracking-tight flex-shrink-0">R$ {order.total.toFixed(2).replace('.', ',')}</span>
                   {isSending && <Loader2 className="w-5 h-5 animate-spin text-emerald-500 flex-shrink-0" />}
                   {whatsappConfigured && !wasSent && !isSending && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); sendManualWhatsapp(order, order.status); }}
-                      className="p-2 rounded-xl hover:bg-emerald-50 transition-colors flex-shrink-0"
-                      title="Enviar notificação WhatsApp"
-                    >
+                    <button onClick={(e) => { e.stopPropagation(); sendManualWhatsapp(order, order.status); }} className="p-2 rounded-xl hover:bg-emerald-50 transition-colors flex-shrink-0" title="Enviar notificação WhatsApp">
                       <MessageCircle className="w-4 h-4 text-emerald-500" />
                     </button>
                   )}
@@ -202,7 +175,6 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Detail modal */}
       {selectedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm" onClick={() => setSelectedOrder(null)} />
@@ -224,45 +196,17 @@ export default function OrdersPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Status</p>
-                  {(() => {
-                    const c = statusConfig[selectedOrder.status] || statusConfig.PENDING;
-                    return (
-                      <span className={`badge ${c.bg} ${c.color}`}>
-                        <c.icon className="w-3.5 h-3.5" /> {c.label}
-                      </span>
-                    );
-                  })()}
+                  {(() => { const c = statusConfig[selectedOrder.status] || statusConfig.PENDING; return <span className={`badge ${c.bg} ${c.color}`}><c.icon className="w-3.5 h-3.5" /> {c.label}</span>; })()}
                 </div>
                 <div className="flex gap-1.5 flex-wrap justify-end">
-                  {selectedOrder.status === 'PENDING' && (
-                    <button onClick={() => updateStatus(selectedOrder.id, 'PAID')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100/80 transition-colors">
-                      Confirmar pgto
-                    </button>
-                  )}
-                  {(selectedOrder.status === 'PAID' || selectedOrder.status === 'PENDING') && (
-                    <button onClick={() => updateStatus(selectedOrder.id, 'PREPARING')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100/80 transition-colors">
-                      Preparar
-                    </button>
-                  )}
-                  {selectedOrder.status === 'PREPARING' && selectedOrder.deliveryType === 'delivery' && (
-                    <button onClick={() => updateStatus(selectedOrder.id, 'DELIVERING')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-100/80 transition-colors">
-                      Saiu para entrega
-                    </button>
-                  )}
-                  {selectedOrder.status === 'PREPARING' && selectedOrder.deliveryType === 'pickup' && (
-                    <button onClick={() => updateStatus(selectedOrder.id, 'COMPLETED')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200/80 transition-colors">
-                      Entregue
-                    </button>
-                  )}
-                  {selectedOrder.status === 'DELIVERING' && (
-                    <button onClick={() => updateStatus(selectedOrder.id, 'COMPLETED')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200/80 transition-colors">
-                      Entregue
-                    </button>
-                  )}
+                  {selectedOrder.status === 'PENDING' && <button onClick={() => updateStatus(selectedOrder.id, 'PAID')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100/80 transition-colors">Confirmar pgto</button>}
+                  {(selectedOrder.status === 'PAID' || selectedOrder.status === 'PENDING') && <button onClick={() => updateStatus(selectedOrder.id, 'PREPARING')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100/80 transition-colors">Preparar</button>}
+                  {selectedOrder.status === 'PREPARING' && selectedOrder.deliveryType === 'delivery' && <button onClick={() => updateStatus(selectedOrder.id, 'DELIVERING')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-100/80 transition-colors">Saiu para entrega</button>}
+                  {selectedOrder.status === 'PREPARING' && selectedOrder.deliveryType === 'pickup' && <button onClick={() => updateStatus(selectedOrder.id, 'COMPLETED')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200/80 transition-colors">Entregue</button>}
+                  {selectedOrder.status === 'DELIVERING' && <button onClick={() => updateStatus(selectedOrder.id, 'COMPLETED')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200/80 transition-colors">Entregue</button>}
                 </div>
               </div>
 
-              {/* WhatsApp notification info */}
               {whatsappConfigured && (
                 <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100/50 space-y-2.5">
                   <div className="flex items-center justify-between">
@@ -274,21 +218,10 @@ export default function OrdersPage() {
                       {sendingWhatsapp === selectedOrder.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />}
                     </div>
                     {!whatsappSent[selectedOrder.id] && sendingWhatsapp !== selectedOrder.id && (
-                      <button
-                        onClick={() => sendManualWhatsapp(selectedOrder, selectedOrder.status)}
-                        className="px-3 py-1 text-[11px] font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-                      >
-                        Enviar agora
-                      </button>
+                      <button onClick={() => sendManualWhatsapp(selectedOrder, selectedOrder.status)} className="px-3 py-1 text-[11px] font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">Enviar agora</button>
                     )}
                     {whatsappSent[selectedOrder.id] && (
-                      <button
-                        onClick={() => sendManualWhatsapp(selectedOrder, selectedOrder.status)}
-                        className="px-3 py-1 text-[11px] font-semibold rounded-lg bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 transition-colors"
-                        disabled={sendingWhatsapp === selectedOrder.id}
-                      >
-                        Reenviar
-                      </button>
+                      <button onClick={() => sendManualWhatsapp(selectedOrder, selectedOrder.status)} className="px-3 py-1 text-[11px] font-semibold rounded-lg bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 transition-colors" disabled={sendingWhatsapp === selectedOrder.id}>Reenviar</button>
                     )}
                   </div>
                 </div>

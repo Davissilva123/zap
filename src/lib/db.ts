@@ -1,324 +1,167 @@
-import type { User, Category, MenuItem, Scan, RestaurantSettings, Order } from './types';
+import { supabase } from './supabase';
+import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress } from './types';
 
-const KEYS = {
-  users: 'cardapio_users',
-  categories: 'cardapio_categories',
-  menuItems: 'cardapio_menu_items',
-  scans: 'cardapio_scans',
-  settings: 'cardapio_settings',
-  currentUserId: 'cardapio_current_user',
-  orders: 'cardapio_orders',
-};
-
-function read<T>(key: string): T[] {
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
+// ---- Supabase row shapes (snake_case) ----
+interface SettingsRow {
+  user_id: string; name: string; slug: string; accent_color: string;
+  description: string; address: string; phone: string; logo_url: string;
+  xgate_email: string; xgate_password: string; payment_methods: string[];
+  whatsapp_api_token: string; whatsapp_phone_number_id: string; whatsapp_enabled: boolean;
+  created_at: string;
 }
+interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; created_at: string; }
+interface MenuItemRow { id: string; user_id: string; category_id: string; name: string; description: string; emoji: string; price: number; available: boolean; order: number; created_at: string; }
+interface ScanRow { id: string; user_id: string; scanned_at: string; }
+interface OrderRow { id: string; user_id: string; items: OrderItem[]; total: number; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; created_at: string; paid_at: string | null; }
 
-function write<T>(key: string, data: T[]): void {
-  localStorage.setItem(key, JSON.stringify(data));
+// ---- Mappers ----
+function toSettings(r: SettingsRow): RestaurantSettings {
+  return { userId: r.user_id, name: r.name, slug: r.slug, accentColor: r.accent_color, description: r.description, address: r.address, phone: r.phone, logoUrl: r.logo_url, xgateEmail: r.xgate_email, xgatePassword: r.xgate_password, paymentMethods: r.payment_methods as PaymentMethod[], whatsappApiToken: r.whatsapp_api_token, whatsappPhoneNumberId: r.whatsapp_phone_number_id, whatsappEnabled: r.whatsapp_enabled };
 }
+function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, createdAt: r.created_at }; }
+function toMenuItem(r: MenuItemRow): MenuItem { return { id: r.id, userId: r.user_id, categoryId: r.category_id, name: r.name, description: r.description, emoji: r.emoji, price: Number(r.price), available: r.available, order: r.order, createdAt: r.created_at }; }
+function toScan(r: ScanRow): Scan { return { id: r.id, userId: r.user_id, scannedAt: r.scanned_at }; }
+function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, items: r.items, total: Number(r.total), status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as 'pickup' | 'delivery', pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, createdAt: r.created_at, paidAt: r.paid_at }; }
 
-function genId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
-}
-
-// Seed demo data
-function seedIfEmpty() {
-  const users = read<User>(KEYS.users);
-  if (users.length > 0) return;
-
-  const demoUser: User = {
-    id: 'demo_user_1',
-    name: 'João Silva',
-    email: 'joao@exemplo.com',
-    password: '123456',
-    createdAt: new Date().toISOString(),
-  };
-
-  const categories: Category[] = [
-    { id: 'cat_1', userId: demoUser.id, name: 'Entradas', emoji: '🥗', order: 0, createdAt: new Date().toISOString() },
-    { id: 'cat_2', userId: demoUser.id, name: 'Pratos Principais', emoji: '🍽️', order: 1, createdAt: new Date().toISOString() },
-    { id: 'cat_3', userId: demoUser.id, name: 'Sobremesas', emoji: '🍰', order: 2, createdAt: new Date().toISOString() },
-    { id: 'cat_4', userId: demoUser.id, name: 'Bebidas', emoji: '🥤', order: 3, createdAt: new Date().toISOString() },
-  ];
-
-  const menuItems: MenuItem[] = [
-    { id: 'item_1', userId: demoUser.id, categoryId: 'cat_1', name: 'Bruschetta', description: 'Pão italiano com tomate fresco, manjericão e azeite', price: 18.90, emoji: '🥖', available: true, order: 0, createdAt: new Date().toISOString() },
-    { id: 'item_2', userId: demoUser.id, categoryId: 'cat_1', name: 'Salada Caesar', description: 'Alface romana, croutons, parmesão e molho caesar', price: 24.90, emoji: '🥗', available: true, order: 1, createdAt: new Date().toISOString() },
-    { id: 'item_3', userId: demoUser.id, categoryId: 'cat_1', name: 'Carpaccio', description: 'Finas fatias de carne com rúcula, parmesão e alcaparras', price: 32.00, emoji: '🥩', available: false, order: 2, createdAt: new Date().toISOString() },
-    { id: 'item_4', userId: demoUser.id, categoryId: 'cat_2', name: 'Risoto de Cogumelos', description: 'Arroz arbóreo cremoso com mix de cogumelos e trufa', price: 45.90, emoji: '🍚', available: true, order: 0, createdAt: new Date().toISOString() },
-    { id: 'item_5', userId: demoUser.id, categoryId: 'cat_2', name: 'Salmão Grelhado', description: 'Filé de salmão com molho de manteiga e ervas, legumes assados', price: 58.90, emoji: '🐟', available: true, order: 1, createdAt: new Date().toISOString() },
-    { id: 'item_6', userId: demoUser.id, categoryId: 'cat_2', name: 'Picanha na Brasa', description: 'Picanha grelhada com farofa, vinagrete e batata frita', price: 62.00, emoji: '🥩', available: true, order: 2, createdAt: new Date().toISOString() },
-    { id: 'item_7', userId: demoUser.id, categoryId: 'cat_3', name: 'Petit Gâteau', description: 'Bolo de chocolate com centro derretido e sorvete de baunilha', price: 28.90, emoji: '🍫', available: true, order: 0, createdAt: new Date().toISOString() },
-    { id: 'item_8', userId: demoUser.id, categoryId: 'cat_3', name: 'Tiramisu', description: 'Sobremesa italiana com mascarpone, café e cacau', price: 26.00, emoji: '🍰', available: true, order: 1, createdAt: new Date().toISOString() },
-    { id: 'item_9', userId: demoUser.id, categoryId: 'cat_4', name: 'Suco Natural', description: 'Laranja, limão, abacaxi ou maracujá', price: 12.90, emoji: '🍊', available: true, order: 0, createdAt: new Date().toISOString() },
-    { id: 'item_10', userId: demoUser.id, categoryId: 'cat_4', name: 'Caipirinha', description: 'Cachaça, limão e açúcar — clássica brasileira', price: 22.00, emoji: '🍹', available: true, order: 1, createdAt: new Date().toISOString() },
-  ];
-
-  const scans: Scan[] = Array.from({ length: 14 }, (_, i) => ({
-    id: genId(),
-    userId: demoUser.id,
-    scannedAt: new Date(Date.now() - (13 - i) * 86400000).toISOString(),
-  }));
-
-  const settings: RestaurantSettings = {
-    userId: demoUser.id,
-    name: 'Restaurante do João',
-    slug: 'restaurante-do-joao',
-    accentColor: '#059669',
-    description: 'Cozinha contemporânea com ingredientes frescos e selecionados',
-    address: 'Rua das Flores, 123 — São Paulo, SP',
-    phone: '(11) 99999-0000',
-    logoUrl: '',
-    xgateEmail: '',
-    xgatePassword: '',
-    paymentMethods: ['pix', 'credit_card', 'debit_card', 'cash'],
-    whatsappApiToken: '',
-    whatsappPhoneNumberId: '',
-    whatsappEnabled: false,
-  };
-
-  write(KEYS.users, [demoUser]);
-  write(KEYS.categories, categories);
-  write(KEYS.menuItems, menuItems);
-  write(KEYS.scans, scans);
-  write(KEYS.settings, [settings]);
-}
-
-seedIfEmpty();
-
-// Migrate existing data for new fields
-(function migrate() {
-  const allSettings = read<RestaurantSettings>(KEYS.settings);
-  let changed = false;
-  allSettings.forEach((s, i) => {
-    if (!s.paymentMethods) {
-      allSettings[i].paymentMethods = ['pix', 'cash'];
-      changed = true;
-    }
-    if (s.xgateEmail === undefined) {
-      allSettings[i].xgateEmail = '';
-      allSettings[i].xgatePassword = '';
-      changed = true;
-    }
-    if (s.whatsappApiToken === undefined) {
-      allSettings[i].whatsappApiToken = '';
-      allSettings[i].whatsappPhoneNumberId = '';
-      allSettings[i].whatsappEnabled = false;
-      changed = true;
-    }
-  });
-  if (changed) write(KEYS.settings, allSettings);
-
-  const allOrders = read<Order>(KEYS.orders);
-  let orderChanged = false;
-  allOrders.forEach((o, i) => {
-    if (!o.paymentMethod) {
-      allOrders[i].paymentMethod = o.pixTxId ? 'pix' : 'cash';
-      orderChanged = true;
-    }
-    if (!o.deliveryType) {
-      allOrders[i].deliveryType = 'pickup';
-      orderChanged = true;
-    }
-    if (o.deliveryAddress === undefined) {
-      allOrders[i].deliveryAddress = null;
-      orderChanged = true;
-    }
-  });
-  if (orderChanged) write(KEYS.orders, allOrders);
-})();
-
-// Users
 export const db = {
-  // Auth
-  login(email: string, password: string): User | null {
-    const users = read<User>(KEYS.users);
-    const user = users.find(u => u.email === email && u.password === password);
-    if (user) {
-      localStorage.setItem(KEYS.currentUserId, user.id);
-      return user;
-    }
-    return null;
+  // ---- Settings ----
+  async ensureSettings(userId: string, name: string): Promise<void> {
+    const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    await supabase.from('restaurant_settings').upsert({
+      user_id: userId, name, slug, accent_color: '#059669', description: '', address: '', phone: '', logo_url: '',
+      xgate_email: '', xgate_password: '', payment_methods: ['pix', 'cash'],
+      whatsapp_api_token: '', whatsapp_phone_number_id: '', whatsapp_enabled: false,
+    }, { onConflict: 'user_id', ignoreDuplicates: true });
   },
 
-  register(name: string, email: string, password: string): User | null {
-    const users = read<User>(KEYS.users);
-    if (users.find(u => u.email === email)) return null;
-    const user: User = { id: genId(), name, email, password, createdAt: new Date().toISOString() };
-    users.push(user);
-    write(KEYS.users, users);
-
-    const settings: RestaurantSettings = {
-      userId: user.id,
-      name: name,
-      slug: name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-      accentColor: '#059669',
-      description: '',
-      address: '',
-      phone: '',
-      logoUrl: '',
-      xgateEmail: '',
-      xgatePassword: '',
-      paymentMethods: ['pix', 'cash'],
-      whatsappApiToken: '',
-      whatsappPhoneNumberId: '',
-      whatsappEnabled: false,
-    };
-    write(KEYS.settings, [...read<RestaurantSettings>(KEYS.settings), settings]);
-
-    localStorage.setItem(KEYS.currentUserId, user.id);
-    return user;
+  async getSettings(userId: string): Promise<RestaurantSettings | null> {
+    const { data, error } = await supabase.from('restaurant_settings').select('*').eq('user_id', userId).maybeSingle();
+    if (error) { console.error('[db.getSettings]', error); return null; }
+    return data ? toSettings(data as SettingsRow) : null;
   },
 
-  getCurrentUser(): User | null {
-    const id = localStorage.getItem(KEYS.currentUserId);
-    if (!id) return null;
-    return read<User>(KEYS.users).find(u => u.id === id) || null;
+  async updateSettings(userId: string, updates: Partial<RestaurantSettings>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.name !== undefined) row.name = updates.name;
+    if (updates.slug !== undefined) row.slug = updates.slug;
+    if (updates.accentColor !== undefined) row.accent_color = updates.accentColor;
+    if (updates.description !== undefined) row.description = updates.description;
+    if (updates.address !== undefined) row.address = updates.address;
+    if (updates.phone !== undefined) row.phone = updates.phone;
+    if (updates.logoUrl !== undefined) row.logo_url = updates.logoUrl;
+    if (updates.xgateEmail !== undefined) row.xgate_email = updates.xgateEmail;
+    if (updates.xgatePassword !== undefined) row.xgate_password = updates.xgatePassword;
+    if (updates.paymentMethods !== undefined) row.payment_methods = updates.paymentMethods;
+    if (updates.whatsappApiToken !== undefined) row.whatsapp_api_token = updates.whatsappApiToken;
+    if (updates.whatsappPhoneNumberId !== undefined) row.whatsapp_phone_number_id = updates.whatsappPhoneNumberId;
+    if (updates.whatsappEnabled !== undefined) row.whatsapp_enabled = updates.whatsappEnabled;
+    await supabase.from('restaurant_settings').update(row).eq('user_id', userId);
   },
 
-  logout() {
-    localStorage.removeItem(KEYS.currentUserId);
+  // ---- Categories ----
+  async getCategories(userId: string): Promise<Category[]> {
+    const { data, error } = await supabase.from('categories').select('*').eq('user_id', userId).order('order', { ascending: true });
+    if (error) { console.error('[db.getCategories]', error); return []; }
+    return (data as CategoryRow[]).map(toCategory);
   },
 
-  ensureSettings(userId: string, name: string): void {
-    if (db.getSettings(userId)) return;
-    const settings: RestaurantSettings = {
-      userId,
-      name,
-      slug: name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
-      accentColor: '#059669',
-      description: '',
-      address: '',
-      phone: '',
-      logoUrl: '',
-      xgateEmail: '',
-      xgatePassword: '',
-      paymentMethods: ['pix', 'cash'],
-      whatsappApiToken: '',
-      whatsappPhoneNumberId: '',
-      whatsappEnabled: false,
-    };
-    write(KEYS.settings, [...read<RestaurantSettings>(KEYS.settings), settings]);
+  async addCategory(userId: string, name: string, emoji: string): Promise<Category> {
+    const { data: existing } = await supabase.from('categories').select('order').eq('user_id', userId).order('order', { ascending: false }).limit(1);
+    const maxOrder = existing && existing.length > 0 ? (existing[0] as { order: number }).order : -1;
+    const { data, error } = await supabase.from('categories').insert({ user_id: userId, name, emoji, order: maxOrder + 1 }).select().single();
+    if (error) throw error;
+    return toCategory(data as CategoryRow);
   },
 
-  // Categories
-  getCategories(userId: string): Category[] {
-    return read<Category>(KEYS.categories).filter(c => c.userId === userId).sort((a, b) => a.order - b.order);
+  async updateCategory(id: string, updates: Partial<Pick<Category, 'name' | 'emoji' | 'order'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.name !== undefined) row.name = updates.name;
+    if (updates.emoji !== undefined) row.emoji = updates.emoji;
+    if (updates.order !== undefined) row.order = updates.order;
+    await supabase.from('categories').update(row).eq('id', id);
   },
 
-  addCategory(userId: string, name: string, emoji: string): Category {
-    const cats = read<Category>(KEYS.categories);
-    const maxOrder = cats.filter(c => c.userId === userId).reduce((max, c) => Math.max(max, c.order), -1);
-    const cat: Category = { id: genId(), userId, name, emoji, order: maxOrder + 1, createdAt: new Date().toISOString() };
-    cats.push(cat);
-    write(KEYS.categories, cats);
-    return cat;
+  async deleteCategory(id: string): Promise<void> {
+    await supabase.from('categories').delete().eq('id', id);
   },
 
-  updateCategory(id: string, updates: Partial<Pick<Category, 'name' | 'emoji' | 'order'>>): Category | null {
-    const cats = read<Category>(KEYS.categories);
-    const idx = cats.findIndex(c => c.id === id);
-    if (idx === -1) return null;
-    Object.assign(cats[idx], updates);
-    write(KEYS.categories, cats);
-    return cats[idx];
+  // ---- Menu Items ----
+  async getMenuItems(userId: string): Promise<MenuItem[]> {
+    const { data, error } = await supabase.from('menu_items').select('*').eq('user_id', userId).order('order', { ascending: true });
+    if (error) { console.error('[db.getMenuItems]', error); return []; }
+    return (data as MenuItemRow[]).map(toMenuItem);
   },
 
-  deleteCategory(id: string): void {
-    write(KEYS.categories, read<Category>(KEYS.categories).filter(c => c.id !== id));
-    write(KEYS.menuItems, read<MenuItem>(KEYS.menuItems).filter(m => m.categoryId !== id));
+  async addMenuItem(userId: string, item: Omit<MenuItem, 'id' | 'userId' | 'createdAt' | 'order'>): Promise<MenuItem> {
+    const { data: existing } = await supabase.from('menu_items').select('order').eq('user_id', userId).order('order', { ascending: false }).limit(1);
+    const maxOrder = existing && existing.length > 0 ? (existing[0] as { order: number }).order : -1;
+    const { data, error } = await supabase.from('menu_items').insert({ user_id: userId, category_id: item.categoryId, name: item.name, description: item.description, emoji: item.emoji, price: item.price, available: item.available, order: maxOrder + 1 }).select().single();
+    if (error) throw error;
+    return toMenuItem(data as MenuItemRow);
   },
 
-  // Menu Items
-  getMenuItems(userId: string): MenuItem[] {
-    return read<MenuItem>(KEYS.menuItems).filter(m => m.userId === userId).sort((a, b) => a.order - b.order);
+  async updateMenuItem(id: string, updates: Partial<Pick<MenuItem, 'name' | 'description' | 'price' | 'emoji' | 'available' | 'categoryId' | 'order'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.name !== undefined) row.name = updates.name;
+    if (updates.description !== undefined) row.description = updates.description;
+    if (updates.price !== undefined) row.price = updates.price;
+    if (updates.emoji !== undefined) row.emoji = updates.emoji;
+    if (updates.available !== undefined) row.available = updates.available;
+    if (updates.categoryId !== undefined) row.category_id = updates.categoryId;
+    if (updates.order !== undefined) row.order = updates.order;
+    await supabase.from('menu_items').update(row).eq('id', id);
   },
 
-  addMenuItem(userId: string, item: Omit<MenuItem, 'id' | 'userId' | 'createdAt' | 'order'>): MenuItem {
-    const items = read<MenuItem>(KEYS.menuItems);
-    const maxOrder = items.filter(m => m.userId === userId).reduce((max, m) => Math.max(max, m.order), -1);
-    const newItem: MenuItem = { ...item, id: genId(), userId, order: maxOrder + 1, createdAt: new Date().toISOString() };
-    items.push(newItem);
-    write(KEYS.menuItems, items);
-    return newItem;
+  async deleteMenuItem(id: string): Promise<void> {
+    await supabase.from('menu_items').delete().eq('id', id);
   },
 
-  updateMenuItem(id: string, updates: Partial<Pick<MenuItem, 'name' | 'description' | 'price' | 'emoji' | 'available' | 'categoryId' | 'order'>>): MenuItem | null {
-    const items = read<MenuItem>(KEYS.menuItems);
-    const idx = items.findIndex(m => m.id === id);
-    if (idx === -1) return null;
-    Object.assign(items[idx], updates);
-    write(KEYS.menuItems, items);
-    return items[idx];
+  // ---- Scans ----
+  async getScans(userId: string): Promise<Scan[]> {
+    const { data, error } = await supabase.from('scans').select('*').eq('user_id', userId);
+    if (error) { console.error('[db.getScans]', error); return []; }
+    return (data as ScanRow[]).map(toScan);
   },
 
-  deleteMenuItem(id: string): void {
-    write(KEYS.menuItems, read<MenuItem>(KEYS.menuItems).filter(m => m.id !== id));
+  async addScan(userId: string): Promise<void> {
+    await supabase.from('scans').insert({ user_id: userId });
   },
 
-  // Scans
-  getScans(userId: string): Scan[] {
-    return read<Scan>(KEYS.scans).filter(s => s.userId === userId);
+  // ---- Public Menu ----
+  async getPublicMenu(slug: string): Promise<{ settings: RestaurantSettings; categories: Category[]; items: MenuItem[] } | null> {
+    const { data: settingsData } = await supabase.from('restaurant_settings').select('*').eq('slug', slug).maybeSingle();
+    if (!settingsData) return null;
+    const settings = toSettings(settingsData as SettingsRow);
+    const [{ data: catsData }, { data: itemsData }] = await Promise.all([
+      supabase.from('categories').select('*').eq('user_id', settings.userId).order('order', { ascending: true }),
+      supabase.from('menu_items').select('*').eq('user_id', settings.userId).eq('available', true).order('order', { ascending: true }),
+    ]);
+    return { settings, categories: (catsData as CategoryRow[] || []).map(toCategory), items: (itemsData as MenuItemRow[] || []).map(toMenuItem) };
   },
 
-  addScan(userId: string): Scan {
-    const scans = read<Scan>(KEYS.scans);
-    const scan: Scan = { id: genId(), userId, scannedAt: new Date().toISOString() };
-    scans.push(scan);
-    write(KEYS.scans, scans);
-    return scan;
+  // ---- Orders ----
+  async getOrders(userId: string): Promise<Order[]> {
+    const { data, error } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    if (error) { console.error('[db.getOrders]', error); return []; }
+    return (data as OrderRow[]).map(toOrder);
   },
 
-  // Settings
-  getSettings(userId: string): RestaurantSettings | null {
-    return read<RestaurantSettings>(KEYS.settings).find(s => s.userId === userId) || null;
+  async addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<Order> {
+    const { data, error } = await supabase.from('orders').insert({
+      user_id: order.userId, items: order.items, total: order.total, status: order.status,
+      customer_name: order.customerName, customer_phone: order.customerPhone,
+      payment_method: order.paymentMethod, delivery_address: order.deliveryAddress,
+      delivery_type: order.deliveryType, pix_tx_id: order.pixTxId,
+      pix_qr_code: order.pixQrCode, pix_copy_paste: order.pixCopyPaste, paid_at: order.paidAt,
+    }).select().single();
+    if (error) throw error;
+    return toOrder(data as OrderRow);
   },
 
-  updateSettings(userId: string, updates: Partial<RestaurantSettings>): RestaurantSettings | null {
-    const all = read<RestaurantSettings>(KEYS.settings);
-    const idx = all.findIndex(s => s.userId === userId);
-    if (idx === -1) return null;
-    Object.assign(all[idx], updates);
-    write(KEYS.settings, all);
-    return all[idx];
-  },
-
-  // Public lookup
-  getPublicMenu(slug: string): { settings: RestaurantSettings; categories: Category[]; items: MenuItem[] } | null {
-    const settings = read<RestaurantSettings>(KEYS.settings).find(s => s.slug === slug);
-    if (!settings) return null;
-    return {
-      settings,
-      categories: db.getCategories(settings.userId),
-      items: db.getMenuItems(settings.userId).filter(m => m.available),
-    };
-  },
-
-  // Orders
-  getOrders(userId: string): Order[] {
-    return read<Order>(KEYS.orders).filter(o => o.userId === userId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  },
-
-  addOrder(order: Omit<Order, 'id' | 'createdAt'>): Order {
-    const orders = read<Order>(KEYS.orders);
-    const newOrder: Order = { ...order, id: genId(), createdAt: new Date().toISOString() };
-    orders.push(newOrder);
-    write(KEYS.orders, orders);
-    return newOrder;
-  },
-
-  updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt'>>): Order | null {
-    const orders = read<Order>(KEYS.orders);
-    const idx = orders.findIndex(o => o.id === id);
-    if (idx === -1) return null;
-    Object.assign(orders[idx], updates);
-    write(KEYS.orders, orders);
-    return orders[idx];
+  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.status !== undefined) row.status = updates.status;
+    if (updates.paidAt !== undefined) row.paid_at = updates.paidAt;
+    await supabase.from('orders').update(row).eq('id', id);
   },
 };

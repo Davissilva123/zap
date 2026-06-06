@@ -42,15 +42,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!user) return;
-    const s = db.getSettings(user.id);
-    if (s) setForm({ ...s });
+    db.getSettings(user.id).then(s => { if (s) setForm({ ...s }); });
   }, [user]);
 
   if (!user || !form) return null;
 
-  const save = () => {
+  const save = async () => {
     const slug = form.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    db.updateSettings(user.id, { ...form, slug });
+    await db.updateSettings(user.id, { ...form, slug });
     setForm(f => ({ ...f!, slug }));
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -63,7 +62,6 @@ export default function SettingsPage() {
         <p className="text-slate-500 mt-0.5 text-sm">Personalize seu cardápio digital</p>
       </div>
 
-      {/* Restaurant info */}
       <SectionCard icon={Store} title="Informações do restaurante">
         <div>
           <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Nome</label>
@@ -85,7 +83,6 @@ export default function SettingsPage() {
         </div>
       </SectionCard>
 
-      {/* URL slug */}
       <SectionCard icon={Link2} title="URL do cardápio" description="Endereço público do seu cardápio">
         <div>
           <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Slug</label>
@@ -96,7 +93,6 @@ export default function SettingsPage() {
         </div>
       </SectionCard>
 
-      {/* Accent color */}
       <SectionCard icon={Palette} title="Cor de destaque" description="Usada no cardápio público e QR Code">
         <div className="grid grid-cols-4 gap-2">
           {accentColors.map(c => (
@@ -112,7 +108,6 @@ export default function SettingsPage() {
         </div>
       </SectionCard>
 
-      {/* Payment methods */}
       <SectionCard icon={CreditCard} title="Formas de pagamento" description="Selecione quais métodos estarão disponíveis">
         <div className="space-y-1.5">
           {allPaymentMethods.map(method => {
@@ -145,7 +140,6 @@ export default function SettingsPage() {
         )}
       </SectionCard>
 
-      {/* XGate PIX */}
       <SectionCard icon={QrCode} title="Pagamento via PIX (XGate)" description="Configure para aceitar pagamentos PIX">
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
@@ -165,7 +159,6 @@ export default function SettingsPage() {
         )}
       </SectionCard>
 
-      {/* WhatsApp */}
       <SectionCard icon={MessageCircle} title="Notificações WhatsApp" description="Envie atualizações de pedido automaticamente ao cliente">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-slate-700">Ativar notificações</span>
@@ -176,7 +169,6 @@ export default function SettingsPage() {
             <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.whatsappEnabled ? 'translate-x-5' : ''}`} />
           </div>
         </div>
-
         {form.whatsappEnabled && (
           <div className="space-y-4 pt-1">
             <div>
@@ -192,7 +184,6 @@ export default function SettingsPage() {
         )}
       </SectionCard>
 
-      {/* Save */}
       <button onClick={save} className={`btn-primary px-8 py-3 ${saved ? '!bg-emerald-600' : ''}`}>
         {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
         {saved ? 'Salvo com sucesso!' : 'Salvar configurações'}

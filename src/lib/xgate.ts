@@ -29,14 +29,7 @@ export async function createPixCharge(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
     },
-    body: JSON.stringify({
-      email: xgateEmail,
-      password: xgatePassword,
-      amount,
-      txId,
-      customerName,
-      customerDocument,
-    }),
+    body: JSON.stringify({ email: xgateEmail, password: xgatePassword, amount, txId, customerName, customerDocument }),
   });
 
   if (!res.ok) {
@@ -69,7 +62,7 @@ export async function checkPixPayment(
   return res.json();
 }
 
-export function createOrder(
+export async function createOrder(
   userId: string,
   items: OrderItem[],
   total: number,
@@ -79,7 +72,7 @@ export function createOrder(
   deliveryType: 'pickup' | 'delivery',
   deliveryAddress: DeliveryAddress | null,
   pixResult: PixChargeResult | null
-): Order {
+): Promise<Order> {
   return db.addOrder({
     userId,
     items,

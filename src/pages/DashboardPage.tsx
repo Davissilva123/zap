@@ -12,9 +12,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
-    setScans(db.getScans(user.id));
-    setCategories(db.getCategories(user.id));
-    setItems(db.getMenuItems(user.id));
+    const load = async () => {
+      const [s, c, i] = await Promise.all([
+        db.getScans(user.id),
+        db.getCategories(user.id),
+        db.getMenuItems(user.id),
+      ]);
+      setScans(s);
+      setCategories(c);
+      setItems(i);
+    };
+    load();
   }, [user]);
 
   if (!user) return null;
@@ -34,43 +42,14 @@ export default function DashboardPage() {
   const maxCount = Math.max(...last14.map(d => d.count), 1);
 
   const stats = [
-    {
-      label: 'Total de Scans',
-      value: totalScans,
-      icon: Eye,
-      iconBg: 'bg-emerald-50',
-      iconColor: 'text-emerald-600',
-      accent: 'border-l-emerald-500',
-    },
-    {
-      label: 'Itens no Cardápio',
-      value: totalItems,
-      icon: UtensilsCrossed,
-      iconBg: 'bg-blue-50',
-      iconColor: 'text-blue-600',
-      accent: 'border-l-blue-500',
-    },
-    {
-      label: 'Categorias',
-      value: totalCategories,
-      icon: Grid3X3,
-      iconBg: 'bg-violet-50',
-      iconColor: 'text-violet-600',
-      accent: 'border-l-violet-500',
-    },
-    {
-      label: 'Disponíveis',
-      value: availableItems,
-      icon: TrendingUp,
-      iconBg: 'bg-amber-50',
-      iconColor: 'text-amber-600',
-      accent: 'border-l-amber-500',
-    },
+    { label: 'Total de Scans', value: totalScans, icon: Eye, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', accent: 'border-l-emerald-500' },
+    { label: 'Itens no Cardápio', value: totalItems, icon: UtensilsCrossed, iconBg: 'bg-blue-50', iconColor: 'text-blue-600', accent: 'border-l-blue-500' },
+    { label: 'Categorias', value: totalCategories, icon: Grid3X3, iconBg: 'bg-violet-50', iconColor: 'text-violet-600', accent: 'border-l-violet-500' },
+    { label: 'Disponíveis', value: availableItems, icon: TrendingUp, iconBg: 'bg-amber-50', iconColor: 'text-amber-600', accent: 'border-l-amber-500' },
   ];
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
@@ -82,7 +61,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {stats.map(stat => (
           <div key={stat.label} className={`card p-5 border-l-4 ${stat.accent}`}>
@@ -97,7 +75,6 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Chart */}
       <div className="card p-6">
         <div className="flex items-start justify-between mb-6">
           <div>
@@ -119,10 +96,7 @@ export default function DashboardPage() {
                 </span>
                 <div
                   className="w-full rounded-t-md bg-emerald-500 transition-all duration-500 min-h-[3px] group-hover:bg-emerald-400"
-                  style={{
-                    height: `${Math.max((d.count / maxCount) * 100, 4)}%`,
-                    opacity: d.count > 0 ? 1 : 0.1,
-                  }}
+                  style={{ height: `${Math.max((d.count / maxCount) * 100, 4)}%`, opacity: d.count > 0 ? 1 : 0.1 }}
                 />
               </div>
               <span className="text-[9px] text-slate-400 font-medium uppercase">{d.day}</span>
@@ -131,7 +105,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Quick tips */}
       {totalItems === 0 && (
         <div className="card p-5 border-l-4 border-l-blue-500 bg-blue-50/30">
           <p className="text-sm font-semibold text-blue-900 mb-1">Configure seu cardápio</p>

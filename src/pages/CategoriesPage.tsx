@@ -7,45 +7,39 @@ import { Plus, Pencil, Trash2, X, FolderOpen } from 'lucide-react';
 export default function CategoriesPage() {
   const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
   const [showModal, setShowModal] = useState(false);
   const [editCat, setEditCat] = useState<Category | null>(null);
   const [form, setForm] = useState({ name: '', emoji: '📁' });
 
-  const load = () => {
+  const load = async () => {
     if (!user) return;
-    setCategories(db.getCategories(user.id));
+    const [cats, its] = await Promise.all([db.getCategories(user.id), db.getMenuItems(user.id)]);
+    setCategories(cats);
+    const counts: Record<string, number> = {};
+    cats.forEach(c => { counts[c.id] = its.filter(i => i.categoryId === c.id).length; });
+    setItemCounts(counts);
   };
 
-  useEffect(load, [user]);
+  useEffect(() => { load(); }, [user]);
   if (!user) return null;
 
-  const openAdd = () => {
-    setEditCat(null);
-    setForm({ name: '', emoji: '📁' });
-    setShowModal(true);
-  };
+  const openAdd = () => { setEditCat(null); setForm({ name: '', emoji: '📁' }); setShowModal(true); };
+  const openEdit = (cat: Category) => { setEditCat(cat); setForm({ name: cat.name, emoji: cat.emoji }); setShowModal(true); };
 
-  const openEdit = (cat: Category) => {
-    setEditCat(cat);
-    setForm({ name: cat.name, emoji: cat.emoji });
-    setShowModal(true);
-  };
-
-  const save = () => {
+  const save = async () => {
     if (!form.name.trim()) return;
-    if (editCat) db.updateCategory(editCat.id, { name: form.name.trim(), emoji: form.emoji });
-    else db.addCategory(user.id, form.name.trim(), form.emoji);
+    if (editCat) await db.updateCategory(editCat.id, { name: form.name.trim(), emoji: form.emoji });
+    else await db.addCategory(user.id, form.name.trim(), form.emoji);
     setShowModal(false);
     load();
   };
 
-  const deleteCat = (id: string) => {
+  const deleteCat = async (id: string) => {
     if (!confirm('Ao apagar a categoria, todos os itens nela serão removidos. Continuar?')) return;
-    db.deleteCategory(id);
+    await db.deleteCategory(id);
     load();
   };
-
-  const itemCount = (catId: string) => db.getMenuItems(user.id).filter(i => i.categoryId === catId).length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -73,7 +67,7 @@ export default function CategoriesPage() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {categories.map(cat => {
-            const count = itemCount(cat.id);
+            const count = itemCounts[cat.id] ?? 0;
             return (
               <div key={cat.id} className="card-hover p-5 group">
                 <div className="flex items-center justify-between">

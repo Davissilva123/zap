@@ -14,13 +14,14 @@ export default function MenuPage() {
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
   const [form, setForm] = useState({ name: '', description: '', price: '', emoji: '🍽️', categoryId: '', available: true });
 
-  const load = () => {
+  const load = async () => {
     if (!user) return;
-    setCategories(db.getCategories(user.id));
-    setItems(db.getMenuItems(user.id));
+    const [cats, its] = await Promise.all([db.getCategories(user.id), db.getMenuItems(user.id)]);
+    setCategories(cats);
+    setItems(its);
   };
 
-  useEffect(load, [user]);
+  useEffect(() => { load(); }, [user]);
   if (!user) return null;
 
   const filtered = items.filter(i => {
@@ -41,28 +42,27 @@ export default function MenuPage() {
     setShowModal(true);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!form.name.trim() || !form.price) return;
     const data = { name: form.name.trim(), description: form.description.trim(), price: parseFloat(form.price), emoji: form.emoji, categoryId: form.categoryId, available: form.available };
-    if (editItem) db.updateMenuItem(editItem.id, data);
-    else db.addMenuItem(user.id, data);
+    if (editItem) await db.updateMenuItem(editItem.id, data);
+    else await db.addMenuItem(user.id, data);
     setShowModal(false);
     load();
   };
 
-  const toggleAvailable = (item: MenuItem) => {
-    db.updateMenuItem(item.id, { available: !item.available });
+  const toggleAvailable = async (item: MenuItem) => {
+    await db.updateMenuItem(item.id, { available: !item.available });
     load();
   };
 
-  const deleteItem = (id: string) => {
-    db.deleteMenuItem(id);
+  const deleteItem = async (id: string) => {
+    await db.deleteMenuItem(id);
     load();
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Cardápio</h1>
@@ -73,7 +73,6 @@ export default function MenuPage() {
         </button>
       </div>
 
-      {/* Search & Filter */}
       <div className="flex flex-col sm:flex-row gap-2.5">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -85,7 +84,6 @@ export default function MenuPage() {
         </select>
       </div>
 
-      {/* Items by category */}
       {categories.map(cat => {
         const catItems = filtered.filter(i => i.categoryId === cat.id);
         if (catItems.length === 0) return null;
@@ -99,9 +97,7 @@ export default function MenuPage() {
             <div className="card overflow-hidden divide-y divide-slate-100">
               {catItems.map(item => (
                 <div key={item.id} className={`flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors group ${!item.available ? 'opacity-50' : ''}`}>
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">
-                    {item.emoji}
-                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0">{item.emoji}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
@@ -109,14 +105,10 @@ export default function MenuPage() {
                     </div>
                     <p className="text-xs text-slate-400 truncate mt-0.5">{item.description}</p>
                   </div>
-                  <span className="text-base font-bold text-emerald-600 flex-shrink-0">
-                    R$ {item.price.toFixed(2).replace('.', ',')}
-                  </span>
+                  <span className="text-base font-bold text-emerald-600 flex-shrink-0">R$ {item.price.toFixed(2).replace('.', ',')}</span>
                   <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => toggleAvailable(item)} title={item.available ? 'Desativar' : 'Ativar'} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
-                      {item.available
-                        ? <ToggleRight className="w-5 h-5 text-emerald-500" />
-                        : <ToggleLeft className="w-5 h-5 text-slate-400" />}
+                      {item.available ? <ToggleRight className="w-5 h-5 text-emerald-500" /> : <ToggleLeft className="w-5 h-5 text-slate-400" />}
                     </button>
                     <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
                       <Pencil className="w-4 h-4 text-slate-400" />
@@ -144,7 +136,6 @@ export default function MenuPage() {
         </div>
       )}
 
-      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowModal(false)} />
