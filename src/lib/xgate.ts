@@ -75,7 +75,8 @@ export async function createOrder(
   customerUserId?: string,
   couponCode?: string,
   discount?: number,
-  tableName?: string
+  tableName?: string,
+  scheduledFor?: string | null
 ): Promise<Order> {
   return db.addOrder({
     userId,
@@ -95,6 +96,7 @@ export async function createOrder(
     pixQrCode: pixResult?.qrCodeImage || pixResult?.qrCode || '',
     pixCopyPaste: pixResult?.pixCopyPaste || '',
     paidAt: paymentMethod === 'cash' ? new Date().toISOString() : null,
+    scheduledFor: scheduledFor ?? null,
   });
 }
 

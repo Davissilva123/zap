@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth, useRestaurantId } from '../lib/auth';
 import type { Order } from '../lib/types';
-import { TrendingUp, ShoppingBag, DollarSign, Clock, Star } from 'lucide-react';
+import { TrendingUp, ShoppingBag, DollarSign, Clock, Star, Download } from 'lucide-react';
 
 function fmt(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}`; }
 
@@ -71,6 +71,34 @@ export default function ReportsPage() {
   rangeOrders.forEach(o => { byPayment[o.paymentMethod] = (byPayment[o.paymentMethod] || 0) + 1; });
   const payLabels: Record<string, string> = { pix: 'PIX', credit_card: 'Crédito', debit_card: 'Débito', cash: 'Dinheiro', meal_voucher: 'Vale-refeição' };
 
+  const exportCSV = () => {
+    const headers = ['Data', 'Hora', 'Cliente', 'Telefone', 'Itens', 'Total', 'Status', 'Pagamento', 'Tipo entrega'];
+    const rows = rangeOrders.map(o => {
+      const d = new Date(o.createdAt);
+      return [
+        d.toLocaleDateString('pt-BR'),
+        d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        o.customerName,
+        o.customerPhone,
+        o.items.map(i => `${i.quantity}x ${i.name}`).join(' | '),
+        o.total.toFixed(2).replace('.', ','),
+        o.status,
+        o.paymentMethod,
+        o.deliveryType,
+      ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`);
+    });
+    const csv = [headers.map(h => `"${h}"`), ...rows].map(r => r.join(';')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `relatorio-${range}d-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (!user) return null;
 
   return (
@@ -80,7 +108,16 @@ export default function ReportsPage() {
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Relatórios</h1>
           <p className="text-slate-500 mt-0.5 text-sm">Visão geral do seu desempenho</p>
         </div>
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={exportCSV}
+            disabled={rangeOrders.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-[13px] font-medium hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Exportar pedidos como CSV (abre no Excel)"
+          >
+            <Download className="w-3.5 h-3.5" /> Exportar CSV
+          </button>
+          <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
           {(['7', '30', '90'] as const).map(r => (
             <button key={r} onClick={() => setRange(r)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${range === r ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -88,6 +125,7 @@ export default function ReportsPage() {
             </button>
           ))}
         </div>
+      </div>
       </div>
 
       {/* KPIs */}

@@ -1,4 +1,4 @@
-import { Receipt, BarChart2, UtensilsCrossed, Tag, LogOut, Menu, Zap, X, LayoutGrid } from 'lucide-react';
+import { Receipt, BarChart2, UtensilsCrossed, Tag, LogOut, Menu, Zap, X, LayoutGrid, ChefHat } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState } from 'react';
@@ -14,13 +14,14 @@ type NavItem = { to: string; icon: typeof Receipt; label: string };
 function getNavItems(role: 'waiter' | 'cashier' | 'admin'): NavItem[] {
   const orders: NavItem = { to: '/op/pedidos', icon: Receipt, label: 'Pedidos' };
   const tables: NavItem = { to: '/op/mesas', icon: LayoutGrid, label: 'Mesas' };
+  const kitchen: NavItem = { to: '/op/cozinha', icon: ChefHat, label: 'Cozinha' };
   const reports: NavItem = { to: '/op/relatorios', icon: BarChart2, label: 'Relatórios' };
   const menu: NavItem = { to: '/op/cardapio', icon: UtensilsCrossed, label: 'Cardápio' };
   const coupons: NavItem = { to: '/op/cupons', icon: Tag, label: 'Cupons' };
 
-  if (role === 'waiter') return [orders, tables];
-  if (role === 'cashier') return [orders, tables, reports];
-  return [orders, tables, menu, reports, coupons]; // admin
+  if (role === 'waiter') return [orders, tables, kitchen];
+  if (role === 'cashier') return [orders, tables, kitchen, reports];
+  return [orders, tables, kitchen, menu, reports, coupons]; // admin
 }
 
 export default function OperatorLayout() {

@@ -4,7 +4,7 @@ import { db } from '../lib/db';
 import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import { useCustomerAuth } from '../lib/customerAuth';
 import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption } from '../lib/types';
-import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid } from 'lucide-react';
+import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift } from 'lucide-react';
 
 interface CartItem extends OrderItem { categoryId: string; }
 type CheckoutStep = 'cart' | 'auth' | 'delivery' | 'payment' | 'paying' | 'pix' | 'success' | 'error' | 'no-xgate' | 'no-methods' | 'order_placed';
@@ -69,6 +69,13 @@ export default function PublicMenuPage() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [appliedCouponId, setAppliedCouponId] = useState<string | null>(null);
   const [appliedCouponUses, setAppliedCouponUses] = useState(0);
+
+  // Agendamento
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState('');
+
+  // Fidelidade
+  const [loyaltyCount, setLoyaltyCount] = useState<number | null>(null);
 
   // Avaliação
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
@@ -201,6 +208,15 @@ export default function PublicMenuPage() {
     const couponCodeToSend = couponValid ? couponCode : undefined;
     const discountToSend = couponValid ? couponDiscount : 0;
 
+    const schedFor = scheduleEnabled && scheduledFor ? new Date(scheduledFor).toISOString() : null;
+
+    const fetchLoyalty = async (orderId: string) => {
+      if (settings.loyaltyEnabled && customer?.id) {
+        const count = await db.getCustomerOrderCount(settings.userId, customer.id);
+        setLoyaltyCount(count);
+      }
+    };
+
     if (selectedPayment === 'pix') {
       if (!settings.xgateEmail || !settings.xgatePassword) { setStep('no-xgate'); return; }
       setStep('paying');
@@ -208,9 +224,10 @@ export default function PublicMenuPage() {
       try {
         const txId = `cardapio_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
         const result = await createPixCharge(settings.xgateEmail, settings.xgatePassword, cartTotal, txId, customerName.trim());
-        const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, delivAddr, result, customer?.id, couponCodeToSend, discountToSend, tableName);
+        const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, delivAddr, result, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor);
         setPlacedOrderId(order.id);
         if (appliedCouponId) await db.useCoupon(appliedCouponId, appliedCouponUses);
+        await fetchLoyalty(order.id);
         setPixCopyPaste(result.pixCopyPaste);
         setPixQrCode(result.qrCodeImage || result.qrCode);
         setPixTxId(result.txId);
@@ -225,15 +242,16 @@ export default function PublicMenuPage() {
     }
     setErrorMsg('');
     try {
-      const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, delivAddr, null, customer?.id, couponCodeToSend, discountToSend, tableName);
+      const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, delivAddr, null, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor);
       setPlacedOrderId(order.id);
       if (appliedCouponId) await db.useCoupon(appliedCouponId, appliedCouponUses);
+      await fetchLoyalty(order.id);
       setStep('order_placed');
     } catch (err) {
       setErrorMsg(String(err));
       setStep('error');
     }
-  }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address, customer, mesaParam, couponValid, couponCode, couponDiscount, appliedCouponId, appliedCouponUses]);
+  }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address, customer, mesaParam, couponValid, couponCode, couponDiscount, appliedCouponId, appliedCouponUses, scheduleEnabled, scheduledFor]);
 
   useEffect(() => {
     if (!polling || !settings?.xgateEmail || !pixTxId) return;
@@ -254,6 +272,7 @@ export default function PublicMenuPage() {
     setPixCopyPaste(''); setPixQrCode(''); setPixTxId(''); setCashChange('');
     setCouponCode(''); setCouponValid(false); setCouponDiscount(0); setAppliedCouponId(null); setCouponMsg('');
     setPlacedOrderId(null); setOrderRating(0); setRatingComment(''); setRatingSubmitted(false);
+    setScheduleEnabled(false); setScheduledFor(''); setLoyaltyCount(null);
   };
 
   const handleAuthSubmit = async () => {
@@ -1136,6 +1155,35 @@ export default function PublicMenuPage() {
                     </div>
                   )}
 
+                  {/* Agendamento */}
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleEnabled(v => !v)}
+                      className="w-full flex items-center justify-between px-4 py-3.5 text-left"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Clock className="w-4 h-4 text-slate-400" />
+                        <span className="text-sm font-semibold text-slate-700">Agendar para mais tarde</span>
+                      </div>
+                      <div className={`w-10 h-5 rounded-full flex items-center transition-colors duration-200 ${scheduleEnabled ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                        <div className={`w-4 h-4 bg-white rounded-full shadow-sm mx-0.5 transition-transform duration-200 ${scheduleEnabled ? 'translate-x-5' : ''}`} />
+                      </div>
+                    </button>
+                    {scheduleEnabled && (
+                      <div className="px-4 pb-4 pt-0">
+                        <input
+                          type="datetime-local"
+                          value={scheduledFor}
+                          onChange={e => setScheduledFor(e.target.value)}
+                          min={new Date(Date.now() + 15 * 60000).toISOString().slice(0, 16)}
+                          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-slate-400"
+                        />
+                        <p className="text-[11px] text-slate-400 mt-1.5">Seu pedido entrará na fila apenas no horário agendado.</p>
+                      </div>
+                    )}
+                  </div>
+
                   {errorMsg && (
                     <div className="flex items-center gap-2 bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl border border-red-100 font-medium">
                       <X className="w-4 h-4 flex-shrink-0" /> {errorMsg}
@@ -1302,6 +1350,24 @@ export default function PublicMenuPage() {
                     </div>
                   )}
                   {ratingSubmitted && <p className="text-sm text-emerald-600 font-semibold mt-4">Obrigado pela avaliação! ⭐</p>}
+                  {loyaltyCount !== null && settings.loyaltyEnabled && customer && (
+                    <div className="w-full mt-4 p-4 rounded-2xl border border-violet-100 bg-violet-50 text-left">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Gift className="w-4 h-4 text-violet-500 flex-shrink-0" />
+                        <p className="text-sm font-bold text-violet-800">Programa de fidelidade</p>
+                      </div>
+                      {loyaltyCount > 0 && loyaltyCount % settings.loyaltyOrdersNeeded === 0 ? (
+                        <p className="text-sm text-violet-700 font-semibold">🎉 Parabéns! Você ganhou: <span className="font-bold">{settings.loyaltyReward}</span></p>
+                      ) : (
+                        <>
+                          <p className="text-xs text-violet-600 mb-2">{loyaltyCount % settings.loyaltyOrdersNeeded} de {settings.loyaltyOrdersNeeded} pedidos para ganhar: <strong>{settings.loyaltyReward}</strong></p>
+                          <div className="w-full h-2 rounded-full bg-violet-200 overflow-hidden">
+                            <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${Math.min(100, ((loyaltyCount % settings.loyaltyOrdersNeeded) / settings.loyaltyOrdersNeeded) * 100)}%` }} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {customer && (
                     <button onClick={() => { closeAndReset(); navigate(`/m/${slug}/conta`); }}
                       className="mt-4 px-5 py-2.5 rounded-2xl text-sm font-bold text-white" style={{ backgroundColor: accent }}>
@@ -1354,6 +1420,24 @@ export default function PublicMenuPage() {
                     </div>
                   )}
                   {ratingSubmitted && <p className="text-sm text-emerald-600 font-semibold mt-4">Obrigado pela avaliação! ⭐</p>}
+                  {loyaltyCount !== null && settings.loyaltyEnabled && customer && (
+                    <div className="w-full mt-4 p-4 rounded-2xl border border-violet-100 bg-violet-50 text-left">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Gift className="w-4 h-4 text-violet-500 flex-shrink-0" />
+                        <p className="text-sm font-bold text-violet-800">Programa de fidelidade</p>
+                      </div>
+                      {loyaltyCount > 0 && loyaltyCount % settings.loyaltyOrdersNeeded === 0 ? (
+                        <p className="text-sm text-violet-700 font-semibold">🎉 Parabéns! Você ganhou: <span className="font-bold">{settings.loyaltyReward}</span></p>
+                      ) : (
+                        <>
+                          <p className="text-xs text-violet-600 mb-2">{loyaltyCount % settings.loyaltyOrdersNeeded} de {settings.loyaltyOrdersNeeded} pedidos para ganhar: <strong>{settings.loyaltyReward}</strong></p>
+                          <div className="w-full h-2 rounded-full bg-violet-200 overflow-hidden">
+                            <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${Math.min(100, ((loyaltyCount % settings.loyaltyOrdersNeeded) / settings.loyaltyOrdersNeeded) * 100)}%` }} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {customer && (
                     <button onClick={() => { closeAndReset(); navigate(`/m/${slug}/conta`); }}
                       className="mt-4 px-5 py-2.5 rounded-2xl text-sm font-bold text-white" style={{ backgroundColor: accent }}>

@@ -99,6 +99,9 @@ export interface RestaurantSettings {
   deliveryTime: string;
   deliveryFee: number;
   deliveryNeighborhoods: DeliveryNeighborhood[];
+  loyaltyEnabled: boolean;
+  loyaltyOrdersNeeded: number;
+  loyaltyReward: string;
 }
 
 export interface OrderItem {
@@ -140,6 +143,7 @@ export interface Order {
   pixCopyPaste: string;
   rating?: number;
   ratingComment?: string;
+  scheduledFor?: string | null;
   createdAt: string;
   paidAt: string | null;
 }

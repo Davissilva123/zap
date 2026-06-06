@@ -6,7 +6,8 @@ import { playNewOrderSound, unlockAudio } from '../../lib/sound';
 import { printOrder } from '../../lib/print';
 import { supabase } from '../../lib/supabase';
 import type { Order, RestaurantSettings } from '../../lib/types';
-import { Clock, CheckCircle, XCircle, Eye, X, Truck, ShoppingBag, MapPin, Inbox, Loader2, Printer, Volume2, VolumeX, Ban, Star, LayoutGrid, Tag } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Eye, X, Truck, ShoppingBag, MapPin, Inbox, Loader2, Printer, Volume2, VolumeX, Ban, Star, LayoutGrid, Tag, Search, CalendarDays } from 'lucide-react';
+import { showNewOrderNotification, requestNotificationPermission } from '../../lib/notifications';
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string }> = {
   PENDING: { label: 'Pendente', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
@@ -35,6 +36,9 @@ export default function OpOrdersPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [autoPrint, setAutoPrint] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const knownIdsRef = useRef<Set<string>>(new Set());
   const settingsRef = useRef<RestaurantSettings | null>(null);
 
@@ -57,7 +61,7 @@ export default function OpOrdersPage() {
   };
 
   useEffect(() => {
-    const handler = () => unlockAudio();
+    const handler = () => { unlockAudio(); requestNotificationPermission(); };
     window.addEventListener('click', handler, { once: true });
     return () => window.removeEventListener('click', handler);
   }, []);
@@ -73,6 +77,7 @@ export default function OpOrdersPage() {
         if (knownIdsRef.current.has(newOrder.id)) return;
         knownIdsRef.current.add(newOrder.id);
         if (soundEnabled) playNewOrderSound();
+        showNewOrderNotification(newOrder.customer_name, Number(newOrder.total));
 
         const mapped: Order = {
           id: newOrder.id,
@@ -103,7 +108,16 @@ export default function OpOrdersPage() {
 
   if (!user) return null;
 
-  const filtered = orders.filter(o => !filter || o.status === filter);
+  const filtered = orders.filter(o => {
+    if (filter && o.status !== filter) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!o.customerName.toLowerCase().includes(q) && !o.customerPhone?.toLowerCase().includes(q)) return false;
+    }
+    if (dateFrom && o.createdAt.slice(0, 10) < dateFrom) return false;
+    if (dateTo && o.createdAt.slice(0, 10) > dateTo) return false;
+    return true;
+  });
   const formatDate = (d: string) => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
   const updateStatus = async (orderId: string, newStatus: string) => {
@@ -145,6 +159,36 @@ export default function OpOrdersPage() {
             <Printer className="w-4 h-4" />
             {autoPrint ? 'Auto-imprimir ON' : 'Auto-imprimir OFF'}
           </button>
+        </div>
+      </div>
+
+      {/* Search + date filter */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por cliente ou telefone..."
+            className="input-field pl-9 w-full"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+              <X className="w-4 h-4 text-slate-400 hover:text-slate-600" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+          <CalendarDays className="w-4 h-4 text-slate-400 flex-shrink-0" />
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            className="input-field text-sm py-2 w-36" title="Data início" />
+          <span className="text-slate-400 text-sm">até</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            className="input-field text-sm py-2 w-36" title="Data fim" />
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="p-1.5 rounded-lg hover:bg-slate-100">
+              <X className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          )}
         </div>
       </div>
 

@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { RestaurantSettings, PaymentMethod } from '../lib/types';
-import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2 } from 'lucide-react';
+import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift } from 'lucide-react';
 import type { DeliveryNeighborhood, DayHours } from '../lib/types';
 
 const allPaymentMethods: PaymentMethod[] = ['pix', 'credit_card', 'debit_card', 'cash', 'meal_voucher'];
@@ -363,6 +363,40 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+      </SectionCard>
+
+      {/* Fidelidade */}
+      <SectionCard icon={Gift} title="Programa de fidelidade" description="Recompense clientes frequentes automaticamente">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-slate-700">Ativar programa de fidelidade</span>
+          <div
+            onClick={() => setForm(f => ({ ...f!, loyaltyEnabled: !f!.loyaltyEnabled }))}
+            className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center cursor-pointer ${form.loyaltyEnabled ? 'bg-emerald-500' : 'bg-slate-200'}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.loyaltyEnabled ? 'translate-x-5' : ''}`} />
+          </div>
+        </div>
+        {form.loyaltyEnabled && (
+          <div className="space-y-4 pt-1">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Pedidos necessários para ganhar recompensa</label>
+              <input
+                type="number" min={2} max={100} value={form.loyaltyOrdersNeeded}
+                onChange={e => setForm(f => ({ ...f!, loyaltyOrdersNeeded: Number(e.target.value) }))}
+                className="input-field w-32"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Ex: 10 = a cada 10 pedidos o cliente ganha a recompensa</p>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Descrição da recompensa</label>
+              <input
+                type="text" value={form.loyaltyReward}
+                onChange={e => setForm(f => ({ ...f!, loyaltyReward: e.target.value }))}
+                className="input-field" placeholder="Ex: Hambúrguer grátis, 20% de desconto..."
+              />
+            </div>
+          </div>
+        )}
       </SectionCard>
 
       <button onClick={save} disabled={saving} className={`btn-primary px-8 py-3 disabled:opacity-60 ${saved ? '!bg-emerald-600' : ''}`}>
