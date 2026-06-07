@@ -379,6 +379,9 @@ export default function PublicMenuPage() {
   }
 
   const accent = settings.accentColor;
+  const avgRating = publicReviews.length
+    ? Math.round((publicReviews.reduce((s, r) => s + r.rating, 0) / publicReviews.length) * 10) / 10
+    : 0;
   const isCategoryAvailableNow = (cat: Category) => {
     if (!cat.availableFrom || !cat.availableTo) return true;
     const now = new Date();
@@ -525,7 +528,7 @@ export default function PublicMenuPage() {
               </div>
             </div>
 
-            {(settings.address || settings.phone) && (
+            {(settings.address || settings.phone || publicReviews.length > 0) && (
               <div className="flex flex-wrap gap-2 mt-5">
                 {settings.address && (
                   <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm rounded-full px-3 py-1.5">
@@ -537,6 +540,12 @@ export default function PublicMenuPage() {
                   <div className="flex items-center gap-1.5 bg-black/20 backdrop-blur-sm rounded-full px-3 py-1.5">
                     <Phone className="w-3 h-3 text-white/80" />
                     <span className="text-white/80 text-xs font-medium">{settings.phone}</span>
+                  </div>
+                )}
+                {publicReviews.length > 0 && (
+                  <div className="flex items-center gap-1.5 bg-amber-400/90 backdrop-blur-sm rounded-full px-3 py-1.5">
+                    <Star className="w-3 h-3 text-white fill-white" />
+                    <span className="text-white text-xs font-bold">{avgRating} ({publicReviews.length} avaliações)</span>
                   </div>
                 )}
               </div>
@@ -667,6 +676,46 @@ export default function PublicMenuPage() {
           );
         })()}
 
+        {/* ── PUBLIC REVIEWS CAROUSEL ── */}
+        {searchResults === null && !activeCat && publicReviews.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-0.5">
+                  {[1,2,3,4,5].map(s => (
+                    <Star key={s} className={`w-4 h-4 ${s <= Math.round(avgRating) ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                  ))}
+                </div>
+                <span className="font-extrabold text-slate-900 text-base">{avgRating}</span>
+                <span className="text-slate-400 text-sm">({publicReviews.length} avaliações)</span>
+              </div>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {publicReviews.map((r, i) => (
+                <div key={i} className="flex-shrink-0 w-56 bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-extrabold flex-shrink-0" style={{ backgroundColor: accent }}>
+                      {r.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-800 text-xs truncate">{r.name.split(' ')[0]}</p>
+                      <div className="flex items-center gap-0.5 mt-0.5">
+                        {[1,2,3,4,5].map(s => (
+                          <Star key={s} className={`w-3 h-3 ${s <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {r.comment
+                    ? <p className="text-xs text-slate-500 leading-snug line-clamp-3 italic">"{r.comment}"</p>
+                    : <p className="text-xs text-slate-300 italic">Sem comentário</p>
+                  }
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Normal category view */}
         {searchResults === null && filteredCategories.map(cat => {
           const catItems = items.filter(i => i.categoryId === cat.id);
@@ -791,32 +840,6 @@ export default function PublicMenuPage() {
           </div>
         )}
       </div>
-
-      {/* ── PUBLIC REVIEWS ── */}
-      {publicReviews.length > 0 && (
-        <div className="px-4 sm:px-5 pb-6 max-w-xl mx-auto w-full">
-          <div className="flex items-center gap-2 mb-3">
-            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-            <h3 className="font-bold text-slate-700 text-sm">Avaliações dos clientes</h3>
-            <span className="text-xs text-slate-400">({publicReviews.length})</span>
-          </div>
-          <div className="space-y-3">
-            {publicReviews.map((r, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-slate-100 px-4 py-3 shadow-sm">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-semibold text-slate-800 text-sm">{r.name.split(' ')[0]}</span>
-                  <div className="flex items-center gap-0.5">
-                    {[1,2,3,4,5].map(s => (
-                      <Star key={s} className={`w-3.5 h-3.5 ${s <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
-                    ))}
-                  </div>
-                </div>
-                {r.comment && <p className="text-xs text-slate-500 italic leading-snug">"{r.comment}"</p>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ── FOOTER ── */}
       <div className="text-center pb-8 text-[11px] text-slate-300 font-semibold flex items-center justify-center gap-1.5 tracking-wide uppercase">
