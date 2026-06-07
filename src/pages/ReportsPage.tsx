@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth, useRestaurantId } from '../lib/auth';
-import type { Order } from '../lib/types';
-import { TrendingUp, ShoppingBag, DollarSign, Clock, Star, Download } from 'lucide-react';
+import type { Order, RestaurantSettings } from '../lib/types';
+import { TrendingUp, ShoppingBag, DollarSign, Clock, Star, Download, Check, Loader2, Copy } from 'lucide-react';
 
 function fmt(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}`; }
 
@@ -25,14 +25,44 @@ export default function ReportsPage() {
   const { user } = useAuth();
   const restaurantId = useRestaurantId();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [range, setRange] = useState<'7' | '30' | '90' | 'custom'>('30');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [generatingCoupon, setGeneratingCoupon] = useState<string | null>(null);
+  const [generatedCoupons, setGeneratedCoupons] = useState<Record<string, string>>({});
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!restaurantId) return;
     db.getOrders(restaurantId).then(setOrders);
+    db.getSettings(restaurantId).then(setSettings);
   }, [restaurantId]);
+
+  const generateCashbackCoupon = async (customerName: string, customerPhone: string, amount: number) => {
+    if (!restaurantId) return;
+    const key = customerPhone;
+    setGeneratingCoupon(key);
+    const code = `CB${customerName.replace(/\s+/g, '').toUpperCase().slice(0, 6)}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const expires = new Date(Date.now() + 30 * 86400000).toISOString();
+    await db.addCoupon(restaurantId, {
+      code,
+      discountType: 'fixed',
+      discountValue: Math.floor(amount * 100) / 100,
+      minOrder: 0,
+      maxUses: 1,
+      active: true,
+      expiresAt: expires,
+    });
+    setGeneratedCoupons(prev => ({ ...prev, [key]: code }));
+    setGeneratingCoupon(null);
+  };
+
+  const copyCoupon = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode(null), 2500);
+  };
 
   const days = range === 'custom' ? 30 : Number(range);
   const since = range === 'custom' && customFrom
@@ -247,6 +277,67 @@ export default function ReportsPage() {
           <p className="text-slate-500 font-medium">Sem pedidos nos últimos {range} dias</p>
         </div>
       )}
+
+      {/* ── CASHBACK MANAGEMENT ── */}
+      {settings && (settings.cashbackPercent ?? 0) > 0 && (() => {
+        const pct = settings.cashbackPercent / 100;
+        // Group all-time completed orders by customer phone
+        const byCustomer: Record<string, { name: string; phone: string; total: number; count: number }> = {};
+        orders.filter(o => ['COMPLETED', 'DELIVERING', 'PREPARING', 'PAID'].includes(o.status)).forEach(o => {
+          const k = o.customerPhone;
+          if (!byCustomer[k]) byCustomer[k] = { name: o.customerName, phone: o.customerPhone, total: 0, count: 0 };
+          byCustomer[k].total += o.total;
+          byCustomer[k].count += 1;
+        });
+        const rows = Object.values(byCustomer)
+          .map(c => ({ ...c, cashback: c.total * pct }))
+          .filter(c => c.cashback >= 1)
+          .sort((a, b) => b.cashback - a.cashback);
+        if (rows.length === 0) return null;
+        return (
+          <div className="card overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+              <DollarSign className="w-4 h-4 text-emerald-600" />
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">Cashback dos clientes</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{settings.cashbackPercent}% sobre todos os pedidos concluídos · {rows.length} cliente{rows.length !== 1 ? 's' : ''} com saldo ≥ R$ 1,00</p>
+              </div>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {rows.map(row => {
+                const couponCode = generatedCoupons[row.phone];
+                const isGenerating = generatingCoupon === row.phone;
+                return (
+                  <div key={row.phone} className="px-5 py-3.5 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-900 text-sm truncate">{row.name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{row.phone} · {row.count} pedido{row.count !== 1 ? 's' : ''} · gasto R$ {row.total.toFixed(2).replace('.', ',')}</p>
+                    </div>
+                    <span className="text-base font-extrabold text-emerald-600 flex-shrink-0">R$ {row.cashback.toFixed(2).replace('.', ',')}</span>
+                    {couponCode ? (
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="text-xs font-mono font-bold text-violet-700 bg-violet-50 border border-violet-200 px-2 py-1 rounded-lg">{couponCode}</span>
+                        <button onClick={() => copyCoupon(couponCode)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+                          {copiedCode === couponCode ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => generateCashbackCoupon(row.name, row.phone, row.cashback)}
+                        disabled={isGenerating}
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-colors disabled:opacity-60"
+                      >
+                        {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <DollarSign className="w-3.5 h-3.5" />}
+                        Gerar cupom
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
