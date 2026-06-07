@@ -124,9 +124,9 @@ export default function OrdersPage() {
   const formatDate = (d: string) => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   const whatsappConfigured = settings?.whatsappEnabled && settings?.whatsappApiToken && settings?.whatsappPhoneNumberId;
 
-  const doUpdateStatus = async (orderId: string, newStatus: string, driverName?: string) => {
+  const doUpdateStatus = async (orderId: string, newStatus: string, driverName?: string, driverId?: string) => {
     const order = orders.find(o => o.id === orderId);
-    await db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined, driverName });
+    await db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined, driverName, driverId });
     load();
     if (selectedOrder?.id === orderId) {
       setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'], driverName } : null);
@@ -158,14 +158,17 @@ export default function OrdersPage() {
   const confirmDriver = () => {
     if (!driverModal) return;
     let driverName: string | undefined;
+    let driverId: string | undefined;
     if (driverSelection === 'other') {
       driverName = driverCustomName.trim() || undefined;
     } else if (driverSelection !== 'none') {
-      driverName = drivers.find(d => d.id === driverSelection)?.name;
+      const driver = drivers.find(d => d.id === driverSelection);
+      driverName = driver?.name;
+      driverId = driver?.id;
     }
     const { orderId, newStatus } = driverModal;
     setDriverModal(null);
-    doUpdateStatus(orderId, newStatus, driverName);
+    doUpdateStatus(orderId, newStatus, driverName, driverId);
   };
 
   const cancelOrder = async (orderId: string) => {

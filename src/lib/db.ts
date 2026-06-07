@@ -19,13 +19,13 @@ interface SettingsRow {
 interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; available_from?: string | null; available_to?: string | null; created_at: string; }
 interface MenuItemRow { id: string; user_id: string; category_id: string; name: string; description: string; emoji: string; image_url: string; price: number; promo_price?: number | null; available: boolean; featured?: boolean; stock?: number | null; cost?: number | null; order: number; created_at: string; }
 interface ScanRow { id: string; user_id: string; scanned_at: string; }
-interface OrderRow { id: string; user_id: string; customer_user_id: string | null; items: OrderItem[]; total: number; discount: number; coupon_code: string | null; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; table_name: string | null; notes?: string | null; driver_name?: string | null; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; rating: number | null; rating_comment: string | null; scheduled_for: string | null; created_at: string; paid_at: string | null; }
+interface OrderRow { id: string; user_id: string; customer_user_id: string | null; items: OrderItem[]; total: number; discount: number; coupon_code: string | null; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; table_name: string | null; notes?: string | null; driver_name?: string | null; driver_id?: string | null; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; rating: number | null; rating_comment: string | null; scheduled_for: string | null; created_at: string; paid_at: string | null; }
 interface ItemGroupRow { id: string; user_id: string; menu_item_id: string; name: string; required: boolean; min_choices: number; max_choices: number; order: number; created_at: string; }
 interface ItemOptionRow { id: string; user_id: string; group_id: string; name: string; price_delta: number; order: number; created_at: string; }
 interface CouponRow { id: string; user_id: string; code: string; discount_type: string; discount_value: number; min_order: number; max_uses: number | null; uses_count: number; active: boolean; expires_at: string | null; created_at: string; }
 interface RestaurantTableRow { id: string; user_id: string; name: string; order: number; active: boolean; created_at: string; }
 interface OperatorRow { id: string; owner_id: string; email: string; name: string; role: string; active: boolean; notes: string; created_at: string; user_id?: string | null; }
-interface DriverRow { id: string; user_id: string; name: string; phone: string; active: boolean; created_at: string; }
+interface DriverRow { id: string; user_id: string; name: string; phone: string; active: boolean; access_token: string; created_at: string; }
 
 // ---- Mappers ----
 function toSettings(r: SettingsRow): RestaurantSettings {
@@ -53,13 +53,13 @@ function toSettings(r: SettingsRow): RestaurantSettings {
 function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, availableFrom: r.available_from ?? undefined, availableTo: r.available_to ?? undefined, createdAt: r.created_at }; }
 function toMenuItem(r: MenuItemRow): MenuItem { return { id: r.id, userId: r.user_id, categoryId: r.category_id, name: r.name, description: r.description, emoji: r.emoji, imageUrl: r.image_url ?? '', price: Number(r.price), promoPrice: r.promo_price ? Number(r.promo_price) : undefined, available: r.available, featured: r.featured ?? false, stock: r.stock ?? null, cost: r.cost ? Number(r.cost) : undefined, order: r.order, createdAt: r.created_at }; }
 function toScan(r: ScanRow): Scan { return { id: r.id, userId: r.user_id, scannedAt: r.scanned_at }; }
-function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, customerUserId: r.customer_user_id ?? undefined, items: r.items, total: Number(r.total), discount: Number(r.discount ?? 0), couponCode: r.coupon_code ?? undefined, status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as Order['deliveryType'], tableName: r.table_name ?? undefined, notes: r.notes ?? undefined, driverName: r.driver_name ?? undefined, pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, rating: r.rating ?? undefined, ratingComment: r.rating_comment ?? undefined, scheduledFor: r.scheduled_for ?? null, createdAt: r.created_at, paidAt: r.paid_at }; }
+function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, customerUserId: r.customer_user_id ?? undefined, items: r.items, total: Number(r.total), discount: Number(r.discount ?? 0), couponCode: r.coupon_code ?? undefined, status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as Order['deliveryType'], tableName: r.table_name ?? undefined, notes: r.notes ?? undefined, driverName: r.driver_name ?? undefined, driverId: r.driver_id ?? undefined, pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, rating: r.rating ?? undefined, ratingComment: r.rating_comment ?? undefined, scheduledFor: r.scheduled_for ?? null, createdAt: r.created_at, paidAt: r.paid_at }; }
 function toItemGroup(r: ItemGroupRow, options: ItemOption[] = []): ItemGroup { return { id: r.id, userId: r.user_id, menuItemId: r.menu_item_id, name: r.name, required: r.required, minChoices: r.min_choices, maxChoices: r.max_choices, order: r.order, options }; }
 function toItemOption(r: ItemOptionRow): ItemOption { return { id: r.id, userId: r.user_id, groupId: r.group_id, name: r.name, priceDelta: Number(r.price_delta), order: r.order }; }
 function toCoupon(r: CouponRow): Coupon { return { id: r.id, userId: r.user_id, code: r.code, discountType: r.discount_type as 'percent' | 'fixed', discountValue: Number(r.discount_value), minOrder: Number(r.min_order), maxUses: r.max_uses, usesCount: r.uses_count, active: r.active, expiresAt: r.expires_at, createdAt: r.created_at }; }
 function toRestaurantTable(r: RestaurantTableRow): RestaurantTable { return { id: r.id, userId: r.user_id, name: r.name, order: r.order, active: r.active, createdAt: r.created_at }; }
 function toOperator(r: OperatorRow): Operator { return { id: r.id, ownerId: r.owner_id, email: r.email, name: r.name, role: r.role as Operator['role'], active: r.active, notes: r.notes || '', createdAt: r.created_at, userId: r.user_id }; }
-function toDriver(r: DriverRow): Driver { return { id: r.id, userId: r.user_id, name: r.name, phone: r.phone || '', active: r.active, createdAt: r.created_at }; }
+function toDriver(r: DriverRow): Driver { return { id: r.id, userId: r.user_id, name: r.name, phone: r.phone || '', active: r.active, accessToken: r.access_token, createdAt: r.created_at }; }
 
 export const db = {
   // ---- Settings ----
@@ -320,7 +320,7 @@ export const db = {
     return toOrder(data as OrderRow);
   },
 
-  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt' | 'rating' | 'ratingComment' | 'items' | 'total' | 'driverName'>>): Promise<void> {
+  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt' | 'rating' | 'ratingComment' | 'items' | 'total' | 'driverName' | 'driverId'>>): Promise<void> {
     const row: Record<string, unknown> = {};
     if (updates.status !== undefined) row.status = updates.status;
     if (updates.paidAt !== undefined) row.paid_at = updates.paidAt;
@@ -329,6 +329,7 @@ export const db = {
     if (updates.items !== undefined) row.items = updates.items;
     if (updates.total !== undefined) row.total = updates.total;
     if (updates.driverName !== undefined) row.driver_name = updates.driverName || null;
+    if (updates.driverId !== undefined) row.driver_id = updates.driverId || null;
     await supabase.from('orders').update(row).eq('id', id);
   },
 
@@ -488,5 +489,23 @@ export const db = {
 
   async deleteDriver(id: string): Promise<void> {
     await supabase.from('drivers').delete().eq('id', id);
+  },
+
+  // ---- Driver Portal (sem auth, via access_token) ----
+  async getDriverByToken(token: string): Promise<{ id: string; name: string; phone: string } | null> {
+    const { data, error } = await supabase.rpc('get_driver_by_token', { p_token: token });
+    if (error || !data || (data as unknown[]).length === 0) return null;
+    const row = (data as Array<{ id: string; name: string; phone: string }>)[0];
+    return { id: row.id, name: row.name, phone: row.phone };
+  },
+
+  async getDriverOrders(token: string): Promise<Order[]> {
+    const { data, error } = await supabase.rpc('get_driver_orders', { p_token: token });
+    if (error || !data) return [];
+    return (data as OrderRow[]).map(toOrder);
+  },
+
+  async completeDriverOrder(token: string, orderId: string): Promise<void> {
+    await supabase.rpc('complete_driver_order', { p_token: token, p_order_id: orderId });
   },
 };

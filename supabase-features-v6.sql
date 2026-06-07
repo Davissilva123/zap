@@ -63,6 +63,34 @@ BEGIN
   END IF;
 END $$;
 
+-- Portal do entregador: access_token e driver_id
+ALTER TABLE drivers ADD COLUMN IF NOT EXISTS access_token UUID DEFAULT gen_random_uuid();
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES drivers(id) DEFAULT NULL;
+
+-- Funções SECURITY DEFINER para o portal do entregador (sem auth)
+CREATE OR REPLACE FUNCTION get_driver_by_token(p_token UUID)
+RETURNS TABLE(id UUID, name TEXT, phone TEXT)
+LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  SELECT d.id, d.name, d.phone FROM drivers d WHERE d.access_token = p_token LIMIT 1;
+$$;
+
+CREATE OR REPLACE FUNCTION get_driver_orders(p_token UUID)
+RETURNS SETOF orders
+LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  SELECT o.* FROM orders o
+  JOIN drivers d ON d.id = o.driver_id
+  WHERE d.access_token = p_token AND o.status = 'DELIVERING'
+  ORDER BY o.created_at DESC;
+$$;
+
+CREATE OR REPLACE FUNCTION complete_driver_order(p_token UUID, p_order_id UUID)
+RETURNS void
+LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+  UPDATE orders SET status = 'COMPLETED'
+  WHERE id = p_order_id
+    AND driver_id = (SELECT id FROM drivers WHERE access_token = p_token);
+$$;
+
 -- Policy: operadores podem atualizar itens do menu (para marcar esgotado via KDS)
 DO $$
 BEGIN

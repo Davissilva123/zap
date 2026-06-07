@@ -150,6 +150,7 @@ export interface Order {
   tableName?: string;
   notes?: string;
   driverName?: string;
+  driverId?: string;
   pixTxId: string;
   pixQrCode: string;
   pixCopyPaste: string;
@@ -166,6 +167,7 @@ export interface Driver {
   name: string;
   phone: string;
   active: boolean;
+  accessToken: string;
   createdAt: string;
 }
 

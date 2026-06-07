@@ -15,6 +15,7 @@ import CouponsPage from './pages/CouponsPage';
 import TablesPage from './pages/TablesPage';
 import ComandasPage from './pages/ComandasPage';
 import DriversPage from './pages/DriversPage';
+import DriverPortalPage from './pages/DriverPortalPage';
 import OperatorsPage from './pages/OperatorsPage';
 import OpOrdersPage from './pages/op/OrdersPage';
 import OpTablesPage from './pages/op/TablesPage';
@@ -88,6 +89,9 @@ export default function App() {
             <Route path="cardapio" element={<MenuPage />} />
             <Route path="cupons" element={<CouponsPage />} />
           </Route>
+
+          {/* Driver portal (public, token-based) */}
+          <Route path="/entregador/:token" element={<DriverPortalPage />} />
 
           {/* Public customer routes */}
           <Route path="/m/:slug/*" element={
