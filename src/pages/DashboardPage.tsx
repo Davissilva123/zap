@@ -1,30 +1,33 @@
 import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
-import type { Scan, Category, MenuItem, RestaurantSettings } from '../lib/types';
-import { Eye, UtensilsCrossed, Grid3X3, TrendingUp, ArrowUpRight, PowerOff, Loader2 } from 'lucide-react';
+import type { Scan, Category, MenuItem, RestaurantSettings, Order } from '../lib/types';
+import { Eye, UtensilsCrossed, Grid3X3, TrendingUp, ArrowUpRight, PowerOff, Loader2, Receipt, DollarSign, ShoppingBag, BarChart2 } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [scans, setScans] = useState<Scan[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [closingToggle, setClosingToggle] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     const load = async () => {
-      const [s, c, i, st] = await Promise.all([
+      const [s, c, i, st, o] = await Promise.all([
         db.getScans(user.id),
         db.getCategories(user.id),
         db.getMenuItems(user.id),
         db.getSettings(user.id),
+        db.getOrders(user.id),
       ]);
       setScans(s);
       setCategories(c);
       setItems(i);
       setSettings(st);
+      setOrders(o);
     };
     load();
   }, [user]);
@@ -44,6 +47,17 @@ export default function DashboardPage() {
   const totalItems = items.length;
   const totalCategories = categories.length;
   const availableItems = items.filter(i => i.available).length;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const activeOrders = orders.filter(o => o.status !== 'CANCELLED');
+  const todayOrders = activeOrders.filter(o => o.createdAt.slice(0, 10) === today);
+  const monthOrders = activeOrders.filter(o => o.createdAt.slice(0, 7) === thisMonth);
+  const todayRevenue = todayOrders
+    .filter(o => ['COMPLETED', 'DELIVERING', 'PAID', 'PREPARING'].includes(o.status))
+    .reduce((s, o) => s + o.total - (o.discount ?? 0), 0);
+  const avgTicket = activeOrders.length ? activeOrders.reduce((s, o) => s + o.total, 0) / activeOrders.length : 0;
+  const fmt = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
 
   const last14 = Array.from({ length: 14 }, (_, i) => {
     const d = new Date();
@@ -108,6 +122,29 @@ export default function DashboardPage() {
             <p className="text-3xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Order metrics */}
+      <div>
+        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-3">Pedidos</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: 'Pedidos hoje', value: todayOrders.length, icon: Receipt, iconBg: 'bg-orange-50', iconColor: 'text-orange-600', accent: 'border-l-orange-500' },
+            { label: 'Receita hoje', value: fmt(todayRevenue), icon: DollarSign, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', accent: 'border-l-emerald-500' },
+            { label: 'Ticket médio', value: fmt(avgTicket), icon: BarChart2, iconBg: 'bg-blue-50', iconColor: 'text-blue-600', accent: 'border-l-blue-500' },
+            { label: 'Pedidos do mês', value: monthOrders.length, icon: ShoppingBag, iconBg: 'bg-violet-50', iconColor: 'text-violet-600', accent: 'border-l-violet-500' },
+          ].map(s => (
+            <div key={s.label} className={`card p-5 border-l-4 ${s.accent}`}>
+              <div className="flex items-start justify-between mb-3">
+                <p className="text-[13px] font-medium text-slate-500 leading-snug">{s.label}</p>
+                <div className={`w-8 h-8 rounded-lg ${s.iconBg} flex items-center justify-center flex-shrink-0`}>
+                  <s.icon className={`w-4 h-4 ${s.iconColor}`} strokeWidth={1.75} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-slate-900 tracking-tight">{s.value}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="card p-6">

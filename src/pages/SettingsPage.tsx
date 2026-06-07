@@ -315,12 +315,21 @@ export default function SettingsPage() {
           <p className="text-[11px] text-slate-400 mt-1">Ex: "30-45" ou "50" ou "1h"</p>
         </div>
 
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Taxa de entrega padrão (R$)</label>
-          <input type="number" min={0} step={0.5} value={form.deliveryFee}
-            onChange={e => setForm(f => ({ ...f!, deliveryFee: Number(e.target.value) }))}
-            className="input-field w-36" placeholder="0,00" />
-          <p className="text-[11px] text-slate-400 mt-1">Usada quando nenhum bairro abaixo bater</p>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Taxa de entrega padrão (R$)</label>
+            <input type="number" min={0} step={0.5} value={form.deliveryFee}
+              onChange={e => setForm(f => ({ ...f!, deliveryFee: Number(e.target.value) }))}
+              className="input-field" placeholder="0,00" />
+            <p className="text-[11px] text-slate-400 mt-1">Usada quando nenhum bairro abaixo bater</p>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Pedido mínimo para delivery (R$)</label>
+            <input type="number" min={0} step={1} value={form.minimumOrder ?? 0}
+              onChange={e => setForm(f => ({ ...f!, minimumOrder: Number(e.target.value) }))}
+              className="input-field" placeholder="0,00" />
+            <p className="text-[11px] text-slate-400 mt-1">0 = sem valor mínimo</p>
+          </div>
         </div>
 
         <div>

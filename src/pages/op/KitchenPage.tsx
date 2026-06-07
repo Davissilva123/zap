@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { db } from '../../lib/db';
 import { useRestaurantId } from '../../lib/auth';
 import { supabase } from '../../lib/supabase';
+import { playNewOrderSound, unlockAudio } from '../../lib/sound';
+import { showNewOrderNotification, requestNotificationPermission } from '../../lib/notifications';
 import type { Order, RestaurantSettings } from '../../lib/types';
-import { Clock, ChefHat, CheckCircle2, Truck, ShoppingBag, LayoutGrid, Loader2, AlertCircle } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle2, Truck, ShoppingBag, LayoutGrid, Loader2, AlertCircle, Volume2, VolumeX, BellOff } from 'lucide-react';
 
 function elapsed(createdAt: string) {
   const m = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
@@ -30,13 +32,14 @@ interface CardProps {
   order: Order;
   updating: string | null;
   onAction: (order: Order) => void;
+  onMarkUnavailable?: (menuItemId: string, name: string) => void;
   actionLabel: string;
   actionColor: string;
   borderColor: string;
   headerColor: string;
 }
 
-function OrderCard({ order, updating, onAction, actionLabel, actionColor, borderColor, headerColor }: CardProps) {
+function OrderCard({ order, updating, onAction, onMarkUnavailable, actionLabel, actionColor, borderColor, headerColor }: CardProps) {
   return (
     <div className={`rounded-2xl border-2 ${borderColor} overflow-hidden bg-white shadow-sm`}>
       {/* Header */}
@@ -69,12 +72,21 @@ function OrderCard({ order, updating, onAction, actionLabel, actionColor, border
         {order.items.map((item, i) => (
           <div key={i} className="flex items-start gap-2.5">
             <span className="text-slate-500 font-bold text-sm w-6 flex-shrink-0 text-right">{item.quantity}×</span>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-slate-900 text-sm font-semibold leading-snug">{item.emoji} {item.name}</p>
               {item.selectedOptions && item.selectedOptions.length > 0 && (
                 <p className="text-slate-400 text-xs mt-0.5">{item.selectedOptions.map(o => o.optionName).join(', ')}</p>
               )}
             </div>
+            {onMarkUnavailable && item.menuItemId && (
+              <button
+                onClick={() => onMarkUnavailable(item.menuItemId, item.name)}
+                title="Marcar item como esgotado"
+                className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+              >
+                86
+              </button>
+            )}
           </div>
         ))}
         {order.scheduledFor && (
@@ -112,18 +124,36 @@ export default function KitchenPage() {
   const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const knownIdsRef = useRef<Set<string>>(new Set());
   useTimerTick();
 
   const load = useCallback(async () => {
     if (!restaurantId) return;
     const [all, st] = await Promise.all([db.getOrders(restaurantId), db.getSettings(restaurantId)]);
     const since = new Date(Date.now() - 86400000).toISOString();
-    setOrders(all.filter(o =>
+    const filtered = all.filter(o =>
       (o.status === 'PENDING' || o.status === 'PAID' || o.status === 'PREPARING') && o.createdAt >= since
-    ));
+    );
+    // detect new orders after initial load
+    if (knownIdsRef.current.size > 0) {
+      const newOnes = filtered.filter(o => !knownIdsRef.current.has(o.id));
+      if (newOnes.length > 0) {
+        if (soundEnabled) playNewOrderSound();
+        newOnes.forEach(o => showNewOrderNotification(o.customerName, o.total));
+      }
+    }
+    filtered.forEach(o => knownIdsRef.current.add(o.id));
+    setOrders(filtered);
     setSettings(st);
     setLoading(false);
-  }, [restaurantId]);
+  }, [restaurantId, soundEnabled]);
+
+  useEffect(() => {
+    const handler = () => { unlockAudio(); requestNotificationPermission(); };
+    window.addEventListener('click', handler, { once: true });
+    return () => window.removeEventListener('click', handler);
+  }, []);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -157,6 +187,12 @@ export default function KitchenPage() {
     await db.updateOrder(order.id, { status: next });
     await load();
     setUpdating(null);
+  };
+
+  const markUnavailable = async (menuItemId: string, name: string) => {
+    if (!confirm(`Marcar "${name}" como esgotado? O item ficará indisponível no cardápio.`)) return;
+    await db.updateMenuItem(menuItemId, { available: false });
+    await load();
   };
 
   const pending = orders.filter(o => o.status === 'PENDING' || o.status === 'PAID').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -193,14 +229,22 @@ export default function KitchenPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3 flex-wrap justify-end">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-100">
             <Clock className="w-3.5 h-3.5 text-blue-500" />
             <span className="text-xs font-bold text-blue-700">~{estimatedWait}min espera</span>
           </div>
+          <button
+            onClick={() => setSoundEnabled(s => !s)}
+            title={soundEnabled ? 'Silenciar alertas' : 'Ativar alertas sonoros'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${soundEnabled ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-slate-100 border-slate-200 text-slate-400'}`}
+          >
+            {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            {soundEnabled ? 'Som' : 'Mudo'}
+          </button>
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Atualiza a cada 10s
+            10s
           </div>
         </div>
       </div>
@@ -238,6 +282,7 @@ export default function KitchenPage() {
               order={order}
               updating={updating}
               onAction={accept}
+              onMarkUnavailable={markUnavailable}
               actionLabel="Aceitar e iniciar preparo"
               actionColor="bg-amber-500 hover:bg-amber-600"
               borderColor="border-amber-200"
@@ -263,6 +308,7 @@ export default function KitchenPage() {
               order={order}
               updating={updating}
               onAction={done}
+              onMarkUnavailable={markUnavailable}
               actionLabel={order.deliveryType === 'delivery' ? '✓ Saiu para entrega!' : '✓ Pronto para servir!'}
               actionColor="bg-emerald-500 hover:bg-emerald-600"
               borderColor="border-blue-200"
