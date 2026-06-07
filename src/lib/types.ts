@@ -106,6 +106,7 @@ export interface RestaurantSettings {
   loyaltyEnabled: boolean;
   loyaltyOrdersNeeded: number;
   loyaltyReward: string;
+  cashbackPercent: number;
   minimumOrder: number;
   manualClosed: boolean;
 }

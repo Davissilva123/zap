@@ -10,6 +10,7 @@ interface SettingsRow {
   opening_hours: OpeningHours; delivery_time: string; delivery_fee: number;
   delivery_neighborhoods: DeliveryNeighborhood[];
   loyalty_enabled: boolean; loyalty_orders_needed: number; loyalty_reward: string;
+  cashback_percent: number;
   minimum_order: number;
   mercado_pago_token: string;
   manual_closed: boolean;
@@ -42,6 +43,7 @@ function toSettings(r: SettingsRow): RestaurantSettings {
     loyaltyEnabled: r.loyalty_enabled ?? false,
     loyaltyOrdersNeeded: r.loyalty_orders_needed ?? 10,
     loyaltyReward: r.loyalty_reward ?? '',
+    cashbackPercent: Number(r.cashback_percent ?? 0),
     minimumOrder: Number(r.minimum_order ?? 0),
     mercadoPagoToken: r.mercado_pago_token ?? '',
     manualClosed: r.manual_closed ?? false,
@@ -98,6 +100,7 @@ export const db = {
     if (updates.loyaltyEnabled !== undefined) row.loyalty_enabled = updates.loyaltyEnabled;
     if (updates.loyaltyOrdersNeeded !== undefined) row.loyalty_orders_needed = updates.loyaltyOrdersNeeded;
     if (updates.loyaltyReward !== undefined) row.loyalty_reward = updates.loyaltyReward;
+    if (updates.cashbackPercent !== undefined) row.cashback_percent = updates.cashbackPercent;
     if (updates.minimumOrder !== undefined) row.minimum_order = updates.minimumOrder;
     if (updates.mercadoPagoToken !== undefined) row.mercado_pago_token = updates.mercadoPagoToken;
     if (updates.manualClosed !== undefined) row.manual_closed = updates.manualClosed;

@@ -414,6 +414,20 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+        <div className="pt-2 border-t border-slate-100">
+          <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Cashback (% do pedido)</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="number" min={0} max={50} step={0.5}
+              value={form.cashbackPercent ?? 0}
+              onChange={e => setForm(f => ({ ...f!, cashbackPercent: Number(e.target.value) }))}
+              className="input-field w-28"
+              placeholder="0"
+            />
+            <span className="text-sm text-slate-500">% do total de cada pedido concluído</span>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1">0 = cashback desativado. O saldo acumulado é exibido no portal do cliente.</p>
+        </div>
       </SectionCard>
 
       <button onClick={save} disabled={saving} className={`btn-primary px-8 py-3 disabled:opacity-60 ${saved ? '!bg-emerald-600' : ''}`}>

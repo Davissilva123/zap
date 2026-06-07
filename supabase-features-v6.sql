@@ -8,8 +8,9 @@ ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS stock INTEGER DEFAULT NULL;
 -- Orders: observações do cliente
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT NULL;
 
--- Restaurant settings: token Mercado Pago
+-- Restaurant settings: token Mercado Pago e cashback
 ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS mercado_pago_token TEXT DEFAULT '';
+ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS cashback_percent NUMERIC DEFAULT 0;
 
 -- Pedido mínimo para delivery (caso não tenha sido aplicado ainda pelo v5)
 ALTER TABLE restaurant_settings ADD COLUMN IF NOT EXISTS minimum_order NUMERIC DEFAULT 0;

@@ -5,7 +5,7 @@ import { useCustomerAuth } from '../lib/customerAuth';
 import { db } from '../lib/db';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { Order, RestaurantSettings } from '../lib/types';
-import { ArrowLeft, Clock, CheckCircle, XCircle, Truck, ShoppingBag, Package, LogOut, User, Loader2, Ban, ChefHat, MapPin, Zap, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, XCircle, Truck, ShoppingBag, Package, LogOut, User, Loader2, Ban, ChefHat, MapPin, Zap, RotateCcw, Gift, Star, DollarSign } from 'lucide-react';
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string; pulse?: boolean }> = {
   PENDING: { label: 'Aguardando', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', pulse: true },
@@ -177,6 +177,78 @@ export default function CustomerPortalPage() {
       </div>
 
       <div className="max-w-xl mx-auto px-4 pt-5 pb-12">
+
+        {/* Loyalty + Cashback cards */}
+        {!loading && settings && (settings.loyaltyEnabled || (settings.cashbackPercent ?? 0) > 0) && (() => {
+          const completedOrders = orders.filter(o => ['COMPLETED', 'DELIVERING', 'PREPARING', 'PAID'].includes(o.status));
+          const loyaltyCount = completedOrders.length;
+          const loyaltyProgress = settings.loyaltyOrdersNeeded > 0 ? loyaltyCount % settings.loyaltyOrdersNeeded : 0;
+          const loyaltyPct = settings.loyaltyOrdersNeeded > 0 ? (loyaltyProgress / settings.loyaltyOrdersNeeded) * 100 : 0;
+          const rewardsEarned = settings.loyaltyOrdersNeeded > 0 ? Math.floor(loyaltyCount / settings.loyaltyOrdersNeeded) : 0;
+          const cashbackTotal = (settings.cashbackPercent ?? 0) > 0
+            ? completedOrders.reduce((s, o) => s + o.total, 0) * (settings.cashbackPercent / 100)
+            : 0;
+          return (
+            <div className="grid grid-cols-1 gap-3 mb-5">
+              {settings.loyaltyEnabled && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: accent + '20' }}>
+                      <Gift className="w-5 h-5" style={{ color: accent }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-900 text-sm">Programa de Fidelidade</p>
+                      <p className="text-xs text-slate-400 font-medium">{loyaltyCount} pedido{loyaltyCount !== 1 ? 's' : ''} concluído{loyaltyCount !== 1 ? 's' : ''} no total</p>
+                    </div>
+                    {rewardsEarned > 0 && (
+                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold" style={{ backgroundColor: accent, color: '#fff' }}>
+                        <Star className="w-3 h-3 fill-white" /> {rewardsEarned}x premiado
+                      </span>
+                    )}
+                  </div>
+                  {loyaltyCount % settings.loyaltyOrdersNeeded === 0 && loyaltyCount > 0 ? (
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+                      <Star className="w-4 h-4 text-emerald-500 fill-emerald-500 flex-shrink-0" />
+                      <p className="text-sm font-semibold text-emerald-700">🎉 Você ganhou: <strong>{settings.loyaltyReward}</strong></p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between text-xs font-semibold mb-1.5">
+                        <span className="text-slate-500">{loyaltyProgress} de {settings.loyaltyOrdersNeeded} pedidos</span>
+                        <span style={{ color: accent }}>{settings.loyaltyOrdersNeeded - loyaltyProgress} para ganhar</span>
+                      </div>
+                      <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${loyaltyPct}%`, backgroundColor: accent }} />
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1.5">Recompensa: <span className="font-semibold text-slate-600">{settings.loyaltyReward || '—'}</span></p>
+                    </>
+                  )}
+                </div>
+              )}
+              {(settings.cashbackPercent ?? 0) > 0 && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                      <DollarSign className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-slate-900 text-sm">Cashback Acumulado</p>
+                      <p className="text-xs text-slate-400 font-medium">{settings.cashbackPercent}% de cada pedido concluído</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xl font-extrabold text-emerald-600">R$ {cashbackTotal.toFixed(2).replace('.', ',')}</p>
+                      <p className="text-[10px] text-slate-400 font-medium mt-0.5">{completedOrders.length} pedido{completedOrders.length !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <p className="text-xs text-slate-500">Para resgatar seu cashback, entre em contato com o restaurante ou aguarde um cupom de desconto.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         <h2 className="text-lg font-extrabold text-slate-900 mb-4">Meus Pedidos</h2>
 
         {loading ? (
