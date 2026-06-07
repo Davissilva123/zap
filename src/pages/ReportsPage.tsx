@@ -34,9 +34,10 @@ export default function ReportsPage() {
     db.getOrders(restaurantId).then(setOrders);
   }, [restaurantId]);
 
+  const days = range === 'custom' ? 30 : Number(range);
   const since = range === 'custom' && customFrom
     ? new Date(customFrom).toISOString()
-    : new Date(Date.now() - Number(range) * 86400000).toISOString();
+    : new Date(Date.now() - days * 86400000).toISOString();
   const until = range === 'custom' && customTo
     ? new Date(customTo + 'T23:59:59').toISOString()
     : new Date().toISOString();
