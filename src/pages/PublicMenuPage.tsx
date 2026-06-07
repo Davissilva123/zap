@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '../lib/db';
 import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS, type PixChargeResult } from '../lib/xgate';
-import { createMpPixCharge, checkMpPayment } from '../lib/mercadopago';
+import { createMpPixCharge, checkMpPayment, cancelMpPayment } from '../lib/mercadopago';
 import { useCustomerAuth } from '../lib/customerAuth';
 import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption } from '../lib/types';
 import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift, Search } from 'lucide-react';
@@ -51,6 +51,7 @@ export default function PublicMenuPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [copied, setCopied] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [pixCountdown, setPixCountdown] = useState(0);
   const [cashChange, setCashChange] = useState('');
   const catBarRef = useRef<HTMLDivElement>(null);
   const pixGatewayRef = useRef<'xgate' | 'mp'>('xgate');
@@ -318,6 +319,31 @@ export default function PublicMenuPage() {
     }, 5000);
     return () => clearInterval(interval);
   }, [polling, settings, pixTxId]);
+
+  // Countdown de 30 min para o PIX expirar
+  useEffect(() => {
+    if (step !== 'pix') return;
+    setPixCountdown(30 * 60);
+    const tick = setInterval(() => {
+      setPixCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(tick);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [step]);
+
+  const handleCancelPix = async () => {
+    setPolling(false);
+    if (pixGatewayRef.current === 'mp' && settings?.mercadoPagoToken && pixTxId) {
+      try { await cancelMpPayment(settings.mercadoPagoToken, pixTxId); } catch { /* ignore */ }
+    }
+    setStep('payment');
+    setPixTxId(''); setPixCopyPaste(''); setPixQrCode('');
+  };
 
   const closeAndReset = () => {
     setCart([]); setShowCart(false); setStep('cart'); setCustomerName(''); setCustomerPhone('');
@@ -1519,7 +1545,15 @@ export default function PublicMenuPage() {
                     }
                   </div>
                   <p className="text-3xl font-extrabold text-slate-900 tracking-tight">R$ {pixAmount.toFixed(2).replace('.', ',')}</p>
-                  <p className="text-sm text-slate-400 mt-1 mb-5 font-medium">Escaneie ou copie o código PIX</p>
+                  <p className="text-sm text-slate-400 mt-1 mb-1 font-medium">Escaneie ou copie o código PIX</p>
+
+                  {/* Countdown */}
+                  <div className={`flex items-center gap-1.5 mb-4 px-3 py-1.5 rounded-full text-xs font-bold ${pixCountdown < 300 ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-600'}`}>
+                    <Clock className="w-3.5 h-3.5" />
+                    {pixCountdown > 0
+                      ? `Expira em ${String(Math.floor(pixCountdown / 60)).padStart(2, '0')}:${String(pixCountdown % 60).padStart(2, '0')}`
+                      : 'QR Code expirado'}
+                  </div>
 
                   <div className="w-full bg-slate-50 rounded-2xl p-4 mb-3 border border-slate-200">
                     <code className="text-[11px] text-slate-500 break-all line-clamp-3 font-mono leading-relaxed">{pixCopyPaste}</code>
@@ -1527,7 +1561,7 @@ export default function PublicMenuPage() {
 
                   <button
                     onClick={copyPixCode}
-                    className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition-all duration-200"
+                    className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition-all duration-200 mb-2"
                     style={copied
                       ? { backgroundColor: '#10b981', color: '#fff' }
                       : { backgroundColor: accent, color: '#fff' }}
@@ -1536,7 +1570,15 @@ export default function PublicMenuPage() {
                     {copied ? 'Código copiado!' : 'Copiar código PIX'}
                   </button>
 
-                  {polling && (
+                  <button
+                    onClick={handleCancelPix}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                    Cancelar pagamento
+                  </button>
+
+                  {polling && pixCountdown > 0 && (
                     <div className="flex items-center gap-2 mt-5 text-sm text-slate-400 font-medium">
                       <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                       Aguardando pagamento...

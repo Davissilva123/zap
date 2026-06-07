@@ -48,3 +48,17 @@ export async function checkMpPayment(
   if (!res.ok) return { status: 'pending' };
   return res.json();
 }
+
+export async function cancelMpPayment(
+  accessToken: string,
+  txId: string
+): Promise<void> {
+  await fetch(`${SUPABASE_URL}/functions/v1/mp-cancel-payment`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ accessToken, txId }),
+  });
+}

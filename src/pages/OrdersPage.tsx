@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
+import { cancelMpPayment } from '../lib/mercadopago';
 import { sendWhatsAppNotification } from '../lib/whatsapp';
 import { playNewOrderSound, unlockAudio } from '../lib/sound';
 import { printOrder } from '../lib/print';
@@ -147,6 +148,11 @@ export default function OrdersPage() {
   const cancelOrder = async (orderId: string) => {
     if (!confirm('Cancelar este pedido?')) return;
     await db.updateOrder(orderId, { status: 'CANCELLED' });
+    // Cancela cobrança PIX no Mercado Pago se aplicável
+    const order = orders.find(o => o.id === orderId);
+    if (order?.pixTxId && order.paymentMethod === 'pix' && settings?.mercadoPagoToken) {
+      try { await cancelMpPayment(settings.mercadoPagoToken, order.pixTxId); } catch { /* ignore */ }
+    }
     load();
     if (selectedOrder?.id === orderId) {
       setSelectedOrder(prev => prev ? { ...prev, status: 'CANCELLED' } : null);
