@@ -37,6 +37,32 @@ BEGIN
   END IF;
 END $$;
 
+-- Tabela de entregadores
+CREATE TABLE IF NOT EXISTS drivers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  phone TEXT DEFAULT '',
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE drivers ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'drivers' AND policyname = 'owners can manage their drivers'
+  ) THEN
+    EXECUTE '
+      CREATE POLICY "owners can manage their drivers"
+        ON drivers FOR ALL
+        USING (auth.uid() = user_id)
+        WITH CHECK (auth.uid() = user_id)
+    ';
+  END IF;
+END $$;
+
 -- Policy: operadores podem atualizar itens do menu (para marcar esgotado via KDS)
 DO $$
 BEGIN

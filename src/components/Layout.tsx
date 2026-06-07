@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState } from 'react';
@@ -13,6 +13,7 @@ const navItems = [
   { to: '/coupons', icon: Tag, label: 'Cupons' },
   { to: '/tables', icon: LayoutGrid, label: 'Mesas' },
   { to: '/comandas', icon: ClipboardList, label: 'Comandas' },
+  { to: '/drivers', icon: Bike, label: 'Entregadores' },
   { to: '/operators', icon: Users, label: 'Operadores' },
   { to: '/qrcode', icon: QrCode, label: 'QR Code' },
   { to: '/settings', icon: Settings, label: 'Configurações' },

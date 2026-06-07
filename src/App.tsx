@@ -14,6 +14,7 @@ import ReportsPage from './pages/ReportsPage';
 import CouponsPage from './pages/CouponsPage';
 import TablesPage from './pages/TablesPage';
 import ComandasPage from './pages/ComandasPage';
+import DriversPage from './pages/DriversPage';
 import OperatorsPage from './pages/OperatorsPage';
 import OpOrdersPage from './pages/op/OrdersPage';
 import OpTablesPage from './pages/op/TablesPage';
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="coupons" element={<CouponsPage />} />
             <Route path="tables" element={<TablesPage />} />
             <Route path="comandas" element={<ComandasPage />} />
+            <Route path="drivers" element={<DriversPage />} />
             <Route path="operators" element={<OperatorsPage />} />
             <Route path="qrcode" element={<QRCodePage />} />
             <Route path="settings" element={<SettingsPage />} />

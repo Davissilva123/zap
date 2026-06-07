@@ -160,6 +160,15 @@ export interface Order {
   paidAt: string | null;
 }
 
+export interface Driver {
+  id: string;
+  userId: string;
+  name: string;
+  phone: string;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface Coupon {
   id: string;
   userId: string;

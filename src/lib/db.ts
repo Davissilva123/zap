@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, ItemOption, OpeningHours, DeliveryNeighborhood, Coupon, RestaurantTable, Operator } from './types';
+import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, ItemOption, OpeningHours, DeliveryNeighborhood, Coupon, RestaurantTable, Operator, Driver } from './types';
 
 // ---- Supabase row shapes (snake_case) ----
 interface SettingsRow {
@@ -25,6 +25,7 @@ interface ItemOptionRow { id: string; user_id: string; group_id: string; name: s
 interface CouponRow { id: string; user_id: string; code: string; discount_type: string; discount_value: number; min_order: number; max_uses: number | null; uses_count: number; active: boolean; expires_at: string | null; created_at: string; }
 interface RestaurantTableRow { id: string; user_id: string; name: string; order: number; active: boolean; created_at: string; }
 interface OperatorRow { id: string; owner_id: string; email: string; name: string; role: string; active: boolean; notes: string; created_at: string; user_id?: string | null; }
+interface DriverRow { id: string; user_id: string; name: string; phone: string; active: boolean; created_at: string; }
 
 // ---- Mappers ----
 function toSettings(r: SettingsRow): RestaurantSettings {
@@ -58,6 +59,7 @@ function toItemOption(r: ItemOptionRow): ItemOption { return { id: r.id, userId:
 function toCoupon(r: CouponRow): Coupon { return { id: r.id, userId: r.user_id, code: r.code, discountType: r.discount_type as 'percent' | 'fixed', discountValue: Number(r.discount_value), minOrder: Number(r.min_order), maxUses: r.max_uses, usesCount: r.uses_count, active: r.active, expiresAt: r.expires_at, createdAt: r.created_at }; }
 function toRestaurantTable(r: RestaurantTableRow): RestaurantTable { return { id: r.id, userId: r.user_id, name: r.name, order: r.order, active: r.active, createdAt: r.created_at }; }
 function toOperator(r: OperatorRow): Operator { return { id: r.id, ownerId: r.owner_id, email: r.email, name: r.name, role: r.role as Operator['role'], active: r.active, notes: r.notes || '', createdAt: r.created_at, userId: r.user_id }; }
+function toDriver(r: DriverRow): Driver { return { id: r.id, userId: r.user_id, name: r.name, phone: r.phone || '', active: r.active, createdAt: r.created_at }; }
 
 export const db = {
   // ---- Settings ----
@@ -461,5 +463,30 @@ export const db = {
 
   async deleteOperator(id: string): Promise<void> {
     await supabase.from('operators').delete().eq('id', id);
+  },
+
+  // ---- Drivers (Entregadores) ----
+  async getDrivers(userId: string): Promise<Driver[]> {
+    const { data, error } = await supabase.from('drivers').select('*').eq('user_id', userId).order('name', { ascending: true });
+    if (error) { console.error('[db.getDrivers]', error); return []; }
+    return (data as DriverRow[]).map(toDriver);
+  },
+
+  async createDriver(userId: string, d: Pick<Driver, 'name' | 'phone' | 'active'>): Promise<Driver> {
+    const { data, error } = await supabase.from('drivers').insert({ user_id: userId, name: d.name, phone: d.phone, active: d.active }).select().single();
+    if (error) throw new Error(error.message);
+    return toDriver(data as DriverRow);
+  },
+
+  async updateDriver(id: string, updates: Partial<Pick<Driver, 'name' | 'phone' | 'active'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.name !== undefined) row.name = updates.name;
+    if (updates.phone !== undefined) row.phone = updates.phone;
+    if (updates.active !== undefined) row.active = updates.active;
+    await supabase.from('drivers').update(row).eq('id', id);
+  },
+
+  async deleteDriver(id: string): Promise<void> {
+    await supabase.from('drivers').delete().eq('id', id);
   },
 };

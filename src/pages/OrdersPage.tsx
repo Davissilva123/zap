@@ -7,8 +7,8 @@ import { sendWhatsAppNotification } from '../lib/whatsapp';
 import { playNewOrderSound, unlockAudio } from '../lib/sound';
 import { printOrder } from '../lib/print';
 import { supabase } from '../lib/supabase';
-import type { Order, RestaurantSettings } from '../lib/types';
-import { Clock, CheckCircle, XCircle, Eye, X, Truck, ShoppingBag, MapPin, Inbox, MessageCircle, Loader2, Printer, Volume2, VolumeX, Ban, Star, LayoutGrid, Tag, Search, CalendarDays } from 'lucide-react';
+import type { Order, RestaurantSettings, Driver } from '../lib/types';
+import { Clock, CheckCircle, XCircle, Eye, X, Truck, ShoppingBag, MapPin, Inbox, MessageCircle, Loader2, Printer, Volume2, VolumeX, Ban, Star, LayoutGrid, Tag, Search, CalendarDays, Bike, Check } from 'lucide-react';
 import { showNewOrderNotification, requestNotificationPermission } from '../lib/notifications';
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string }> = {
@@ -42,15 +42,20 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [driverModal, setDriverModal] = useState<{ orderId: string; newStatus: string } | null>(null);
+  const [driverSelection, setDriverSelection] = useState<string>('none');
+  const [driverCustomName, setDriverCustomName] = useState('');
   const knownIdsRef = useRef<Set<string>>(new Set());
   const settingsRef = useRef<RestaurantSettings | null>(null);
 
   const load = async () => {
     if (!user) return;
-    const [o, s] = await Promise.all([db.getOrders(user.id), db.getSettings(user.id)]);
+    const [o, s, drvs] = await Promise.all([db.getOrders(user.id), db.getSettings(user.id), db.getDrivers(user.id)]);
     setOrders(o);
     setSettings(s);
     settingsRef.current = s;
+    setDrivers(drvs);
     knownIdsRef.current = new Set(o.map(x => x.id));
   };
 
@@ -119,17 +124,12 @@ export default function OrdersPage() {
   const formatDate = (d: string) => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   const whatsappConfigured = settings?.whatsappEnabled && settings?.whatsappApiToken && settings?.whatsappPhoneNumberId;
 
-  const updateStatus = async (orderId: string, newStatus: string) => {
+  const doUpdateStatus = async (orderId: string, newStatus: string, driverName?: string) => {
     const order = orders.find(o => o.id === orderId);
-    let driverName: string | undefined;
-    if (newStatus === 'DELIVERING') {
-      const name = prompt('Nome do entregador (opcional):');
-      if (name !== null) driverName = name.trim() || undefined;
-    }
     await db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined, driverName });
     load();
     if (selectedOrder?.id === orderId) {
-      setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
+      setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'], driverName } : null);
     }
     if (whatsappConfigured && order && settings) {
       setSendingWhatsapp(orderId);
@@ -143,6 +143,29 @@ export default function OrdersPage() {
         setSendingWhatsapp(null);
       }
     }
+  };
+
+  const updateStatus = (orderId: string, newStatus: string) => {
+    if (newStatus === 'DELIVERING') {
+      setDriverSelection('none');
+      setDriverCustomName('');
+      setDriverModal({ orderId, newStatus });
+      return;
+    }
+    doUpdateStatus(orderId, newStatus);
+  };
+
+  const confirmDriver = () => {
+    if (!driverModal) return;
+    let driverName: string | undefined;
+    if (driverSelection === 'other') {
+      driverName = driverCustomName.trim() || undefined;
+    } else if (driverSelection !== 'none') {
+      driverName = drivers.find(d => d.id === driverSelection)?.name;
+    }
+    const { orderId, newStatus } = driverModal;
+    setDriverModal(null);
+    doUpdateStatus(orderId, newStatus, driverName);
   };
 
   const cancelOrder = async (orderId: string) => {
@@ -473,6 +496,67 @@ export default function OrdersPage() {
               )}
 
               <p className="text-[12px] text-slate-400">{formatDate(selectedOrder.createdAt)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Driver selection modal */}
+      {driverModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Bike className="w-5 h-5 text-teal-500" />
+                <h2 className="text-base font-bold text-slate-900">Selecionar entregador</h2>
+              </div>
+              <button onClick={() => setDriverModal(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-2">
+              {/* No driver option */}
+              <label className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors hover:bg-slate-50 has-[:checked]:border-teal-400 has-[:checked]:bg-teal-50/40">
+                <input type="radio" name="driver" value="none" checked={driverSelection === 'none'} onChange={() => setDriverSelection('none')} className="accent-teal-500" />
+                <span className="text-sm font-medium text-slate-700">Sem entregador</span>
+              </label>
+
+              {/* Active drivers */}
+              {drivers.filter(d => d.active).map(d => (
+                <label key={d.id} className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors hover:bg-slate-50 has-[:checked]:border-teal-400 has-[:checked]:bg-teal-50/40">
+                  <input type="radio" name="driver" value={d.id} checked={driverSelection === d.id} onChange={() => setDriverSelection(d.id)} className="accent-teal-500" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800">{d.name}</p>
+                    {d.phone && <p className="text-xs text-slate-400">{d.phone}</p>}
+                  </div>
+                </label>
+              ))}
+
+              {/* Custom name option */}
+              <label className="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors hover:bg-slate-50 has-[:checked]:border-teal-400 has-[:checked]:bg-teal-50/40">
+                <input type="radio" name="driver" value="other" checked={driverSelection === 'other'} onChange={() => setDriverSelection('other')} className="accent-teal-500 mt-0.5" />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-slate-700">Outro (digitar nome)</span>
+                  {driverSelection === 'other' && (
+                    <input
+                      autoFocus
+                      value={driverCustomName}
+                      onChange={e => setDriverCustomName(e.target.value)}
+                      className="mt-2 w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                      placeholder="Nome do entregador"
+                    />
+                  )}
+                </div>
+              </label>
+            </div>
+            <div className="flex gap-3 px-5 pb-5">
+              <button onClick={() => setDriverModal(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={confirmDriver} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-teal-500 text-white text-sm font-semibold hover:bg-teal-600 transition-colors">
+                <Check className="w-4 h-4" />
+                Confirmar saída
+              </button>
             </div>
           </div>
         </div>
