@@ -22,9 +22,12 @@ export interface MenuItem {
   name: string;
   description: string;
   price: number;
+  promoPrice?: number;
   emoji: string;
   imageUrl: string;
   available: boolean;
+  featured?: boolean;
+  stock?: number | null;
   order: number;
   createdAt: string;
 }
@@ -81,6 +84,7 @@ export interface DeliveryNeighborhood {
 
 export interface RestaurantSettings {
   userId: string;
+  mercadoPagoToken: string;
   name: string;
   slug: string;
   accentColor: string;
@@ -140,6 +144,7 @@ export interface Order {
   deliveryAddress: DeliveryAddress | null;
   deliveryType: 'pickup' | 'delivery' | 'table';
   tableName?: string;
+  notes?: string;
   pixTxId: string;
   pixQrCode: string;
   pixCopyPaste: string;

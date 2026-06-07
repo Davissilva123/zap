@@ -74,6 +74,9 @@ export default function PublicMenuPage() {
   // Busca no cardápio
   const [menuSearch, setMenuSearch] = useState('');
 
+  // Observações do pedido
+  const [orderNotes, setOrderNotes] = useState('');
+
   // Agendamento
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState('');
@@ -107,6 +110,16 @@ export default function PublicMenuPage() {
       setCategories(data.categories);
       setItems(data.items);
       db.addScan(data.settings.userId);
+      // Repetir pedido: check sessionStorage for pre-filled cart
+      const repeatRaw = sessionStorage.getItem(`repeat_cart_${slug}`);
+      if (repeatRaw) {
+        sessionStorage.removeItem(`repeat_cart_${slug}`);
+        try {
+          const repeatItems = JSON.parse(repeatRaw) as import('../lib/types').OrderItem[];
+          setCart(repeatItems.map(i => ({ ...i, categoryId: data.items.find(m => m.id === i.menuItemId || m.name === i.name)?.categoryId || '' })));
+          setShowCart(true);
+        } catch { /* ignore parse errors */ }
+      }
     };
     load();
   }, [slug]);
@@ -233,7 +246,7 @@ export default function PublicMenuPage() {
       try {
         const txId = `cardapio_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
         const result = await createPixCharge(settings.xgateEmail, settings.xgatePassword, cartTotal, txId, customerName.trim());
-        const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, delivAddr, result, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor);
+        const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, delivAddr, result, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor, orderNotes || undefined);
         setPlacedOrderId(order.id);
         if (appliedCouponId) await db.useCoupon(appliedCouponId, appliedCouponUses);
         await fetchLoyalty(order.id);
@@ -251,7 +264,7 @@ export default function PublicMenuPage() {
     }
     setErrorMsg('');
     try {
-      const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, delivAddr, null, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor);
+      const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, delivAddr, null, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor, orderNotes || undefined);
       setPlacedOrderId(order.id);
       if (appliedCouponId) await db.useCoupon(appliedCouponId, appliedCouponUses);
       await fetchLoyalty(order.id);
@@ -260,7 +273,7 @@ export default function PublicMenuPage() {
       setErrorMsg(String(err));
       setStep('error');
     }
-  }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address, customer, mesaParam, couponValid, couponCode, couponDiscount, appliedCouponId, appliedCouponUses, scheduleEnabled, scheduledFor]);
+  }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address, customer, mesaParam, couponValid, couponCode, couponDiscount, appliedCouponId, appliedCouponUses, scheduleEnabled, scheduledFor, orderNotes]);
 
   useEffect(() => {
     if (!polling || !settings?.xgateEmail || !pixTxId) return;
@@ -281,7 +294,7 @@ export default function PublicMenuPage() {
     setPixCopyPaste(''); setPixQrCode(''); setPixTxId(''); setCashChange('');
     setCouponCode(''); setCouponValid(false); setCouponDiscount(0); setAppliedCouponId(null); setCouponMsg('');
     setPlacedOrderId(null); setOrderRating(0); setRatingComment(''); setRatingSubmitted(false);
-    setScheduleEnabled(false); setScheduledFor(''); setLoyaltyCount(null);
+    setScheduleEnabled(false); setScheduledFor(''); setLoyaltyCount(null); setOrderNotes('');
   };
 
   const handleAuthSubmit = async () => {
@@ -608,6 +621,42 @@ export default function PublicMenuPage() {
           </div>
         )}
 
+        {/* Featured items section */}
+        {searchResults === null && !activeCat && (() => {
+          const featuredItems = items.filter(i => i.featured && i.available && (i.stock == null || i.stock > 0));
+          if (featuredItems.length === 0) return null;
+          return (
+            <div className="mt-4">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+                <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Destaques</h2>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                {featuredItems.map(item => {
+                  const effectivePrice = item.promoPrice ?? item.price;
+                  return (
+                    <button key={item.id} onClick={() => openItemModal(item)}
+                      className="flex-shrink-0 w-40 bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5 text-left active:scale-[0.97] transition-transform">
+                      <div className="w-full h-28 overflow-hidden" style={{ backgroundColor: accent + '15' }}>
+                        {item.imageUrl
+                          ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-4xl">{item.emoji}</div>}
+                      </div>
+                      <div className="p-2.5">
+                        <p className="font-bold text-slate-900 text-xs leading-tight line-clamp-2">{item.name}</p>
+                        <div className="mt-1 flex items-baseline gap-1">
+                          <span className="text-sm font-extrabold" style={{ color: accent }}>R$ {effectivePrice.toFixed(2).replace('.', ',')}</span>
+                          {item.promoPrice && <span className="text-[10px] text-slate-400 line-through">R$ {item.price.toFixed(2).replace('.', ',')}</span>}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Normal category view */}
         {searchResults === null && filteredCategories.map(cat => {
           const catItems = items.filter(i => i.categoryId === cat.id);
@@ -624,6 +673,9 @@ export default function PublicMenuPage() {
               <div className="space-y-3">
                 {catItems.map(item => {
                   const inCart = cart.find(c => c.menuItemId === item.id);
+                  const outOfStock = item.stock != null && item.stock <= 0;
+                  const effectiveUnavailable = !item.available || outOfStock;
+                  const effectivePrice = item.promoPrice ?? item.price;
                   return (
                     <div
                       key={item.id}
@@ -653,19 +705,33 @@ export default function PublicMenuPage() {
                           {item.description && (
                             <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">{item.description}</p>
                           )}
-                          <div className="flex items-center gap-2 mt-2">
-                            <p className="text-base font-extrabold tracking-tight" style={{ color: item.available ? accent : '#94a3b8' }}>
-                              R$ {item.price.toFixed(2).replace('.', ',')}
-                            </p>
-                            {!item.available && (
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {item.promoPrice ? (
+                              <>
+                                <p className="text-base font-extrabold tracking-tight" style={{ color: accent }}>
+                                  R$ {item.promoPrice.toFixed(2).replace('.', ',')}
+                                </p>
+                                <p className="text-xs text-slate-400 line-through">
+                                  R$ {item.price.toFixed(2).replace('.', ',')}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-base font-extrabold tracking-tight" style={{ color: effectiveUnavailable ? '#94a3b8' : accent }}>
+                                R$ {effectivePrice.toFixed(2).replace('.', ',')}
+                              </p>
+                            )}
+                            {effectiveUnavailable && (
                               <span className="text-[10px] font-bold bg-red-50 text-red-500 px-2 py-0.5 rounded-full border border-red-100">Esgotado</span>
+                            )}
+                            {!effectiveUnavailable && item.stock != null && item.stock <= 5 && (
+                              <span className="text-[10px] font-bold bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100">{item.stock} restam</span>
                             )}
                           </div>
                         </div>
 
                         {/* Add / Qty */}
                         <div className="flex-shrink-0">
-                          {!item.available ? (
+                          {effectiveUnavailable ? (
                             <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
                               <X className="w-4 h-4 text-slate-400" />
                             </div>
@@ -1167,6 +1233,12 @@ export default function PublicMenuPage() {
                       <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-slate-400 bg-slate-50 transition-colors"
                         placeholder="(11) 99999-0000" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Observações (opcional)</label>
+                      <textarea value={orderNotes} onChange={e => setOrderNotes(e.target.value)} rows={2}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-slate-400 bg-slate-50 transition-colors resize-none"
+                        placeholder="Sem cebola, ponto da carne, alergia..." />
                     </div>
                   </div>
 

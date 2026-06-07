@@ -25,16 +25,22 @@ export default function ReportsPage() {
   const { user } = useAuth();
   const restaurantId = useRestaurantId();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [range, setRange] = useState<'7' | '30' | '90'>('30');
+  const [range, setRange] = useState<'7' | '30' | '90' | 'custom'>('30');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
 
   useEffect(() => {
     if (!restaurantId) return;
     db.getOrders(restaurantId).then(setOrders);
   }, [restaurantId]);
 
-  const days = Number(range);
-  const since = new Date(Date.now() - days * 86400000).toISOString();
-  const rangeOrders = orders.filter(o => o.createdAt >= since && o.status !== 'CANCELLED');
+  const since = range === 'custom' && customFrom
+    ? new Date(customFrom).toISOString()
+    : new Date(Date.now() - Number(range) * 86400000).toISOString();
+  const until = range === 'custom' && customTo
+    ? new Date(customTo + 'T23:59:59').toISOString()
+    : new Date().toISOString();
+  const rangeOrders = orders.filter(o => o.createdAt >= since && o.createdAt <= until && o.status !== 'CANCELLED');
 
   const totalRevenue = rangeOrders.reduce((s, o) => s + o.total, 0);
   const avgTicket = rangeOrders.length ? totalRevenue / rangeOrders.length : 0;
@@ -118,13 +124,26 @@ export default function ReportsPage() {
             <Download className="w-3.5 h-3.5" /> Exportar CSV
           </button>
           <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-          {(['7', '30', '90'] as const).map(r => (
-            <button key={r} onClick={() => setRange(r)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${range === r ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
-              {r}d
+            {(['7', '30', '90'] as const).map(r => (
+              <button key={r} onClick={() => setRange(r)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${range === r ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
+                {r}d
+              </button>
+            ))}
+            <button onClick={() => setRange('custom')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${range === 'custom' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
+              Custom
             </button>
-          ))}
-        </div>
+          </div>
+          {range === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-slate-400" />
+              <span className="text-slate-400 text-sm">até</span>
+              <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-slate-400" />
+            </div>
+          )}
       </div>
       </div>
 
@@ -133,7 +152,7 @@ export default function ReportsPage() {
         <StatCard icon={DollarSign} label="Faturamento" value={fmt(totalRevenue)} sub={`Últimos ${range} dias`} color="bg-emerald-500" />
         <StatCard icon={ShoppingBag} label="Pedidos" value={String(rangeOrders.length)} sub="Concluídos e pendentes" color="bg-blue-500" />
         <StatCard icon={TrendingUp} label="Ticket médio" value={fmt(avgTicket)} sub="Por pedido" color="bg-violet-500" />
-        <StatCard icon={Clock} label="Cancelamentos" value={String(orders.filter(o => o.createdAt >= since && o.status === 'CANCELLED').length)} sub={`Últimos ${range} dias`} color="bg-red-400" />
+        <StatCard icon={Clock} label="Cancelamentos" value={String(orders.filter(o => o.createdAt >= since && o.createdAt <= until && o.status === 'CANCELLED').length)} sub={range === 'custom' ? 'Período selecionado' : `Últimos ${range} dias`} color="bg-red-400" />
       </div>
 
       {/* Gráfico de faturamento por dia */}

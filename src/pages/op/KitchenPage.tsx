@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { playNewOrderSound, unlockAudio } from '../../lib/sound';
 import { showNewOrderNotification, requestNotificationPermission } from '../../lib/notifications';
 import type { Order, RestaurantSettings } from '../../lib/types';
-import { Clock, ChefHat, CheckCircle2, Truck, ShoppingBag, LayoutGrid, Loader2, AlertCircle, Volume2, VolumeX, BellOff } from 'lucide-react';
+import { Clock, ChefHat, Truck, ShoppingBag, LayoutGrid, Loader2, AlertCircle, Volume2, VolumeX, Printer, MessageSquare } from 'lucide-react';
 
 function elapsed(createdAt: string) {
   const m = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
@@ -97,6 +97,12 @@ function OrderCard({ order, updating, onAction, onMarkUnavailable, actionLabel, 
             </span>
           </div>
         )}
+        {order.notes && (
+          <div className="flex items-start gap-2 mt-2 pt-2 border-t border-slate-100">
+            <MessageSquare className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 mt-0.5" />
+            <span className="text-xs text-slate-600 font-medium leading-snug">{order.notes}</span>
+          </div>
+        )}
       </div>
 
       {/* Action button */}
@@ -118,6 +124,28 @@ function OrderCard({ order, updating, onAction, onMarkUnavailable, actionLabel, 
   );
 }
 
+function printOrder(order: Order) {
+  const w = window.open('', '_blank', 'width=380,height=600');
+  if (!w) return;
+  const items = order.items.map(i =>
+    `<div style="display:flex;justify-content:space-between;margin:4px 0"><span>${i.quantity}x ${i.name}</span></div>`
+    + (i.selectedOptions?.length ? `<div style="font-size:11px;color:#555;margin-left:16px">${i.selectedOptions.map(o => o.optionName).join(', ')}</div>` : '')
+  ).join('');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pedido</title>
+  <style>body{font-family:monospace;font-size:14px;padding:16px;max-width:320px}hr{border:1px dashed #ccc}h2{text-align:center}p{margin:4px 0}</style></head><body>
+  <h2>Pedido #${order.id.slice(-6).toUpperCase()}</h2><hr>
+  <p><b>Cliente:</b> ${order.customerName}</p>
+  <p><b>Tel:</b> ${order.customerPhone}</p>
+  <p><b>Tipo:</b> ${order.deliveryType === 'delivery' ? 'Delivery' : order.deliveryType === 'table' ? `Mesa ${order.tableName}` : 'Retirada'}</p>
+  <hr><div>${items}</div><hr>
+  <p><b>Total: R$ ${order.total.toFixed(2).replace('.', ',')}</b></p>
+  ${order.notes ? `<hr><p><b>Obs:</b> ${order.notes}</p>` : ''}
+  <hr><p style="text-align:center;font-size:11px">${new Date(order.createdAt).toLocaleString('pt-BR')}</p>
+  </body></html>`);
+  w.document.close();
+  w.print();
+}
+
 export default function KitchenPage() {
   const restaurantId = useRestaurantId();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -125,6 +153,7 @@ export default function KitchenPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [autoPrint, setAutoPrint] = useState(false);
   const knownIdsRef = useRef<Set<string>>(new Set());
   useTimerTick();
 
@@ -140,14 +169,17 @@ export default function KitchenPage() {
       const newOnes = filtered.filter(o => !knownIdsRef.current.has(o.id));
       if (newOnes.length > 0) {
         if (soundEnabled) playNewOrderSound();
-        newOnes.forEach(o => showNewOrderNotification(o.customerName, o.total));
+        newOnes.forEach(o => {
+          showNewOrderNotification(o.customerName, o.total);
+          if (autoPrint) printOrder(o);
+        });
       }
     }
     filtered.forEach(o => knownIdsRef.current.add(o.id));
     setOrders(filtered);
     setSettings(st);
     setLoading(false);
-  }, [restaurantId, soundEnabled]);
+  }, [restaurantId, soundEnabled, autoPrint]);
 
   useEffect(() => {
     const handler = () => { unlockAudio(); requestNotificationPermission(); };
@@ -241,6 +273,14 @@ export default function KitchenPage() {
           >
             {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
             {soundEnabled ? 'Som' : 'Mudo'}
+          </button>
+          <button
+            onClick={() => setAutoPrint(s => !s)}
+            title={autoPrint ? 'Desativar impressão automática' : 'Ativar impressão automática'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${autoPrint ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-400'}`}
+          >
+            <Printer className="w-3.5 h-3.5" />
+            {autoPrint ? 'Auto-print ON' : 'Auto-print'}
           </button>
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />

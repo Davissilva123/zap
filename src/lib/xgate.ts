@@ -76,7 +76,8 @@ export async function createOrder(
   couponCode?: string,
   discount?: number,
   tableName?: string,
-  scheduledFor?: string | null
+  scheduledFor?: string | null,
+  notes?: string
 ): Promise<Order> {
   return db.addOrder({
     userId,
@@ -92,6 +93,7 @@ export async function createOrder(
     deliveryType,
     deliveryAddress,
     tableName,
+    notes,
     pixTxId: pixResult?.txId || '',
     pixQrCode: pixResult?.qrCodeImage || pixResult?.qrCode || '',
     pixCopyPaste: pixResult?.pixCopyPaste || '',

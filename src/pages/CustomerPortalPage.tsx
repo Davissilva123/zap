@@ -5,7 +5,7 @@ import { useCustomerAuth } from '../lib/customerAuth';
 import { db } from '../lib/db';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { Order, RestaurantSettings } from '../lib/types';
-import { ArrowLeft, Clock, CheckCircle, XCircle, Truck, ShoppingBag, Package, LogOut, User, Loader2, Ban, ChefHat, MapPin, Zap } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, XCircle, Truck, ShoppingBag, Package, LogOut, User, Loader2, Ban, ChefHat, MapPin, Zap, RotateCcw } from 'lucide-react';
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string; pulse?: boolean }> = {
   PENDING: { label: 'Aguardando', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', pulse: true },
@@ -110,6 +110,11 @@ export default function CustomerPortalPage() {
 
   const handleSignOut = async () => {
     await signOut();
+    navigate(`/m/${slug}`);
+  };
+
+  const handleRepeatOrder = (order: Order) => {
+    sessionStorage.setItem(`repeat_cart_${slug}`, JSON.stringify(order.items));
     navigate(`/m/${slug}`);
   };
 
@@ -318,17 +323,26 @@ export default function CustomerPortalPage() {
                         </div>
                       )}
 
-                      {/* Cancel */}
-                      {canCancel && (
+                      {/* Actions */}
+                      <div className="flex gap-2">
                         <button
-                          onClick={() => handleCancel(order.id)}
-                          disabled={!!isCancelling}
-                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-500 text-sm font-semibold hover:bg-red-100 transition-colors disabled:opacity-60"
+                          onClick={() => handleRepeatOrder(order)}
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                          style={{ backgroundColor: accent + '15', color: accent }}
                         >
-                          {isCancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
-                          Cancelar pedido
+                          <RotateCcw className="w-4 h-4" /> Repetir pedido
                         </button>
-                      )}
+                        {canCancel && (
+                          <button
+                            onClick={() => handleCancel(order.id)}
+                            disabled={!!isCancelling}
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-500 text-sm font-semibold hover:bg-red-100 transition-colors disabled:opacity-60"
+                          >
+                            {isCancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                            Cancelar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

@@ -3,8 +3,11 @@ import { db } from '../lib/db';
 import { useAuth, useRestaurantId } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import type { Category, MenuItem } from '../lib/types';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, X, ImagePlus, Loader2, ChevronDown, Settings2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, X, ImagePlus, Loader2, Settings2, Star, GripVertical, Package } from 'lucide-react';
 import ItemGroupsEditor from '../components/ItemGroupsEditor';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 export default function MenuPage() {
   const { user } = useAuth();
@@ -16,7 +19,8 @@ export default function MenuPage() {
   const [showModal, setShowModal] = useState(false);
   const [showGroupsFor, setShowGroupsFor] = useState<string | null>(null);
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
-  const [form, setForm] = useState({ name: '', description: '', price: '', emoji: '🍽️', categoryId: '', available: true, imageUrl: '' });
+  const [form, setForm] = useState({ name: '', description: '', price: '', promoPrice: '', emoji: '🍽️', categoryId: '', available: true, featured: false, stock: '', imageUrl: '' });
+  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [uploading, setUploading] = useState(false);
@@ -40,7 +44,7 @@ export default function MenuPage() {
 
   const openAdd = () => {
     setEditItem(null);
-    setForm({ name: '', description: '', price: '', emoji: '🍽️', categoryId: categories[0]?.id || '', available: true, imageUrl: '' });
+    setForm({ name: '', description: '', price: '', promoPrice: '', emoji: '🍽️', categoryId: categories[0]?.id || '', available: true, featured: false, stock: '', imageUrl: '' });
     setImageFile(null);
     setImagePreview('');
     setShowModal(true);
@@ -48,7 +52,7 @@ export default function MenuPage() {
 
   const openEdit = (item: MenuItem) => {
     setEditItem(item);
-    setForm({ name: item.name, description: item.description, price: String(item.price), emoji: item.emoji, categoryId: item.categoryId, available: item.available, imageUrl: item.imageUrl || '' });
+    setForm({ name: item.name, description: item.description, price: String(item.price), promoPrice: item.promoPrice ? String(item.promoPrice) : '', emoji: item.emoji, categoryId: item.categoryId, available: item.available, featured: item.featured ?? false, stock: item.stock != null ? String(item.stock) : '', imageUrl: item.imageUrl || '' });
     setImageFile(null);
     setImagePreview(item.imageUrl || '');
     setShowModal(true);
@@ -77,7 +81,7 @@ export default function MenuPage() {
         const uploaded = await uploadImage(imageFile, 'items');
         if (uploaded) imageUrl = uploaded;
       }
-      const data = { name: form.name.trim(), description: form.description.trim(), price: parseFloat(form.price), emoji: form.emoji, imageUrl, categoryId: form.categoryId, available: form.available };
+      const data = { name: form.name.trim(), description: form.description.trim(), price: parseFloat(form.price), promoPrice: form.promoPrice ? parseFloat(form.promoPrice) : undefined, emoji: form.emoji, imageUrl, categoryId: form.categoryId, available: form.available, featured: form.featured, stock: form.stock !== '' ? parseInt(form.stock) : null };
       if (editItem) await db.updateMenuItem(editItem.id, data);
       else if (restaurantId) await db.addMenuItem(restaurantId, data);
       setShowModal(false);
@@ -92,10 +96,84 @@ export default function MenuPage() {
     load();
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setItems(prev => {
+      const oldIdx = prev.findIndex(i => i.id === active.id);
+      const newIdx = prev.findIndex(i => i.id === over.id);
+      const reordered = arrayMove(prev, oldIdx, newIdx);
+      reordered.forEach((item, idx) => db.updateMenuItem(item.id, { order: idx }));
+      return reordered;
+    });
+  };
+
   const deleteItem = async (id: string) => {
     await db.deleteMenuItem(id);
     load();
   };
+
+  function SortableRow({ item }: { item: MenuItem }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+    const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+    return (
+      <div ref={setNodeRef} style={style} className={`group ${!item.available ? 'opacity-60' : ''}`}>
+        <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 hover:bg-slate-50 transition-colors">
+          <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-slate-300 hover:text-slate-400 flex-shrink-0 touch-none">
+            <GripVertical className="w-4 h-4" />
+          </button>
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0 overflow-hidden">
+            {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /> : item.emoji}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
+              {item.featured && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" title="Em destaque" />}
+              {!item.available && <span className="badge bg-red-50 text-red-600 text-[10px] py-0.5 font-bold">Esgotado</span>}
+              {item.stock != null && item.stock <= 5 && item.available && <span className="badge bg-amber-50 text-amber-600 text-[10px] py-0.5 font-bold">{item.stock === 0 ? 'Sem estoque' : `${item.stock} restam`}</span>}
+            </div>
+            <p className="text-xs text-slate-400 truncate mt-0.5">{item.description}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              {item.promoPrice ? (
+                <>
+                  <span className="text-xs font-bold text-emerald-600">R$ {item.promoPrice.toFixed(2).replace('.', ',')}</span>
+                  <span className="text-[11px] text-slate-400 line-through">R$ {item.price.toFixed(2).replace('.', ',')}</span>
+                </>
+              ) : (
+                <span className="sm:hidden text-xs font-bold text-emerald-600">R$ {item.price.toFixed(2).replace('.', ',')}</span>
+              )}
+            </div>
+          </div>
+          {!item.promoPrice && <span className="hidden sm:block text-base font-bold text-emerald-600 flex-shrink-0">R$ {item.price.toFixed(2).replace('.', ',')}</span>}
+          {item.promoPrice && <div className="hidden sm:flex flex-col items-end flex-shrink-0"><span className="text-base font-bold text-emerald-600">R$ {item.promoPrice.toFixed(2).replace('.', ',')}</span><span className="text-xs text-slate-400 line-through">R$ {item.price.toFixed(2).replace('.', ',')}</span></div>}
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <button onClick={() => toggleAvailable(item)} title={item.available ? 'Marcar como Esgotado' : 'Marcar como Disponível'}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${item.available ? 'hover:bg-slate-100 text-slate-500' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}>
+              {item.available ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-red-400" />}
+              <span className="hidden sm:inline">{item.available ? 'Disponível' : 'Esgotado'}</span>
+            </button>
+            <button onClick={() => setShowGroupsFor(showGroupsFor === item.id ? null : item.id)} title="Adicionais" className={`p-2 rounded-lg hover:bg-slate-100 transition-colors ${showGroupsFor === item.id ? 'bg-emerald-50' : ''}`}>
+              <Settings2 className={`w-4 h-4 ${showGroupsFor === item.id ? 'text-emerald-500' : 'text-slate-400'}`} />
+            </button>
+            <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
+              <Pencil className="w-4 h-4 text-slate-400" />
+            </button>
+            <button onClick={() => deleteItem(item.id)} className="p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
+              <Trash2 className="w-4 h-4 text-red-400" />
+            </button>
+          </div>
+        </div>
+        {showGroupsFor === item.id && (
+          <div className="px-5 pb-4 bg-slate-50 border-t border-slate-100">
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider pt-3 pb-2 flex items-center gap-1.5">
+              <Settings2 className="w-3.5 h-3.5" /> Adicionais / Complementos
+            </p>
+            <ItemGroupsEditor menuItemId={item.id} />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -120,65 +198,26 @@ export default function MenuPage() {
         </select>
       </div>
 
-      {categories.map(cat => {
-        const catItems = filtered.filter(i => i.categoryId === cat.id);
-        if (catItems.length === 0) return null;
-        return (
-          <div key={cat.id}>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-lg">{cat.emoji}</span>
-              <h3 className="font-semibold text-slate-800 text-[15px]">{cat.name}</h3>
-              <span className="badge bg-slate-100 text-slate-500 text-[11px] py-0.5">{catItems.length}</span>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        {categories.map(cat => {
+          const catItems = filtered.filter(i => i.categoryId === cat.id);
+          if (catItems.length === 0) return null;
+          return (
+            <div key={cat.id}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-lg">{cat.emoji}</span>
+                <h3 className="font-semibold text-slate-800 text-[15px]">{cat.name}</h3>
+                <span className="badge bg-slate-100 text-slate-500 text-[11px] py-0.5">{catItems.length}</span>
+              </div>
+              <div className="card overflow-hidden divide-y divide-slate-100">
+                <SortableContext items={catItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                  {catItems.map(item => <SortableRow key={item.id} item={item} />)}
+                </SortableContext>
+              </div>
             </div>
-            <div className="card overflow-hidden divide-y divide-slate-100">
-              {catItems.map(item => (
-                <div key={item.id} className={`group ${!item.available ? 'opacity-60' : ''}`}>
-                  <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 hover:bg-slate-50 transition-colors">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-100 flex items-center justify-center text-xl flex-shrink-0 overflow-hidden">
-                      {item.imageUrl
-                        ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                        : item.emoji}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
-                        {!item.available && <span className="badge bg-red-50 text-red-600 text-[10px] py-0.5 font-bold">Esgotado</span>}
-                      </div>
-                      <p className="text-xs text-slate-400 truncate mt-0.5">{item.description}</p>
-                      <span className="sm:hidden text-xs font-bold text-emerald-600 mt-0.5">R$ {item.price.toFixed(2).replace('.', ',')}</span>
-                    </div>
-                    <span className="hidden sm:block text-base font-bold text-emerald-600 flex-shrink-0">R$ {item.price.toFixed(2).replace('.', ',')}</span>
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <button onClick={() => toggleAvailable(item)} title={item.available ? 'Marcar como Esgotado' : 'Marcar como Disponível'}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${item.available ? 'hover:bg-slate-100 text-slate-500' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}>
-                        {item.available ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-red-400" />}
-                        <span className="hidden sm:inline">{item.available ? 'Disponível' : 'Esgotado'}</span>
-                      </button>
-                      <button onClick={() => setShowGroupsFor(showGroupsFor === item.id ? null : item.id)} title="Adicionais/Complementos" className={`p-2 rounded-lg hover:bg-slate-100 transition-colors ${showGroupsFor === item.id ? 'bg-emerald-50' : ''}`}>
-                        <Settings2 className={`w-4 h-4 ${showGroupsFor === item.id ? 'text-emerald-500' : 'text-slate-400'}`} />
-                      </button>
-                      <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
-                        <Pencil className="w-4 h-4 text-slate-400" />
-                      </button>
-                      <button onClick={() => deleteItem(item.id)} className="p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
-                        <Trash2 className="w-4 h-4 text-red-400" />
-                      </button>
-                    </div>
-                  </div>
-                  {showGroupsFor === item.id && (
-                    <div className="px-5 pb-4 bg-slate-50 border-t border-slate-100">
-                      <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider pt-3 pb-2 flex items-center gap-1.5">
-                        <Settings2 className="w-3.5 h-3.5" /> Adicionais / Complementos
-                      </p>
-                      <ItemGroupsEditor menuItemId={item.id} />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </DndContext>
 
       {filtered.length === 0 && (
         <div className="card p-12 text-center">
@@ -242,19 +281,38 @@ export default function MenuPage() {
                   <input type="number" step="0.01" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className="input-field" placeholder="0,00" />
                 </div>
                 <div className="flex-1">
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Preço Promo (R$)</label>
+                  <input type="number" step="0.01" value={form.promoPrice} onChange={e => setForm(f => ({ ...f, promoPrice: e.target.value }))} className="input-field" placeholder="Deixe vazio se não houver" />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Categoria</label>
                   <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))} className="input-field">
                     {categories.map(c => <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>)}
                   </select>
                 </div>
-              </div>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center ${form.available ? 'bg-emerald-500' : 'bg-slate-200'}`}
-                  onClick={() => setForm(f => ({ ...f, available: !f.available }))}>
-                  <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.available ? 'translate-x-5' : ''}`} />
+                <div className="flex-1">
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Estoque (unid.)</label>
+                  <input type="number" min="0" step="1" value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} className="input-field" placeholder="Vazio = ilimitado" />
                 </div>
-                <span className="text-sm font-medium text-slate-700">{form.available ? 'Disponível no cardápio' : 'Indisponível'}</span>
-              </label>
+              </div>
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center ${form.available ? 'bg-emerald-500' : 'bg-slate-200'}`}
+                    onClick={() => setForm(f => ({ ...f, available: !f.available }))}>
+                    <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.available ? 'translate-x-5' : ''}`} />
+                  </div>
+                  <span className="text-sm font-medium text-slate-700">{form.available ? 'Disponível no cardápio' : 'Indisponível'}</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <div className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center ${form.featured ? 'bg-amber-400' : 'bg-slate-200'}`}
+                    onClick={() => setForm(f => ({ ...f, featured: !f.featured }))}>
+                    <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.featured ? 'translate-x-5' : ''}`} />
+                  </div>
+                  <span className="text-sm font-medium text-slate-700 flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-amber-400" /> Em destaque no menu público</span>
+                </label>
+              </div>
             </div>
             <div className="px-6 pb-5">
               <button onClick={save} disabled={uploading} className="btn-primary w-full py-3 disabled:opacity-60">

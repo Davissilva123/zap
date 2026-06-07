@@ -32,14 +32,15 @@ function formatAddress(addr: DeliveryAddress): string {
   return parts.filter(Boolean).join(', ');
 }
 
-function buildMessage(order: Order, restaurantName: string, newStatus: string): string {
+function buildMessage(order: Order, restaurantName: string, newStatus: string, portalUrl?: string): string {
   const statusMsg = STATUS_MESSAGES[newStatus] || `seu pedido foi atualizado para: ${newStatus}`;
   const items = order.items.map(i => `${i.emoji} ${i.name} x${i.quantity}`).join('\n');
   const delivery = order.deliveryType === 'delivery' && order.deliveryAddress
     ? `\nEntrega: ${formatAddress(order.deliveryAddress)}`
     : `\nRetirada no local`;
+  const trackingLine = portalUrl ? `\n\nAcompanhe seu pedido: ${portalUrl}` : '';
 
-  return `${restaurantName} — Atualização do Pedido\n\nOlá ${order.customerName}, ${statusMsg}!\n\nItens:\n${items}\n\nTotal: R$ ${order.total.toFixed(2).replace('.', ',')}\nPagamento: ${PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}${delivery}\n\nObrigado pela preferência!`;
+  return `${restaurantName} — Atualização do Pedido\n\nOlá ${order.customerName}, ${statusMsg}!\n\nItens:\n${items}\n\nTotal: R$ ${order.total.toFixed(2).replace('.', ',')}\nPagamento: ${PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}${delivery}${trackingLine}\n\nObrigado pela preferência!`;
 }
 
 export async function sendWhatsAppNotification(
@@ -47,9 +48,10 @@ export async function sendWhatsAppNotification(
   phoneNumberId: string,
   order: Order,
   restaurantName: string,
-  newStatus: string
+  newStatus: string,
+  portalUrl?: string
 ): Promise<WhatsAppResult> {
-  const message = buildMessage(order, restaurantName, newStatus);
+  const message = buildMessage(order, restaurantName, newStatus, portalUrl);
   const phone = order.customerPhone.replace(/\D/g, '');
 
   const res = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp`, {

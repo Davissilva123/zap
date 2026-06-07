@@ -247,6 +247,14 @@ export default function SettingsPage() {
         )}
       </SectionCard>
 
+      <SectionCard icon={QrCode} title="PIX via Mercado Pago (opcional)" description="Alternativa ao XGate — requer Edge Function deployada no Supabase">
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Access Token Mercado Pago</label>
+          <input type="password" value={form.mercadoPagoToken ?? ''} onChange={e => setForm(f => ({ ...f!, mercadoPagoToken: e.target.value }))} className="input-field" placeholder="APP_USR-..." />
+          <p className="text-xs text-slate-400 mt-1.5">Obtenha em developers.mercadopago.com → Credenciais de produção</p>
+        </div>
+      </SectionCard>
+
       <SectionCard icon={MessageCircle} title="Notificações WhatsApp" description="Envie atualizações de pedido automaticamente ao cliente">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-slate-700">Ativar notificações</span>
