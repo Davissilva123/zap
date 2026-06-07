@@ -120,7 +120,12 @@ export default function OrdersPage() {
 
   const updateStatus = async (orderId: string, newStatus: string) => {
     const order = orders.find(o => o.id === orderId);
-    await db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined });
+    let driverName: string | undefined;
+    if (newStatus === 'DELIVERING') {
+      const name = prompt('Nome do entregador (opcional):');
+      if (name !== null) driverName = name.trim() || undefined;
+    }
+    await db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined, driverName });
     load();
     if (selectedOrder?.id === orderId) {
       setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);
@@ -407,6 +412,11 @@ export default function OrdersPage() {
                     <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5 text-slate-400" />
                     {formatAddress(selectedOrder.deliveryAddress)}
                   </p>
+                  {selectedOrder.driverName && (
+                    <p className="text-xs text-teal-600 font-semibold mt-1.5 flex items-center gap-1">
+                      <Truck className="w-3.5 h-3.5" /> Entregador: {selectedOrder.driverName}
+                    </p>
+                  )}
                 </div>
               )}
 

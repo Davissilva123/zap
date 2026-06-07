@@ -89,6 +89,7 @@ export default function PublicMenuPage() {
   const [orderRating, setOrderRating] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [publicReviews, setPublicReviews] = useState<Array<{ name: string; rating: number; comment: string; createdAt: string }>>([]);
 
   // Customer auth form state
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -110,6 +111,7 @@ export default function PublicMenuPage() {
       setCategories(data.categories);
       setItems(data.items);
       db.addScan(data.settings.userId);
+      db.getPublicReviews(data.settings.userId).then(setPublicReviews);
       // Repetir pedido: check sessionStorage for pre-filled cart
       const repeatRaw = sessionStorage.getItem(`repeat_cart_${slug}`);
       if (repeatRaw) {
@@ -377,7 +379,15 @@ export default function PublicMenuPage() {
   }
 
   const accent = settings.accentColor;
-  const visibleCategories = categories.filter(c => items.some(i => i.categoryId === c.id));
+  const isCategoryAvailableNow = (cat: Category) => {
+    if (!cat.availableFrom || !cat.availableTo) return true;
+    const now = new Date();
+    const cur = now.getHours() * 60 + now.getMinutes();
+    const [fh, fm] = cat.availableFrom.split(':').map(Number);
+    const [th, tm] = cat.availableTo.split(':').map(Number);
+    return cur >= fh * 60 + fm && cur <= th * 60 + tm;
+  };
+  const visibleCategories = categories.filter(c => items.some(i => i.categoryId === c.id) && isCategoryAvailableNow(c));
   const filteredCategories = activeCat ? visibleCategories.filter(c => c.id === activeCat) : visibleCategories;
   const searchQuery = menuSearch.trim().toLowerCase();
   const searchResults = searchQuery
@@ -781,6 +791,32 @@ export default function PublicMenuPage() {
           </div>
         )}
       </div>
+
+      {/* ── PUBLIC REVIEWS ── */}
+      {publicReviews.length > 0 && (
+        <div className="px-4 sm:px-5 pb-6 max-w-xl mx-auto w-full">
+          <div className="flex items-center gap-2 mb-3">
+            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+            <h3 className="font-bold text-slate-700 text-sm">Avaliações dos clientes</h3>
+            <span className="text-xs text-slate-400">({publicReviews.length})</span>
+          </div>
+          <div className="space-y-3">
+            {publicReviews.map((r, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-slate-100 px-4 py-3 shadow-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold text-slate-800 text-sm">{r.name.split(' ')[0]}</span>
+                  <div className="flex items-center gap-0.5">
+                    {[1,2,3,4,5].map(s => (
+                      <Star key={s} className={`w-3.5 h-3.5 ${s <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                    ))}
+                  </div>
+                </div>
+                {r.comment && <p className="text-xs text-slate-500 italic leading-snug">"{r.comment}"</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── FOOTER ── */}
       <div className="text-center pb-8 text-[11px] text-slate-300 font-semibold flex items-center justify-center gap-1.5 tracking-wide uppercase">

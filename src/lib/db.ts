@@ -16,10 +16,10 @@ interface SettingsRow {
   manual_closed: boolean;
   created_at: string;
 }
-interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; created_at: string; }
-interface MenuItemRow { id: string; user_id: string; category_id: string; name: string; description: string; emoji: string; image_url: string; price: number; promo_price?: number | null; available: boolean; featured?: boolean; stock?: number | null; order: number; created_at: string; }
+interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; available_from?: string | null; available_to?: string | null; created_at: string; }
+interface MenuItemRow { id: string; user_id: string; category_id: string; name: string; description: string; emoji: string; image_url: string; price: number; promo_price?: number | null; available: boolean; featured?: boolean; stock?: number | null; cost?: number | null; order: number; created_at: string; }
 interface ScanRow { id: string; user_id: string; scanned_at: string; }
-interface OrderRow { id: string; user_id: string; customer_user_id: string | null; items: OrderItem[]; total: number; discount: number; coupon_code: string | null; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; table_name: string | null; notes?: string | null; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; rating: number | null; rating_comment: string | null; scheduled_for: string | null; created_at: string; paid_at: string | null; }
+interface OrderRow { id: string; user_id: string; customer_user_id: string | null; items: OrderItem[]; total: number; discount: number; coupon_code: string | null; status: string; customer_name: string; customer_phone: string; payment_method: string; delivery_address: DeliveryAddress | null; delivery_type: string; table_name: string | null; notes?: string | null; driver_name?: string | null; pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string; rating: number | null; rating_comment: string | null; scheduled_for: string | null; created_at: string; paid_at: string | null; }
 interface ItemGroupRow { id: string; user_id: string; menu_item_id: string; name: string; required: boolean; min_choices: number; max_choices: number; order: number; created_at: string; }
 interface ItemOptionRow { id: string; user_id: string; group_id: string; name: string; price_delta: number; order: number; created_at: string; }
 interface CouponRow { id: string; user_id: string; code: string; discount_type: string; discount_value: number; min_order: number; max_uses: number | null; uses_count: number; active: boolean; expires_at: string | null; created_at: string; }
@@ -49,10 +49,10 @@ function toSettings(r: SettingsRow): RestaurantSettings {
     manualClosed: r.manual_closed ?? false,
   };
 }
-function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, createdAt: r.created_at }; }
-function toMenuItem(r: MenuItemRow): MenuItem { return { id: r.id, userId: r.user_id, categoryId: r.category_id, name: r.name, description: r.description, emoji: r.emoji, imageUrl: r.image_url ?? '', price: Number(r.price), promoPrice: r.promo_price ? Number(r.promo_price) : undefined, available: r.available, featured: r.featured ?? false, stock: r.stock ?? null, order: r.order, createdAt: r.created_at }; }
+function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, availableFrom: r.available_from ?? undefined, availableTo: r.available_to ?? undefined, createdAt: r.created_at }; }
+function toMenuItem(r: MenuItemRow): MenuItem { return { id: r.id, userId: r.user_id, categoryId: r.category_id, name: r.name, description: r.description, emoji: r.emoji, imageUrl: r.image_url ?? '', price: Number(r.price), promoPrice: r.promo_price ? Number(r.promo_price) : undefined, available: r.available, featured: r.featured ?? false, stock: r.stock ?? null, cost: r.cost ? Number(r.cost) : undefined, order: r.order, createdAt: r.created_at }; }
 function toScan(r: ScanRow): Scan { return { id: r.id, userId: r.user_id, scannedAt: r.scanned_at }; }
-function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, customerUserId: r.customer_user_id ?? undefined, items: r.items, total: Number(r.total), discount: Number(r.discount ?? 0), couponCode: r.coupon_code ?? undefined, status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as Order['deliveryType'], tableName: r.table_name ?? undefined, notes: r.notes ?? undefined, pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, rating: r.rating ?? undefined, ratingComment: r.rating_comment ?? undefined, scheduledFor: r.scheduled_for ?? null, createdAt: r.created_at, paidAt: r.paid_at }; }
+function toOrder(r: OrderRow): Order { return { id: r.id, userId: r.user_id, customerUserId: r.customer_user_id ?? undefined, items: r.items, total: Number(r.total), discount: Number(r.discount ?? 0), couponCode: r.coupon_code ?? undefined, status: r.status as Order['status'], customerName: r.customer_name, customerPhone: r.customer_phone, paymentMethod: r.payment_method as PaymentMethod, deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as Order['deliveryType'], tableName: r.table_name ?? undefined, notes: r.notes ?? undefined, driverName: r.driver_name ?? undefined, pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste, rating: r.rating ?? undefined, ratingComment: r.rating_comment ?? undefined, scheduledFor: r.scheduled_for ?? null, createdAt: r.created_at, paidAt: r.paid_at }; }
 function toItemGroup(r: ItemGroupRow, options: ItemOption[] = []): ItemGroup { return { id: r.id, userId: r.user_id, menuItemId: r.menu_item_id, name: r.name, required: r.required, minChoices: r.min_choices, maxChoices: r.max_choices, order: r.order, options }; }
 function toItemOption(r: ItemOptionRow): ItemOption { return { id: r.id, userId: r.user_id, groupId: r.group_id, name: r.name, priceDelta: Number(r.price_delta), order: r.order }; }
 function toCoupon(r: CouponRow): Coupon { return { id: r.id, userId: r.user_id, code: r.code, discountType: r.discount_type as 'percent' | 'fixed', discountValue: Number(r.discount_value), minOrder: Number(r.min_order), maxUses: r.max_uses, usesCount: r.uses_count, active: r.active, expiresAt: r.expires_at, createdAt: r.created_at }; }
@@ -122,11 +122,13 @@ export const db = {
     return toCategory(data as CategoryRow);
   },
 
-  async updateCategory(id: string, updates: Partial<Pick<Category, 'name' | 'emoji' | 'order'>>): Promise<void> {
+  async updateCategory(id: string, updates: Partial<Pick<Category, 'name' | 'emoji' | 'order' | 'availableFrom' | 'availableTo'>>): Promise<void> {
     const row: Record<string, unknown> = {};
     if (updates.name !== undefined) row.name = updates.name;
     if (updates.emoji !== undefined) row.emoji = updates.emoji;
     if (updates.order !== undefined) row.order = updates.order;
+    if (updates.availableFrom !== undefined) row.available_from = updates.availableFrom || null;
+    if (updates.availableTo !== undefined) row.available_to = updates.availableTo || null;
     await supabase.from('categories').update(row).eq('id', id);
   },
 
@@ -144,12 +146,12 @@ export const db = {
   async addMenuItem(userId: string, item: Omit<MenuItem, 'id' | 'userId' | 'createdAt' | 'order'>): Promise<MenuItem> {
     const { data: existing } = await supabase.from('menu_items').select('order').eq('user_id', userId).order('order', { ascending: false }).limit(1);
     const maxOrder = existing && existing.length > 0 ? (existing[0] as { order: number }).order : -1;
-    const { data, error } = await supabase.from('menu_items').insert({ user_id: userId, category_id: item.categoryId, name: item.name, description: item.description, emoji: item.emoji, image_url: item.imageUrl ?? '', price: item.price, promo_price: item.promoPrice ?? null, available: item.available, featured: item.featured ?? false, stock: item.stock ?? null, order: maxOrder + 1 }).select().single();
+    const { data, error } = await supabase.from('menu_items').insert({ user_id: userId, category_id: item.categoryId, name: item.name, description: item.description, emoji: item.emoji, image_url: item.imageUrl ?? '', price: item.price, promo_price: item.promoPrice ?? null, available: item.available, featured: item.featured ?? false, stock: item.stock ?? null, cost: item.cost ?? null, order: maxOrder + 1 }).select().single();
     if (error) throw error;
     return toMenuItem(data as MenuItemRow);
   },
 
-  async updateMenuItem(id: string, updates: Partial<Pick<MenuItem, 'name' | 'description' | 'price' | 'promoPrice' | 'emoji' | 'imageUrl' | 'available' | 'featured' | 'stock' | 'categoryId' | 'order'>>): Promise<void> {
+  async updateMenuItem(id: string, updates: Partial<Pick<MenuItem, 'name' | 'description' | 'price' | 'promoPrice' | 'emoji' | 'imageUrl' | 'available' | 'featured' | 'stock' | 'cost' | 'categoryId' | 'order'>>): Promise<void> {
     const row: Record<string, unknown> = {};
     if (updates.name !== undefined) row.name = updates.name;
     if (updates.description !== undefined) row.description = updates.description;
@@ -160,6 +162,7 @@ export const db = {
     if (updates.available !== undefined) row.available = updates.available;
     if (updates.featured !== undefined) row.featured = updates.featured;
     if (updates.stock !== undefined) row.stock = updates.stock;
+    if (updates.cost !== undefined) row.cost = updates.cost || null;
     if (updates.categoryId !== undefined) row.category_id = updates.categoryId;
     if (updates.order !== undefined) row.order = updates.order;
     await supabase.from('menu_items').update(row).eq('id', id);
@@ -260,6 +263,21 @@ export const db = {
     );
   },
 
+  // ---- Public Reviews ----
+  async getPublicReviews(userId: string): Promise<Array<{ name: string; rating: number; comment: string; createdAt: string }>> {
+    const { data } = await supabase
+      .from('orders')
+      .select('customer_name, rating, rating_comment, created_at')
+      .eq('user_id', userId)
+      .not('rating', 'is', null)
+      .gt('rating', 0)
+      .order('created_at', { ascending: false })
+      .limit(8);
+    if (!data) return [];
+    return (data as Array<{ customer_name: string; rating: number; rating_comment: string | null; created_at: string }>)
+      .map(r => ({ name: r.customer_name, rating: r.rating, comment: r.rating_comment || '', createdAt: r.created_at }));
+  },
+
   // ---- Orders ----
   async getOrders(userId: string): Promise<Order[]> {
     const { data, error } = await supabase.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false });
@@ -300,7 +318,7 @@ export const db = {
     return toOrder(data as OrderRow);
   },
 
-  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt' | 'rating' | 'ratingComment' | 'items' | 'total'>>): Promise<void> {
+  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt' | 'rating' | 'ratingComment' | 'items' | 'total' | 'driverName'>>): Promise<void> {
     const row: Record<string, unknown> = {};
     if (updates.status !== undefined) row.status = updates.status;
     if (updates.paidAt !== undefined) row.paid_at = updates.paidAt;
@@ -308,6 +326,7 @@ export const db = {
     if (updates.ratingComment !== undefined) row.rating_comment = updates.ratingComment;
     if (updates.items !== undefined) row.items = updates.items;
     if (updates.total !== undefined) row.total = updates.total;
+    if (updates.driverName !== undefined) row.driver_name = updates.driverName || null;
     await supabase.from('orders').update(row).eq('id', id);
   },
 

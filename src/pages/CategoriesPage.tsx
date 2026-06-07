@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
 import type { Category } from '../lib/types';
-import { Plus, Pencil, Trash2, X, FolderOpen } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, FolderOpen, Clock } from 'lucide-react';
 
 export default function CategoriesPage() {
   const { user } = useAuth();
@@ -10,7 +10,7 @@ export default function CategoriesPage() {
   const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
   const [showModal, setShowModal] = useState(false);
   const [editCat, setEditCat] = useState<Category | null>(null);
-  const [form, setForm] = useState({ name: '', emoji: '📁' });
+  const [form, setForm] = useState({ name: '', emoji: '📁', availableFrom: '', availableTo: '' });
 
   const load = async () => {
     if (!user) return;
@@ -24,12 +24,12 @@ export default function CategoriesPage() {
   useEffect(() => { load(); }, [user]);
   if (!user) return null;
 
-  const openAdd = () => { setEditCat(null); setForm({ name: '', emoji: '📁' }); setShowModal(true); };
-  const openEdit = (cat: Category) => { setEditCat(cat); setForm({ name: cat.name, emoji: cat.emoji }); setShowModal(true); };
+  const openAdd = () => { setEditCat(null); setForm({ name: '', emoji: '📁', availableFrom: '', availableTo: '' }); setShowModal(true); };
+  const openEdit = (cat: Category) => { setEditCat(cat); setForm({ name: cat.name, emoji: cat.emoji, availableFrom: cat.availableFrom || '', availableTo: cat.availableTo || '' }); setShowModal(true); };
 
   const save = async () => {
     if (!form.name.trim()) return;
-    if (editCat) await db.updateCategory(editCat.id, { name: form.name.trim(), emoji: form.emoji });
+    if (editCat) await db.updateCategory(editCat.id, { name: form.name.trim(), emoji: form.emoji, availableFrom: form.availableFrom || undefined, availableTo: form.availableTo || undefined });
     else await db.addCategory(user.id, form.name.trim(), form.emoji);
     setShowModal(false);
     load();
@@ -77,7 +77,7 @@ export default function CategoriesPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-slate-900 text-sm">{cat.name}</h3>
-                      <p className="text-xs text-slate-400 mt-0.5">{count} {count === 1 ? 'item' : 'itens'}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{count} {count === 1 ? 'item' : 'itens'}{cat.availableFrom && cat.availableTo ? ` · ${cat.availableFrom}–${cat.availableTo}` : ''}</p>
                     </div>
                   </div>
                   <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -115,6 +115,15 @@ export default function CategoriesPage() {
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Nome</label>
                   <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-field" placeholder="Ex: Sobremesas" autoFocus />
                 </div>
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider"><Clock className="w-3.5 h-3.5" /> Disponível apenas no horário (opcional)</label>
+                <div className="flex items-center gap-2">
+                  <input type="time" value={form.availableFrom} onChange={e => setForm(f => ({ ...f, availableFrom: e.target.value }))} className="input-field flex-1" />
+                  <span className="text-slate-400 text-sm flex-shrink-0">até</span>
+                  <input type="time" value={form.availableTo} onChange={e => setForm(f => ({ ...f, availableTo: e.target.value }))} className="input-field flex-1" />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Deixe vazio para disponível sempre</p>
               </div>
               <button onClick={save} className="btn-primary w-full py-3">
                 {editCat ? 'Salvar alterações' : 'Criar categoria'}

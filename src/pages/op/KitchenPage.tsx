@@ -6,6 +6,7 @@ import { playNewOrderSound, unlockAudio } from '../../lib/sound';
 import { showNewOrderNotification, requestNotificationPermission } from '../../lib/notifications';
 import type { Order, RestaurantSettings } from '../../lib/types';
 import { Clock, ChefHat, Truck, ShoppingBag, LayoutGrid, Loader2, AlertCircle, Volume2, VolumeX, Printer, MessageSquare } from 'lucide-react';
+import { printOrder } from '../../lib/print';
 
 function elapsed(createdAt: string) {
   const m = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
@@ -32,6 +33,7 @@ interface CardProps {
   order: Order;
   updating: string | null;
   onAction: (order: Order) => void;
+  onPrint?: (order: Order) => void;
   onMarkUnavailable?: (menuItemId: string, name: string) => void;
   actionLabel: string;
   actionColor: string;
@@ -39,7 +41,7 @@ interface CardProps {
   headerColor: string;
 }
 
-function OrderCard({ order, updating, onAction, onMarkUnavailable, actionLabel, actionColor, borderColor, headerColor }: CardProps) {
+function OrderCard({ order, updating, onAction, onPrint, onMarkUnavailable, actionLabel, actionColor, borderColor, headerColor }: CardProps) {
   return (
     <div className={`rounded-2xl border-2 ${borderColor} overflow-hidden bg-white shadow-sm`}>
       {/* Header */}
@@ -106,15 +108,24 @@ function OrderCard({ order, updating, onAction, onMarkUnavailable, actionLabel, 
       </div>
 
       {/* Action button */}
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-4 flex gap-2">
+        {onPrint && (
+          <button
+            onClick={() => onPrint(order)}
+            className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors flex-shrink-0"
+            title="Imprimir cupom"
+          >
+            <Printer className="w-4 h-4 text-slate-400" />
+          </button>
+        )}
         {updating === order.id ? (
-          <div className="flex justify-center py-3">
+          <div className="flex-1 flex justify-center py-3">
             <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
           </div>
         ) : (
           <button
             onClick={() => onAction(order)}
-            className={`w-full py-2.5 rounded-xl ${actionColor} text-white font-bold text-sm transition-all active:scale-95 flex items-center justify-center gap-2`}
+            className={`flex-1 py-2.5 rounded-xl ${actionColor} text-white font-bold text-sm transition-all active:scale-95 flex items-center justify-center gap-2`}
           >
             {actionLabel}
           </button>
@@ -122,28 +133,6 @@ function OrderCard({ order, updating, onAction, onMarkUnavailable, actionLabel, 
       </div>
     </div>
   );
-}
-
-function printOrder(order: Order) {
-  const w = window.open('', '_blank', 'width=380,height=600');
-  if (!w) return;
-  const items = order.items.map(i =>
-    `<div style="display:flex;justify-content:space-between;margin:4px 0"><span>${i.quantity}x ${i.name}</span></div>`
-    + (i.selectedOptions?.length ? `<div style="font-size:11px;color:#555;margin-left:16px">${i.selectedOptions.map(o => o.optionName).join(', ')}</div>` : '')
-  ).join('');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pedido</title>
-  <style>body{font-family:monospace;font-size:14px;padding:16px;max-width:320px}hr{border:1px dashed #ccc}h2{text-align:center}p{margin:4px 0}</style></head><body>
-  <h2>Pedido #${order.id.slice(-6).toUpperCase()}</h2><hr>
-  <p><b>Cliente:</b> ${order.customerName}</p>
-  <p><b>Tel:</b> ${order.customerPhone}</p>
-  <p><b>Tipo:</b> ${order.deliveryType === 'delivery' ? 'Delivery' : order.deliveryType === 'table' ? `Mesa ${order.tableName}` : 'Retirada'}</p>
-  <hr><div>${items}</div><hr>
-  <p><b>Total: R$ ${order.total.toFixed(2).replace('.', ',')}</b></p>
-  ${order.notes ? `<hr><p><b>Obs:</b> ${order.notes}</p>` : ''}
-  <hr><p style="text-align:center;font-size:11px">${new Date(order.createdAt).toLocaleString('pt-BR')}</p>
-  </body></html>`);
-  w.document.close();
-  w.print();
 }
 
 export default function KitchenPage() {
@@ -171,7 +160,7 @@ export default function KitchenPage() {
         if (soundEnabled) playNewOrderSound();
         newOnes.forEach(o => {
           showNewOrderNotification(o.customerName, o.total);
-          if (autoPrint) printOrder(o);
+          if (autoPrint && st) printOrder(o, st);
         });
       }
     }
@@ -225,6 +214,10 @@ export default function KitchenPage() {
     if (!confirm(`Marcar "${name}" como esgotado? O item ficará indisponível no cardápio.`)) return;
     await db.updateMenuItem(menuItemId, { available: false });
     await load();
+  };
+
+  const handlePrint = (order: Order) => {
+    if (settings) printOrder(order, settings);
   };
 
   const pending = orders.filter(o => o.status === 'PENDING' || o.status === 'PAID').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -322,6 +315,7 @@ export default function KitchenPage() {
               order={order}
               updating={updating}
               onAction={accept}
+              onPrint={handlePrint}
               onMarkUnavailable={markUnavailable}
               actionLabel="Aceitar e iniciar preparo"
               actionColor="bg-amber-500 hover:bg-amber-600"
@@ -348,6 +342,7 @@ export default function KitchenPage() {
               order={order}
               updating={updating}
               onAction={done}
+              onPrint={handlePrint}
               onMarkUnavailable={markUnavailable}
               actionLabel={order.deliveryType === 'delivery' ? '✓ Saiu para entrega!' : '✓ Pronto para servir!'}
               actionColor="bg-emerald-500 hover:bg-emerald-600"

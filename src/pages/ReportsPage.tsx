@@ -104,9 +104,19 @@ export default function ReportsPage() {
   const maxHour = Math.max(...hourEntries.map(([, v]) => v), 1);
 
   // Payment methods
-  const byPayment: Record<string, number> = {};
-  rangeOrders.forEach(o => { byPayment[o.paymentMethod] = (byPayment[o.paymentMethod] || 0) + 1; });
-  const payLabels: Record<string, string> = { pix: 'PIX', credit_card: 'Crédito', debit_card: 'Débito', cash: 'Dinheiro', meal_voucher: 'Vale-refeição' };
+  const byPayment: Record<string, { count: number; revenue: number }> = {};
+  rangeOrders.forEach(o => {
+    if (!byPayment[o.paymentMethod]) byPayment[o.paymentMethod] = { count: 0, revenue: 0 };
+    byPayment[o.paymentMethod].count += 1;
+    byPayment[o.paymentMethod].revenue += o.total;
+  });
+  const payLabels: Record<string, { label: string; emoji: string }> = {
+    pix: { label: 'PIX', emoji: '💠' },
+    credit_card: { label: 'Crédito', emoji: '💳' },
+    debit_card: { label: 'Débito', emoji: '💳' },
+    cash: { label: 'Dinheiro', emoji: '💵' },
+    meal_voucher: { label: 'Vale-refeição', emoji: '🎫' },
+  };
 
   const exportCSV = () => {
     const headers = ['Data', 'Hora', 'Cliente', 'Telefone', 'Itens', 'Total', 'Status', 'Pagamento', 'Tipo entrega'];
@@ -255,18 +265,35 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Formas de pagamento */}
+      {/* Conciliação financeira */}
       {Object.keys(byPayment).length > 0 && (
         <div className="card p-6">
-          <h3 className="font-semibold text-slate-900 mb-4 text-sm">Formas de pagamento</h3>
-          <div className="flex flex-wrap gap-3">
-            {Object.entries(byPayment).sort(([,a],[,b]) => b - a).map(([method, count]) => (
-              <div key={method} className="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-2.5">
-                <span className="text-sm font-semibold text-slate-700">{payLabels[method] || method}</span>
-                <span className="text-xs bg-slate-200 text-slate-600 rounded-full px-2 py-0.5 font-bold">{count}</span>
-                <span className="text-xs text-slate-400">{Math.round((count / rangeOrders.length) * 100)}%</span>
-              </div>
-            ))}
+          <h3 className="font-semibold text-slate-900 mb-1 text-sm">Conciliação financeira</h3>
+          <p className="text-xs text-slate-400 mb-4">Receita por forma de pagamento no período</p>
+          <div className="space-y-3">
+            {Object.entries(byPayment).sort(([,a],[,b]) => b.revenue - a.revenue).map(([method, { count, revenue }]) => {
+              const pay = payLabels[method] || { label: method, emoji: '💰' };
+              const pct = totalRevenue > 0 ? revenue / totalRevenue : 0;
+              return (
+                <div key={method}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium text-slate-700">{pay.emoji} {pay.label}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-slate-400">{count} pedido{count !== 1 ? 's' : ''}</span>
+                      <span className="text-sm font-bold text-slate-900">{fmt(revenue)}</span>
+                      <span className="text-xs text-slate-400 w-10 text-right">{Math.round(pct * 100)}%</span>
+                    </div>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${pct * 100}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-500">Total do período</span>
+            <span className="text-base font-extrabold text-emerald-600">{fmt(totalRevenue)}</span>
           </div>
         </div>
       )}

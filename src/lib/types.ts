@@ -12,6 +12,8 @@ export interface Category {
   name: string;
   emoji: string;
   order: number;
+  availableFrom?: string;
+  availableTo?: string;
   createdAt: string;
 }
 
@@ -28,6 +30,7 @@ export interface MenuItem {
   available: boolean;
   featured?: boolean;
   stock?: number | null;
+  cost?: number;
   order: number;
   createdAt: string;
 }
@@ -146,6 +149,7 @@ export interface Order {
   deliveryType: 'pickup' | 'delivery' | 'table';
   tableName?: string;
   notes?: string;
+  driverName?: string;
   pixTxId: string;
   pixQrCode: string;
   pixCopyPaste: string;

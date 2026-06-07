@@ -3,7 +3,7 @@ import { db } from '../lib/db';
 import { useAuth, useRestaurantId } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import type { Category, MenuItem } from '../lib/types';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, X, ImagePlus, Loader2, Settings2, Star, GripVertical, Package } from 'lucide-react';
+import { Plus, Minus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, X, ImagePlus, Loader2, Settings2, Star, GripVertical } from 'lucide-react';
 import ItemGroupsEditor from '../components/ItemGroupsEditor';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -19,7 +19,7 @@ export default function MenuPage() {
   const [showModal, setShowModal] = useState(false);
   const [showGroupsFor, setShowGroupsFor] = useState<string | null>(null);
   const [editItem, setEditItem] = useState<MenuItem | null>(null);
-  const [form, setForm] = useState({ name: '', description: '', price: '', promoPrice: '', emoji: '🍽️', categoryId: '', available: true, featured: false, stock: '', imageUrl: '' });
+  const [form, setForm] = useState({ name: '', description: '', price: '', promoPrice: '', cost: '', emoji: '🍽️', categoryId: '', available: true, featured: false, stock: '', imageUrl: '' });
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
@@ -44,7 +44,7 @@ export default function MenuPage() {
 
   const openAdd = () => {
     setEditItem(null);
-    setForm({ name: '', description: '', price: '', promoPrice: '', emoji: '🍽️', categoryId: categories[0]?.id || '', available: true, featured: false, stock: '', imageUrl: '' });
+    setForm({ name: '', description: '', price: '', promoPrice: '', cost: '', emoji: '🍽️', categoryId: categories[0]?.id || '', available: true, featured: false, stock: '', imageUrl: '' });
     setImageFile(null);
     setImagePreview('');
     setShowModal(true);
@@ -52,7 +52,7 @@ export default function MenuPage() {
 
   const openEdit = (item: MenuItem) => {
     setEditItem(item);
-    setForm({ name: item.name, description: item.description, price: String(item.price), promoPrice: item.promoPrice ? String(item.promoPrice) : '', emoji: item.emoji, categoryId: item.categoryId, available: item.available, featured: item.featured ?? false, stock: item.stock != null ? String(item.stock) : '', imageUrl: item.imageUrl || '' });
+    setForm({ name: item.name, description: item.description, price: String(item.price), promoPrice: item.promoPrice ? String(item.promoPrice) : '', cost: item.cost ? String(item.cost) : '', emoji: item.emoji, categoryId: item.categoryId, available: item.available, featured: item.featured ?? false, stock: item.stock != null ? String(item.stock) : '', imageUrl: item.imageUrl || '' });
     setImageFile(null);
     setImagePreview(item.imageUrl || '');
     setShowModal(true);
@@ -81,7 +81,7 @@ export default function MenuPage() {
         const uploaded = await uploadImage(imageFile, 'items');
         if (uploaded) imageUrl = uploaded;
       }
-      const data = { name: form.name.trim(), description: form.description.trim(), price: parseFloat(form.price), promoPrice: form.promoPrice ? parseFloat(form.promoPrice) : undefined, emoji: form.emoji, imageUrl, categoryId: form.categoryId, available: form.available, featured: form.featured, stock: form.stock !== '' ? parseInt(form.stock) : null };
+      const data = { name: form.name.trim(), description: form.description.trim(), price: parseFloat(form.price), promoPrice: form.promoPrice ? parseFloat(form.promoPrice) : undefined, cost: form.cost ? parseFloat(form.cost) : undefined, emoji: form.emoji, imageUrl, categoryId: form.categoryId, available: form.available, featured: form.featured, stock: form.stock !== '' ? parseInt(form.stock) : null };
       if (editItem) await db.updateMenuItem(editItem.id, data);
       else if (restaurantId) await db.addMenuItem(restaurantId, data);
       setShowModal(false);
@@ -93,6 +93,13 @@ export default function MenuPage() {
 
   const toggleAvailable = async (item: MenuItem) => {
     await db.updateMenuItem(item.id, { available: !item.available });
+    load();
+  };
+
+  const adjustStock = async (item: MenuItem, delta: number) => {
+    const current = item.stock ?? 0;
+    const next = Math.max(0, current + delta);
+    await db.updateMenuItem(item.id, { stock: next });
     load();
   };
 
@@ -130,7 +137,16 @@ export default function MenuPage() {
               <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
               {item.featured && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" title="Em destaque" />}
               {!item.available && <span className="badge bg-red-50 text-red-600 text-[10px] py-0.5 font-bold">Esgotado</span>}
-              {item.stock != null && item.stock <= 5 && item.available && <span className="badge bg-amber-50 text-amber-600 text-[10px] py-0.5 font-bold">{item.stock === 0 ? 'Sem estoque' : `${item.stock} restam`}</span>}
+              {item.stock != null && item.available && (
+                <div className="flex items-center gap-0.5">
+                  <button onClick={e => { e.stopPropagation(); adjustStock(item, -1); }} className="w-5 h-5 rounded flex items-center justify-center bg-slate-100 hover:bg-red-50 hover:text-red-500 text-slate-500 transition-colors text-xs font-bold"><Minus className="w-2.5 h-2.5" /></button>
+                  <span className={`badge text-[10px] py-0.5 font-bold ${item.stock === 0 ? 'bg-red-50 text-red-600' : item.stock <= 5 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-600'}`}>{item.stock === 0 ? 'Sem estoque' : `${item.stock} un.`}</span>
+                  <button onClick={e => { e.stopPropagation(); adjustStock(item, 1); }} className="w-5 h-5 rounded flex items-center justify-center bg-slate-100 hover:bg-emerald-50 hover:text-emerald-600 text-slate-500 transition-colors text-xs font-bold"><Plus className="w-2.5 h-2.5" /></button>
+                </div>
+              )}
+              {item.cost && item.price > 0 && (
+                <span className="badge bg-violet-50 text-violet-600 text-[10px] py-0.5 font-bold">{Math.round((1 - item.cost / item.price) * 100)}% margem</span>
+              )}
             </div>
             <p className="text-xs text-slate-400 truncate mt-0.5">{item.description}</p>
             <div className="flex items-center gap-2 mt-0.5">
@@ -282,8 +298,22 @@ export default function MenuPage() {
                 </div>
                 <div className="flex-1">
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Preço Promo (R$)</label>
-                  <input type="number" step="0.01" value={form.promoPrice} onChange={e => setForm(f => ({ ...f, promoPrice: e.target.value }))} className="input-field" placeholder="Deixe vazio se não houver" />
+                  <input type="number" step="0.01" value={form.promoPrice} onChange={e => setForm(f => ({ ...f, promoPrice: e.target.value }))} className="input-field" placeholder="Vazio = sem promoção" />
                 </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Custo de produção (R$)</label>
+                  <input type="number" step="0.01" min="0" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} className="input-field" placeholder="Vazio = não calcular margem" />
+                </div>
+                {form.cost && form.price && parseFloat(form.cost) > 0 && parseFloat(form.price) > 0 && (
+                  <div className="flex-1 flex items-end pb-1">
+                    <div className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200">
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Margem</p>
+                      <p className="text-base font-bold text-emerald-600">{Math.round((1 - parseFloat(form.cost) / parseFloat(form.price)) * 100)}%</p>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
