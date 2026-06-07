@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '../lib/db';
-import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS } from '../lib/xgate';
+import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS, type PixChargeResult } from '../lib/xgate';
+import { createMpPixCharge, checkMpPayment } from '../lib/mercadopago';
 import { useCustomerAuth } from '../lib/customerAuth';
 import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption } from '../lib/types';
 import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift, Search } from 'lucide-react';
@@ -52,6 +53,7 @@ export default function PublicMenuPage() {
   const [polling, setPolling] = useState(false);
   const [cashChange, setCashChange] = useState('');
   const catBarRef = useRef<HTMLDivElement>(null);
+  const pixGatewayRef = useRef<'xgate' | 'mp'>('xgate');
 
   // Adicionais
   const [itemModal, setItemModal] = useState<{ item: MenuItem; groups: ItemGroup[] } | null>(null);
@@ -242,19 +244,38 @@ export default function PublicMenuPage() {
     };
 
     if (selectedPayment === 'pix') {
-      if (!settings.xgateEmail || !settings.xgatePassword) { setStep('no-xgate'); return; }
+      const hasMp = !!settings.mercadoPagoToken;
+      const hasXgate = !!(settings.xgateEmail && settings.xgatePassword);
+      if (!hasMp && !hasXgate) { setStep('no-xgate'); return; }
       setStep('paying');
       setErrorMsg('');
       try {
-        const txId = `cardapio_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-        const result = await createPixCharge(settings.xgateEmail, settings.xgatePassword, cartTotal, txId, customerName.trim());
-        const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, delivAddr, result, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor, orderNotes || undefined);
+        let pixResult: PixChargeResult;
+        if (hasMp) {
+          pixGatewayRef.current = 'mp';
+          const mp = await createMpPixCharge(settings.mercadoPagoToken, cartTotal, `Pedido ${settings.name}`, customer?.email || 'cliente@zapmenu.app');
+          pixResult = {
+            id: mp.txId,
+            txId: mp.txId,
+            status: 'PENDING',
+            qrCode: mp.qrCode,
+            qrCodeImage: mp.qrCodeBase64 ? `data:image/png;base64,${mp.qrCodeBase64}` : null,
+            pixCopyPaste: mp.qrCode,
+            expiresAt: null,
+            amount: mp.amount,
+          };
+        } else {
+          pixGatewayRef.current = 'xgate';
+          const txId = `cardapio_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          pixResult = await createPixCharge(settings.xgateEmail, settings.xgatePassword, cartTotal, txId, customerName.trim());
+        }
+        const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, delivAddr, pixResult, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor, orderNotes || undefined);
         setPlacedOrderId(order.id);
         if (appliedCouponId) await db.useCoupon(appliedCouponId, appliedCouponUses);
         await fetchLoyalty(order.id);
-        setPixCopyPaste(result.pixCopyPaste);
-        setPixQrCode(result.qrCodeImage || result.qrCode);
-        setPixTxId(result.txId);
+        setPixCopyPaste(pixResult.pixCopyPaste);
+        setPixQrCode(pixResult.qrCodeImage || pixResult.qrCode);
+        setPixTxId(pixResult.txId);
         setPixAmount(cartTotal);
         setStep('pix');
         setPolling(true);
@@ -278,12 +299,20 @@ export default function PublicMenuPage() {
   }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address, customer, mesaParam, couponValid, couponCode, couponDiscount, appliedCouponId, appliedCouponUses, scheduleEnabled, scheduledFor, orderNotes]);
 
   useEffect(() => {
-    if (!polling || !settings?.xgateEmail || !pixTxId) return;
+    if (!polling || !pixTxId || !settings) return;
+    const useMp = pixGatewayRef.current === 'mp';
+    if (!useMp && !settings.xgateEmail) return;
     const interval = setInterval(async () => {
       try {
-        const result = await checkPixPayment(settings.xgateEmail!, settings.xgatePassword!, pixTxId);
-        if (result.status === 'PAID' || result.status === 'CONCLUIDA' || result.status === 'COMPLETED') {
-          setPolling(false); setStep('success');
+        if (useMp) {
+          const result = await checkMpPayment(settings.mercadoPagoToken, pixTxId);
+          if (result.status === 'approved') { setPolling(false); setStep('success'); }
+          else if (result.status === 'rejected' || result.status === 'cancelled') { setPolling(false); setStep('error'); setErrorMsg('Pagamento recusado pelo Mercado Pago.'); }
+        } else {
+          const result = await checkPixPayment(settings.xgateEmail!, settings.xgatePassword!, pixTxId);
+          if (result.status === 'PAID' || result.status === 'CONCLUIDA' || result.status === 'COMPLETED') {
+            setPolling(false); setStep('success');
+          }
         }
       } catch { /* keep polling */ }
     }, 5000);
