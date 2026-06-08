@@ -72,7 +72,7 @@ GRANT EXECUTE ON FUNCTION set_pix_settings(TEXT, TEXT, TEXT) TO authenticated;
 -- Histórico de pagamentos de um restaurante (admin)
 CREATE OR REPLACE FUNCTION get_restaurant_payment_history(p_user_id UUID)
 RETURNS TABLE (
-  id         UUID,
+  rec_id     UUID,
   amount     NUMERIC,
   method     TEXT,
   status     TEXT,

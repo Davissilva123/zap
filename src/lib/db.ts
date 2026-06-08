@@ -909,7 +909,7 @@ export const db = {
     const { data, error } = await supabase.rpc('get_restaurant_payment_history', { p_user_id: userId });
     if (error) throw error;
     return ((data as any[]) ?? []).map(r => ({
-      id: r.id, amount: Number(r.amount), method: r.method, status: r.status,
+      id: r.rec_id ?? r.id, amount: Number(r.amount), method: r.method, status: r.status,
       reference: r.reference, notes: r.notes, paidAt: r.paid_at, dueAt: r.due_at, createdAt: r.created_at,
     }));
   },
