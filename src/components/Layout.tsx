@@ -20,7 +20,7 @@ const BASE_NAV = [
   { to: '/settings', icon: Settings, label: 'Configurações' },
 ];
 
-const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL as string | undefined;
+const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
 export default function Layout() {
   const { user, logout } = useAuth();

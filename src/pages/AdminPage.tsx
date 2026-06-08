@@ -4,7 +4,7 @@ import { db } from '../lib/db';
 import type { RestaurantSettings } from '../lib/types';
 import { Shield, Users, Store, Calendar, Search, RefreshCw, ExternalLink, Zap } from 'lucide-react';
 
-const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL as string | undefined;
+const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
 export default function AdminPage() {
   const { user } = useAuth();
