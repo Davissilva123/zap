@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/db';
-import { Check, X, Zap, Star, Crown, Lock, ExternalLink, Copy, CheckCircle } from 'lucide-react';
+import { Check, X, Zap, Star, Crown, Lock, ExternalLink, Copy, CheckCircle, Tag } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 
 const PLANS = [
@@ -71,11 +71,36 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
   const [showPixModal, setShowPixModal] = useState(false);
   const [selectedPlanForPix, setSelectedPlanForPix] = useState<{ name: string; price: number } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [checkingCoupon, setCheckingCoupon] = useState(false);
+  const [couponResult, setCouponResult] = useState<{ valid: boolean; discountType?: string; discountValue?: number; message?: string } | null>(null);
 
   useEffect(() => {
     db.getPlatformPlanPrices().then(setPrices).catch(() => {});
     db.getPixSettings().then(setPixSettings).catch(() => {});
   }, []);
+
+  const applyDiscount = (basePrice: number): number => {
+    if (!couponResult?.valid || couponResult.discountValue == null) return basePrice;
+    if (couponResult.discountType === 'percent') {
+      return Math.max(0, basePrice - (basePrice * couponResult.discountValue / 100));
+    }
+    return Math.max(0, basePrice - couponResult.discountValue);
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setCheckingCoupon(true);
+    setCouponResult(null);
+    try {
+      const result = await db.validateSubscriptionCoupon(couponCode.trim());
+      setCouponResult(result);
+    } catch {
+      setCouponResult({ valid: false, message: 'Erro ao validar cupom' });
+    } finally {
+      setCheckingCoupon(false);
+    }
+  };
 
   const handleCopyPix = () => {
     if (!pixSettings?.pixKey) return;
@@ -86,7 +111,8 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
   };
 
   const openPixModal = (slug: string) => {
-    const price = prices[slug] ?? PLANS.find(p => p.slug === slug)?.price ?? 0;
+    const basePrice = prices[slug] ?? PLANS.find(p => p.slug === slug)?.price ?? 0;
+    const price = applyDiscount(basePrice);
     const name = PLANS.find(p => p.slug === slug)?.name ?? slug;
     setSelectedPlanForPix({ name, price });
     setShowPixModal(true);
@@ -149,6 +175,37 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
           </div>
         )}
 
+        {/* Campo de cupom */}
+        <div className="mb-6">
+          <div className="flex gap-2 max-w-sm mx-auto">
+            <div className="relative flex-1">
+              <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={couponCode}
+                onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponResult(null); }}
+                onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+                placeholder="Código de cupom"
+                className="w-full pl-9 pr-3 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-slate-400 text-sm focus:outline-none focus:border-emerald-400 transition-colors font-mono"
+              />
+            </div>
+            <button
+              onClick={handleApplyCoupon}
+              disabled={checkingCoupon || !couponCode.trim()}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-bold rounded-xl transition-colors flex-shrink-0"
+            >
+              {checkingCoupon ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : 'Aplicar'}
+            </button>
+          </div>
+          {couponResult && (
+            <div className={`mt-2 text-center text-sm font-semibold ${couponResult.valid ? 'text-emerald-400' : 'text-red-400'}`}>
+              {couponResult.valid ? `✓ ${couponResult.message}` : `✕ ${couponResult.message}`}
+            </div>
+          )}
+        </div>
+
         {/* Stripe não configurado — aviso */}
         {!STRIPE_CONFIGURED && (
           <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-300 text-sm text-center flex items-center gap-2 justify-center">
@@ -181,9 +238,24 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
                 <p className="text-xs text-slate-400 mb-4">{plan.description}</p>
 
                 <div className="mb-5">
-                  <span className="text-3xl font-black text-slate-900">R$ {prices[plan.slug] ?? plan.price}</span>
-                  <span className="text-slate-400 text-sm">/mês</span>
-                  <p className="text-xs text-slate-400 mt-0.5">cobrado mensalmente no cartão</p>
+                  {couponResult?.valid ? (
+                    <>
+                      <span className="text-lg font-semibold text-slate-400 line-through mr-2">
+                        R$ {prices[plan.slug] ?? plan.price}
+                      </span>
+                      <span className="text-3xl font-black text-emerald-600">
+                        R$ {applyDiscount(prices[plan.slug] ?? plan.price).toFixed(2).replace('.', ',')}
+                      </span>
+                      <span className="text-slate-400 text-sm">/mês</span>
+                      <p className="text-xs text-emerald-600 font-semibold mt-0.5">{couponResult.message}</p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-3xl font-black text-slate-900">R$ {prices[plan.slug] ?? plan.price}</span>
+                      <span className="text-slate-400 text-sm">/mês</span>
+                      <p className="text-xs text-slate-400 mt-0.5">cobrado mensalmente no cartão</p>
+                    </>
+                  )}
                 </div>
 
                 <ul className="space-y-2 flex-1 mb-6">
@@ -205,7 +277,7 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
                   {isLoading ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : STRIPE_CONFIGURED ? (
-                    `Assinar R$ ${prices[plan.slug] ?? plan.price}/mês`
+                    `Assinar R$ ${applyDiscount(prices[plan.slug] ?? plan.price).toFixed(2).replace('.', ',')}/mês`
                   ) : (
                     'Assinar via WhatsApp'
                   )}

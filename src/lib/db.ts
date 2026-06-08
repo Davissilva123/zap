@@ -928,6 +928,16 @@ export const db = {
     if (error) throw error;
   },
 
+  async validateSubscriptionCoupon(code: string): Promise<{
+    valid: boolean; discountType?: string; discountValue?: number; message?: string;
+  }> {
+    const { data, error } = await supabase.rpc('validate_subscription_coupon', { p_code: code });
+    if (error) throw error;
+    const r = (data as any[])?.[0];
+    if (!r) return { valid: false, message: 'Cupom inválido' };
+    return { valid: r.valid, discountType: r.discount_type, discountValue: Number(r.discount_value), message: r.message };
+  },
+
   // ---- Platform Plans (preços globais) ----
   async getPlatformPlanPrices(): Promise<Record<string, number>> {
     const { data, error } = await supabase.rpc('get_platform_plans');
