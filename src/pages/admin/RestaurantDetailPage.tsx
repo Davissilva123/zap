@@ -4,7 +4,7 @@ import { db } from '../../lib/db';
 import {
   ArrowLeft, Store, ShoppingBag, DollarSign, Phone, MapPin,
   FileText, Plus, Trash2, Settings, RefreshCw, Mail, AlertTriangle, Clock,
-  CheckCircle, XCircle, Wallet,
+  CheckCircle, XCircle, Wallet, Printer, X,
 } from 'lucide-react';
 
 type Detail = Awaited<ReturnType<typeof db.getRestaurantDetailAdmin>>;
@@ -55,6 +55,7 @@ export default function RestaurantDetailPage() {
   const [recordForm, setRecordForm] = useState({ amount: '', method: 'pix', notes: '', reference: '' });
   const [recordingPayment, setRecordingPayment] = useState(false);
   const [recordError, setRecordError] = useState('');
+  const [receiptPayment, setReceiptPayment] = useState<Payment | null>(null);
 
   const load = async () => {
     if (!userId) return;
@@ -111,6 +112,16 @@ export default function RestaurantDetailPage() {
       setRecordError(e?.message ?? 'Erro ao registrar pagamento. Verifique se o SQL foi executado no Supabase.');
     } finally {
       setRecordingPayment(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm('Excluir este pagamento do histórico?')) return;
+    try {
+      await db.deletePayment(paymentId);
+      setPayments(prev => prev.filter(p => p.id !== paymentId));
+    } catch (e: any) {
+      alert(e?.message ?? 'Erro ao excluir pagamento');
     }
   };
 
@@ -432,6 +443,22 @@ export default function RestaurantDetailPage() {
                         </p>
                         {p.notes && <p className="text-xs text-slate-500 mt-0.5 italic">{p.notes}</p>}
                       </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => setReceiptPayment(p)}
+                          className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-300 hover:text-blue-500 transition-colors"
+                          title="Ver comprovante"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePayment(p.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors"
+                          title="Excluir"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -503,6 +530,88 @@ export default function RestaurantDetailPage() {
                   >
                     {recordingPayment ? 'Registrando...' : 'Confirmar pago'}
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal: Comprovante */}
+          {receiptPayment && detail && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm print:hidden" onClick={() => setReceiptPayment(null)} />
+              <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm z-10 overflow-hidden">
+                {/* Ações — ocultas na impressão */}
+                <div className="flex items-center justify-between px-5 pt-4 pb-2 print:hidden">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Comprovante</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => window.print()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-colors"
+                    >
+                      <Printer className="w-3.5 h-3.5" /> Imprimir
+                    </button>
+                    <button onClick={() => setReceiptPayment(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conteúdo do comprovante */}
+                <div id="receipt-content" className="px-6 pb-6 pt-2">
+                  <div className="text-center border-b border-dashed border-slate-200 pb-4 mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500 flex items-center justify-center mx-auto mb-2">
+                      <span className="text-white font-black text-lg">Z</span>
+                    </div>
+                    <p className="font-black text-slate-900 text-lg">ZapMenu</p>
+                    <p className="text-xs text-slate-400">Comprovante de Pagamento</p>
+                  </div>
+
+                  <div className="space-y-2.5 text-sm mb-4">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Restaurante</span>
+                      <span className="font-semibold text-slate-800 text-right max-w-[55%] truncate">{detail.restaurantName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Valor</span>
+                      <span className="font-black text-emerald-600 text-base">{R(receiptPayment.amount)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Método</span>
+                      <span className="font-semibold text-slate-800 capitalize">{receiptPayment.method.toUpperCase()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Status</span>
+                      <span className={`font-bold ${receiptPayment.status === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {receiptPayment.status === 'paid' ? '✓ Pago' : receiptPayment.status === 'overdue' ? 'Vencido' : 'Pendente'}
+                      </span>
+                    </div>
+                    {receiptPayment.paidAt && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Data do pagamento</span>
+                        <span className="font-semibold text-slate-800">
+                          {new Date(receiptPayment.paidAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
+                      </div>
+                    )}
+                    {receiptPayment.reference && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Referência</span>
+                        <span className="font-semibold text-slate-800">{receiptPayment.reference}</span>
+                      </div>
+                    )}
+                    {receiptPayment.notes && (
+                      <div className="pt-2 border-t border-slate-100">
+                        <span className="text-slate-400 block mb-1 text-xs">Observações</span>
+                        <p className="text-slate-700 text-xs italic">{receiptPayment.notes}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-dashed border-slate-200 pt-3 text-center">
+                    <p className="text-[10px] text-slate-300">
+                      Emitido em {new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} · ZapMenu
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

@@ -922,6 +922,11 @@ export const db = {
     if (error) throw error;
   },
 
+  async deletePayment(paymentId: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_payment', { p_id: paymentId });
+    if (error) throw error;
+  },
+
   // ---- Platform Plans (preços globais) ----
   async getPlatformPlanPrices(): Promise<Record<string, number>> {
     const { data, error } = await supabase.rpc('get_platform_plans');
