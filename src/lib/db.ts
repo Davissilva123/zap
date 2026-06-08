@@ -911,6 +911,7 @@ export const db = {
     return ((data as any[]) ?? []).map(r => ({
       id: r.rec_id ?? r.id, amount: Number(r.amount), method: r.method, status: r.status,
       reference: r.reference, notes: r.notes, paidAt: r.paid_at, dueAt: r.due_at, createdAt: r.created_at,
+      createdBy: r.created_by ?? null,
     }));
   },
 

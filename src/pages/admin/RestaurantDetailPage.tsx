@@ -10,7 +10,7 @@ import {
 type Detail = Awaited<ReturnType<typeof db.getRestaurantDetailAdmin>>;
 type Order = { id: string; status: string; total: number; customerName: string; deliveryType: string; paymentMethod: string; createdAt: string };
 type Note = { id: string; note: string; createdBy: string; createdAt: string };
-type Payment = { id: string; amount: number; method: string; status: string; reference: string | null; notes: string | null; paidAt: string | null; dueAt: string | null; createdAt: string };
+type Payment = { id: string; amount: number; method: string; status: string; reference: string | null; notes: string | null; paidAt: string | null; dueAt: string | null; createdAt: string; createdBy: string | null };
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   PENDING:    { label: 'Pendente',   cls: 'bg-amber-50 text-amber-700' },
@@ -443,22 +443,24 @@ export default function RestaurantDetailPage() {
                         </p>
                         {p.notes && <p className="text-xs text-slate-500 mt-0.5 italic">{p.notes}</p>}
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => setReceiptPayment(p)}
-                          className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-300 hover:text-blue-500 transition-colors"
-                          title="Ver comprovante"
-                        >
-                          <Printer className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeletePayment(p.id)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors"
-                          title="Excluir"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {p.createdBy && (
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => setReceiptPayment(p)}
+                            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-300 hover:text-blue-500 transition-colors"
+                            title="Ver comprovante"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePayment(p.id)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

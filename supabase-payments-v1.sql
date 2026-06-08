@@ -70,6 +70,9 @@ $$;
 GRANT EXECUTE ON FUNCTION set_pix_settings(TEXT, TEXT, TEXT) TO authenticated;
 
 -- Histórico de pagamentos de um restaurante (admin)
+-- DROP obrigatório se função já existir (mudança de tipo de retorno)
+DROP FUNCTION IF EXISTS get_restaurant_payment_history(UUID);
+
 CREATE OR REPLACE FUNCTION get_restaurant_payment_history(p_user_id UUID)
 RETURNS TABLE (
   rec_id     UUID,
@@ -80,7 +83,8 @@ RETURNS TABLE (
   notes      TEXT,
   paid_at    TIMESTAMPTZ,
   due_at     TIMESTAMPTZ,
-  created_at TIMESTAMPTZ
+  created_at TIMESTAMPTZ,
+  created_by UUID
 )
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
@@ -92,7 +96,7 @@ BEGIN
   END IF;
   RETURN QUERY
   SELECT ph.id, ph.amount, ph.method, ph.status, ph.reference,
-         ph.notes, ph.paid_at, ph.due_at, ph.created_at
+         ph.notes, ph.paid_at, ph.due_at, ph.created_at, ph.created_by
   FROM payment_history ph
   WHERE ph.user_id = p_user_id
   ORDER BY ph.created_at DESC
