@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../../lib/db';
 import {
   ArrowLeft, Store, ShoppingBag, DollarSign, Phone, MapPin,
-  FileText, Plus, Trash2, ToggleLeftLeft, RefreshCw, Mail, AlertTriangle, Clock,
+  FileText, Plus, Trash2, Settings, RefreshCw, Mail, AlertTriangle, Clock,
 } from 'lucide-react';
 
 type Detail = Awaited<ReturnType<typeof db.getRestaurantDetailAdmin>>;
@@ -84,7 +84,7 @@ export default function RestaurantDetailPage() {
     setNotes(prev => prev.filter(n => n.id !== noteId));
   };
 
-  const handleToggleLeftFlag = async (flagKey: string) => {
+  const handleSettingsFlag = async (flagKey: string) => {
     if (!userId) return;
     const newVal = !flags[flagKey];
     setFlags(prev => ({ ...prev, [flagKey]: newVal }));
@@ -299,11 +299,11 @@ export default function RestaurantDetailPage() {
               return (
                 <div key={f.key} className="px-5 py-3.5 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <ToggleLeft className={`w-4 h-4 ${enabled ? 'text-violet-500' : 'text-slate-300'}`} />
+                    <Settings className={`w-4 h-4 ${enabled ? 'text-violet-500' : 'text-slate-300'}`} />
                     <span className="text-sm font-medium text-slate-700">{f.label}</span>
                   </div>
                   <button
-                    onClick={() => handleToggleLeftFlag(f.key)}
+                    onClick={() => handleSettingsFlag(f.key)}
                     className={`relative w-11 h-6 rounded-full transition-colors ${enabled ? 'bg-violet-500' : 'bg-slate-200'}`}
                   >
                     <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${enabled ? 'left-6' : 'left-1'}`} />
