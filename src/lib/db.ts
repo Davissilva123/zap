@@ -836,6 +836,33 @@ export const db = {
     await supabase.rpc('complete_driver_order', { p_token: token, p_order_id: orderId });
   },
 
+  // ---- My Plan (plano do usuário logado) ----
+  async getMyPlan(): Promise<{
+    planSlug: string; planName: string; status: string; paymentStatus: string;
+    trialEndsAt: string | null; nextBillingAt: string | null; lastPaymentAt: string | null;
+    isBlocked: boolean; daysRemaining: number;
+  } | null> {
+    const { data, error } = await supabase.rpc('get_my_plan');
+    if (error || !data || (data as unknown[]).length === 0) return null;
+    const r = (data as any[])[0];
+    return {
+      planSlug: r.plan_slug ?? r.plan_slug,
+      planName: r.plan_name,
+      status: r.status,
+      paymentStatus: r.payment_status,
+      trialEndsAt: r.trial_ends_at,
+      nextBillingAt: r.next_billing_at,
+      lastPaymentAt: r.last_payment_at,
+      isBlocked: r.is_blocked,
+      daysRemaining: Number(r.days_remaining ?? 0),
+    };
+  },
+
+  async startTrial(planSlug = 'basic'): Promise<void> {
+    const { error } = await supabase.rpc('start_trial', { p_plan_slug: planSlug });
+    if (error) throw error;
+  },
+
   // ---- Platform Plans (preços globais) ----
   async getPlatformPlanPrices(): Promise<Record<string, number>> {
     const { data, error } = await supabase.rpc('get_platform_plans');

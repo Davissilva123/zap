@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import { Zap, ArrowRight, Check, ChefHat } from 'lucide-react';
+import PlanosPage from './PlanosPage';
 
 const RESTAURANT_TYPES = [
   { emoji: '🍕', label: 'Pizzaria' },
@@ -59,7 +60,7 @@ export default function OnboardingPage() {
         slug,
         description: `${selectedType.emoji} ${selectedType.label}`,
       });
-      localStorage.setItem(`zm_onboarded_${user.id}`, '1');
+      // Vai para escolha de plano (step 3) sem marcar como onboarded ainda
       setStep(3);
     } catch (e) {
       setError('Erro ao salvar. Tente novamente.');
@@ -79,25 +80,38 @@ export default function OnboardingPage() {
           <span className="font-black text-white text-xl tracking-tight">ZapMenu</span>
         </div>
 
-        {/* Step indicators */}
-        <div className="flex items-center gap-2 mb-8 justify-center">
-          {[1, 2, 3].map(s => (
-            <div key={s} className="flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                step > s
-                  ? 'bg-emerald-500 text-white'
-                  : step === s
-                  ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400'
-                  : 'bg-white/10 text-slate-500'
-              }`}>
-                {step > s ? <Check className="w-3.5 h-3.5" /> : s}
+        {/* Step indicators — só mostra para steps 1 e 2 */}
+        {step <= 2 && (
+          <div className="flex items-center gap-2 mb-8 justify-center">
+            {[1, 2, 3].map(s => (
+              <div key={s} className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                  step > s
+                    ? 'bg-emerald-500 text-white'
+                    : step === s
+                    ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400'
+                    : 'bg-white/10 text-slate-500'
+                }`}>
+                  {step > s ? <Check className="w-3.5 h-3.5" /> : s}
+                </div>
+                {s < 3 && <div className={`h-px w-10 sm:w-16 transition-all ${step > s ? 'bg-emerald-500' : 'bg-white/10'}`} />}
               </div>
-              {s < 3 && <div className={`h-px w-10 sm:w-16 transition-all ${step > s ? 'bg-emerald-500' : 'bg-white/10'}`} />}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        <div className="bg-white rounded-3xl shadow-2xl shadow-black/30 p-7 sm:p-8">
+        {/* Step 3: Escolher plano — fora do card branco, ocupa tela toda */}
+        {step === 3 && (
+          <PlanosPage
+            reason="new"
+            onTrialStarted={() => {
+              localStorage.setItem(`zm_onboarded_${user?.id}`, '1');
+              navigate('/dashboard');
+            }}
+          />
+        )}
+
+        {step !== 3 && <div className="bg-white rounded-3xl shadow-2xl shadow-black/30 p-7 sm:p-8">
           {/* Step 1: Restaurant name */}
           {step === 1 && (
             <div className="animate-fade-in">
@@ -185,40 +199,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Step 3: Done */}
-          {step === 3 && (
-            <div className="animate-fade-in text-center">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-5">
-                <Check className="w-8 h-8 text-emerald-600" />
-              </div>
-              <h2 className="text-2xl font-black text-slate-900 mb-2">Tudo pronto! 🎉</h2>
-              <p className="text-slate-500 text-sm leading-relaxed mb-7">
-                Seu cardápio <strong>{restaurantName}</strong> está configurado. Agora adicione suas categorias e itens para começar a receber pedidos.
-              </p>
-              <div className="space-y-3 text-left mb-7">
-                {[
-                  'Adicione categorias (ex: Pizzas, Bebidas)',
-                  'Cadastre seus itens com fotos e preços',
-                  'Configure as formas de pagamento',
-                  'Compartilhe o QR Code com seus clientes',
-                ].map((tip, i) => (
-                  <div key={i} className="flex items-center gap-2.5">
-                    <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                      <span className="text-[10px] font-bold text-emerald-600">{i + 1}</span>
-                    </div>
-                    <span className="text-sm text-slate-600">{tip}</span>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all"
-              >
-                Ir para o painel <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </div>
+        </div>}
       </div>
     </div>
   );

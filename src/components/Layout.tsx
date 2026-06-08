@@ -24,20 +24,43 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [planStatus, setPlanStatus] = useState<'loading' | 'ok' | 'trial_warning' | 'expired' | 'blocked'>('loading');
+  const [daysRemaining, setDaysRemaining] = useState(0);
 
   const navItems = BASE_NAV;
 
   useEffect(() => {
     if (!user) return;
+    // Verifica onboarding
     const key = `zm_onboarded_${user.id}`;
-    if (localStorage.getItem(key)) return;
-    db.getSettings(user.id).then(s => {
-      if (s && s.name && s.name.includes('@')) {
-        navigate('/onboarding');
-      } else {
-        localStorage.setItem(key, '1');
+    if (!localStorage.getItem(key)) {
+      db.getSettings(user.id).then(s => {
+        if (s && s.name && s.name.includes('@')) {
+          navigate('/onboarding');
+        } else {
+          localStorage.setItem(key, '1');
+        }
+      });
+    }
+    // Verifica plano (paywall)
+    db.getMyPlan().then(plan => {
+      if (!plan || plan.status === 'none') {
+        navigate('/planos');
+        return;
       }
-    });
+      if (plan.isBlocked) { setPlanStatus('blocked'); return; }
+      if (plan.status === 'cancelled' || plan.status === 'expired') { navigate('/planos'); return; }
+      if (plan.status === 'trial') {
+        if (plan.trialEndsAt && new Date(plan.trialEndsAt) < new Date()) {
+          navigate('/planos');
+          return;
+        }
+        setDaysRemaining(plan.daysRemaining);
+        setPlanStatus(plan.daysRemaining <= 3 ? 'trial_warning' : 'ok');
+        return;
+      }
+      setPlanStatus('ok');
+    }).catch(() => setPlanStatus('ok')); // em caso de erro na RPC, não bloqueia
   }, [user?.id]);
 
   const handleLogout = async () => {
@@ -145,9 +168,40 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full overflow-x-hidden">
-          <Outlet />
-        </main>
+        {/* Banner: trial expirando */}
+        {planStatus === 'trial_warning' && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-amber-800 text-sm font-semibold">
+              ⚠️ Seu período gratuito encerra em <strong>{daysRemaining} dia{daysRemaining !== 1 ? 's' : ''}</strong>. Assine agora para não perder o acesso.
+            </p>
+            <button onClick={() => navigate('/planos')} className="text-xs font-bold px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors flex-shrink-0">
+              Ver planos
+            </button>
+          </div>
+        )}
+
+        {/* Tela de bloqueio */}
+        {planStatus === 'blocked' ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="text-center max-w-sm">
+              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">🚫</span>
+              </div>
+              <h2 className="text-xl font-black text-slate-900 mb-2">Cardápio suspenso</h2>
+              <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                Seu acesso foi suspenso por falta de pagamento. Entre em contato com o suporte para regularizar.
+              </p>
+              <button onClick={() => navigate('/planos')} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors text-sm">
+                Regularizar agora
+              </button>
+              <button onClick={handleLogout} className="mt-3 text-xs text-slate-400 hover:underline block mx-auto">Sair da conta</button>
+            </div>
+          </div>
+        ) : (
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full overflow-x-hidden">
+            <Outlet />
+          </main>
+        )}
       </div>
     </div>
   );

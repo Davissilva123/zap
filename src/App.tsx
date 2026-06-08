@@ -32,6 +32,7 @@ import AdminPlansPage from './pages/admin/PlansPage';
 import AdminAnalyticsPage from './pages/admin/AnalyticsPage';
 import AdminRestaurantDetailPage from './pages/admin/RestaurantDetailPage';
 import AdminCobrancasPage from './pages/admin/CobrancasPage';
+import PlanosPage from './pages/PlanosPage';
 
 const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
@@ -97,6 +98,9 @@ export default function App() {
 
           {/* Onboarding (owner auth required, no sidebar) */}
           <Route path="/onboarding" element={<OwnerRoute><OnboardingPage /></OwnerRoute>} />
+
+          {/* Escolha de plano (paywall) */}
+          <Route path="/planos" element={<OwnerRoute><PlanosPage reason="expired" /></OwnerRoute>} />
 
           {/* Super-Admin routes (own layout, violet theme) */}
           <Route path="/admin" element={<SuperAdminRoute><AdminLayout /></SuperAdminRoute>}>
