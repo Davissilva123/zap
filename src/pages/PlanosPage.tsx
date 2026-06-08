@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/db';
 import { Check, X, Zap, Star, Crown, Lock, ExternalLink } from 'lucide-react';
@@ -66,6 +66,11 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
   const { logout } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [prices, setPrices] = useState<Record<string, number>>({ basic: 39, pro: 89, premium: 149 });
+
+  useEffect(() => {
+    db.getPlatformPlanPrices().then(setPrices).catch(() => {});
+  }, []);
 
   const handleSubscribe = async (slug: string) => {
     setLoading(slug);
@@ -156,7 +161,7 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
                 <p className="text-xs text-slate-400 mb-4">{plan.description}</p>
 
                 <div className="mb-5">
-                  <span className="text-3xl font-black text-slate-900">R$ {plan.price}</span>
+                  <span className="text-3xl font-black text-slate-900">R$ {prices[plan.slug] ?? plan.price}</span>
                   <span className="text-slate-400 text-sm">/mês</span>
                   <p className="text-xs text-slate-400 mt-0.5">cobrado mensalmente no cartão</p>
                 </div>
@@ -180,7 +185,7 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
                   {isLoading ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : STRIPE_CONFIGURED ? (
-                    `Assinar R$ ${plan.price}/mês`
+                    `Assinar R$ ${prices[plan.slug] ?? plan.price}/mês`
                   ) : (
                     'Assinar via WhatsApp'
                   )}
