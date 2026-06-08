@@ -310,68 +310,199 @@ export default function AdminPlansPage() {
       {/* ---- STRIPE ---- */}
       {tab === 'stripe' && (
         <div className="space-y-4">
-          <div className="card p-5 border-2 border-slate-200">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-indigo-600" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Cobrança recorrente via Stripe</h2>
-                <p className="text-xs text-slate-400">Configuração para cobrar assinaturas automaticamente</p>
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-                <p className="font-bold mb-1">Configuração necessária (1 vez)</p>
-                <p className="text-xs text-amber-700">O Stripe requer um servidor para criar sessões de checkout com segurança. Siga os passos abaixo.</p>
-              </div>
-
-              <ol className="space-y-3 text-sm">
-                {[
-                  { n: '1', title: 'Crie uma conta no Stripe', desc: 'Acesse stripe.com e ative sua conta com os dados do negócio.' },
-                  { n: '2', title: 'Crie os produtos no Stripe', desc: 'Crie 3 produtos recorrentes: Básico (R$39/mês), Pro (R$89/mês), Premium (R$149/mês). Copie os Price IDs.' },
-                  { n: '3', title: 'Deploy da Edge Function', desc: 'Execute no terminal: supabase functions deploy create-checkout. O arquivo está em supabase/functions/create-checkout/index.ts.' },
-                  { n: '4', title: 'Configure as env vars', desc: 'Adicione STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET nas variáveis de ambiente da Supabase Edge Function.' },
-                  { n: '5', title: 'Configure o Webhook', desc: 'No Stripe Dashboard → Webhooks, aponte para: https://[seu-projeto].supabase.co/functions/v1/stripe-webhook. Eventos: customer.subscription.*' },
-                  { n: '6', title: 'Adicione a chave pública', desc: 'Adicione VITE_STRIPE_PUBLISHABLE_KEY=pk_live_... no Vercel (Environment Variables).' },
-                ].map(step => (
-                  <li key={step.n} className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{step.n}</span>
-                    <div>
-                      <p className="font-semibold text-slate-800">{step.title}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{step.desc}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-
-              <div className="p-4 bg-slate-50 rounded-xl">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">Status atual</p>
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'bg-emerald-400' : 'bg-slate-300'}`} />
-                    <span className="text-slate-600">Chave pública Stripe</span>
-                    <span className={`font-medium ${import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'text-emerald-600' : 'text-slate-400'}`}>
-                      {import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'Configurada' : 'Não configurada'}
-                    </span>
+          {/* Status rápido */}
+          <div className="card p-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">Status de configuração</p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              {[
+                {
+                  label: 'Chave pública (Vercel)',
+                  ok: !!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
+                  detail: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+                    ? import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY.slice(0, 14) + '...'
+                    : 'Não configurada',
+                },
+                { label: 'Edge Functions', ok: false, detail: 'Deploy necessário (passo 5)' },
+                { label: 'Webhook Stripe', ok: false, detail: 'Configurar no dashboard (passo 6)' },
+              ].map((s, i) => (
+                <div key={i} className={`p-3 rounded-xl border ${s.ok ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.ok ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                    <span className={`text-xs font-semibold ${s.ok ? 'text-emerald-700' : 'text-slate-600'}`}>{s.label}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-slate-300" />
-                    <span className="text-slate-600">Edge Function</span>
-                    <span className="text-slate-400 font-medium">Verificar manualmente</span>
-                  </div>
+                  <p className="text-[11px] text-slate-400 ml-4">{s.detail}</p>
                 </div>
-              </div>
+              ))}
             </div>
           </div>
 
+          {/* Passo a passo */}
+          <div className="card p-5 space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <CreditCard className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Como configurar o Stripe (passo a passo)</h2>
+                <p className="text-xs text-slate-400">Faça uma vez e a cobrança recorrente funciona automaticamente</p>
+              </div>
+            </div>
+
+            <ol className="space-y-4">
+              {/* Passo 1 */}
+              <li className="flex gap-3">
+                <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                <div className="flex-1">
+                  <p className="font-bold text-slate-800 text-sm">Crie uma conta no Stripe</p>
+                  <p className="text-xs text-slate-500 mt-0.5 mb-2">Acesse <strong>stripe.com</strong>, crie a conta e ative com CNPJ/CPF do negócio.</p>
+                  <a href="https://dashboard.stripe.com/register" target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold transition-colors">
+                    Abrir Stripe →
+                  </a>
+                </div>
+              </li>
+
+              {/* Passo 2 */}
+              <li className="flex gap-3">
+                <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                <div className="flex-1">
+                  <p className="font-bold text-slate-800 text-sm">Crie 3 produtos recorrentes no Stripe</p>
+                  <p className="text-xs text-slate-500 mt-0.5 mb-2">Em <strong>Products → Add product</strong>, crie cada plano como assinatura mensal:</p>
+                  <div className="space-y-1.5">
+                    {[
+                      { name: 'ZapMenu Básico', price: 'R$ 39,00/mês', var: 'STRIPE_PRICE_BASIC' },
+                      { name: 'ZapMenu Pro',    price: 'R$ 89,00/mês', var: 'STRIPE_PRICE_PRO' },
+                      { name: 'ZapMenu Premium',price: 'R$ 149,00/mês', var: 'STRIPE_PRICE_PREMIUM' },
+                    ].map(p => (
+                      <div key={p.var} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg text-xs">
+                        <span className="font-semibold text-slate-700 w-36">{p.name}</span>
+                        <span className="text-slate-400">{p.price}</span>
+                        <span className="ml-auto font-mono text-violet-600 text-[10px]">→ copie o Price ID (price_...)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </li>
+
+              {/* Passo 3 */}
+              <li className="flex gap-3">
+                <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                <div className="flex-1">
+                  <p className="font-bold text-slate-800 text-sm">Execute o SQL no Supabase</p>
+                  <p className="text-xs text-slate-500 mt-0.5 mb-2">
+                    Abra o <strong>Supabase → SQL Editor</strong> e rode o arquivo <code className="bg-slate-100 px-1 rounded font-mono">supabase-stripe-v1.sql</code> (na raiz do projeto).
+                  </p>
+                </div>
+              </li>
+
+              {/* Passo 4 */}
+              <li className="flex gap-3">
+                <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+                <div className="flex-1">
+                  <p className="font-bold text-slate-800 text-sm">Configure as variáveis no Supabase</p>
+                  <p className="text-xs text-slate-500 mt-0.5 mb-2">
+                    Vá em <strong>Supabase → Edge Functions → Manage secrets</strong> e adicione:
+                  </p>
+                  <div className="bg-slate-900 rounded-xl p-3 text-xs font-mono text-emerald-400 space-y-1 overflow-x-auto">
+                    <div>STRIPE_SECRET_KEY=<span className="text-slate-400">sk_live_...</span></div>
+                    <div>STRIPE_WEBHOOK_SECRET=<span className="text-slate-400">whsec_...</span></div>
+                    <div>STRIPE_PRICE_BASIC=<span className="text-slate-400">price_...</span></div>
+                    <div>STRIPE_PRICE_PRO=<span className="text-slate-400">price_...</span></div>
+                    <div>STRIPE_PRICE_PREMIUM=<span className="text-slate-400">price_...</span></div>
+                  </div>
+                </div>
+              </li>
+
+              {/* Passo 5 */}
+              <li className="flex gap-3">
+                <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">5</span>
+                <div className="flex-1">
+                  <p className="font-bold text-slate-800 text-sm">Faça deploy das Edge Functions</p>
+                  <p className="text-xs text-slate-500 mt-0.5 mb-2">No terminal, na raiz do projeto:</p>
+                  <div className="bg-slate-900 rounded-xl p-3 text-xs font-mono text-emerald-400 space-y-1">
+                    <div><span className="text-slate-500"># Login (só na primeira vez)</span></div>
+                    <div>npx supabase login</div>
+                    <div className="mt-1"><span className="text-slate-500"># Deploy das funções Stripe</span></div>
+                    <div>npx supabase functions deploy stripe-create-checkout</div>
+                    <div>npx supabase functions deploy stripe-webhook</div>
+                  </div>
+                </div>
+              </li>
+
+              {/* Passo 6 */}
+              <li className="flex gap-3">
+                <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">6</span>
+                <div className="flex-1">
+                  <p className="font-bold text-slate-800 text-sm">Configure o Webhook no Stripe</p>
+                  <p className="text-xs text-slate-500 mt-0.5 mb-2">
+                    Vá em <strong>Stripe → Developers → Webhooks → Add endpoint</strong>:
+                  </p>
+                  <div className="bg-slate-50 rounded-xl p-3 text-xs space-y-2">
+                    <div>
+                      <span className="text-slate-400 block mb-0.5">URL do endpoint:</span>
+                      <code className="font-mono text-violet-700 break-all">https://[SEU-PROJETO].supabase.co/functions/v1/stripe-webhook</code>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block mb-0.5">Eventos a escutar:</span>
+                      <div className="font-mono text-slate-700 space-y-0.5">
+                        <div>customer.subscription.created</div>
+                        <div>customer.subscription.updated</div>
+                        <div>customer.subscription.deleted</div>
+                        <div>invoice.payment_succeeded</div>
+                        <div>invoice.payment_failed</div>
+                      </div>
+                    </div>
+                    <p className="text-slate-400">Depois copie o <strong>Signing secret (whsec_...)</strong> e adicione como <code className="bg-slate-100 px-1 rounded">STRIPE_WEBHOOK_SECRET</code> no Supabase (passo 4).</p>
+                  </div>
+                </div>
+              </li>
+
+              {/* Passo 7 */}
+              <li className="flex gap-3">
+                <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center flex-shrink-0 mt-0.5">7</span>
+                <div className="flex-1">
+                  <p className="font-bold text-slate-800 text-sm">Adicione a chave pública no Vercel</p>
+                  <p className="text-xs text-slate-500 mt-0.5 mb-2">
+                    Vá em <strong>Vercel → Settings → Environment Variables</strong> e adicione:
+                  </p>
+                  <div className="bg-slate-900 rounded-xl p-3 text-xs font-mono text-emerald-400">
+                    VITE_STRIPE_PUBLISHABLE_KEY=<span className="text-slate-400">pk_live_...</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2">Após salvar, faça um novo deploy no Vercel para a variável entrar em vigor.</p>
+                </div>
+              </li>
+            </ol>
+          </div>
+
+          {/* Como funciona o fluxo */}
+          <div className="card p-4 bg-indigo-50 border border-indigo-100 space-y-2">
+            <p className="text-sm font-bold text-indigo-900">Como funciona o fluxo após configurar</p>
+            <div className="grid sm:grid-cols-2 gap-2 text-xs text-indigo-800">
+              {[
+                '1. Cliente clica em "Assinar" → abre Stripe Checkout seguro',
+                '2. Cliente preenche o cartão e confirma',
+                '3. Stripe cria a assinatura e dispara webhook',
+                '4. Webhook atualiza status do plano no Supabase automaticamente',
+                '5. Se o pagamento falhar → status vira past_due → admin é notificado',
+                '6. Após 15 dias sem pagar → cardápio é bloqueado automaticamente',
+              ].map((t, i) => (
+                <div key={i} className="flex items-start gap-1.5">
+                  <span className="text-indigo-400 flex-shrink-0">→</span>
+                  <span>{t}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Dunning */}
           <div className="card p-4 bg-violet-50 border border-violet-200">
-            <p className="text-sm font-bold text-violet-900 mb-1">Dunning automático</p>
+            <p className="text-sm font-bold text-violet-900 mb-1">Dunning automático (tentativas de cobrança)</p>
             <p className="text-xs text-violet-700">
-              Quando o Stripe não consegue cobrar (cartão expirado, limite, etc.), ele tenta novamente por 4 dias.
-              Após 4 tentativas, o status muda para <code className="bg-violet-100 px-1 rounded">past_due</code>.
-              O ZapMenu exibe um banner de aviso ao dono do restaurante e bloqueia o cardápio após 7 dias de atraso.
+              Quando o cartão é recusado, o Stripe tenta cobrar novamente em 3, 5 e 7 dias (configurável em{' '}
+              <strong>Stripe → Settings → Subscriptions → Smart Retries</strong>).
+              Após falhar todas as tentativas, o status vai para <code className="bg-violet-100 px-1 rounded font-mono">past_due</code> e
+              o ZapMenu exibe aviso ao restaurante. No 16° dia de atraso, o cardápio é bloqueado automaticamente.
             </p>
           </div>
         </div>
