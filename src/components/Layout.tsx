@@ -29,8 +29,17 @@ export default function Layout() {
 
   const navItems = BASE_NAV;
 
+  const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
+
   useEffect(() => {
     if (!user) return;
+
+    // Super admin nunca passa pelo paywall
+    if (user.email === SUPER_ADMIN_EMAIL) {
+      setPlanStatus('ok');
+      return;
+    }
+
     // Verifica onboarding
     const key = `zm_onboarded_${user.id}`;
     if (!localStorage.getItem(key)) {

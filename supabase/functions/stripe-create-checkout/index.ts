@@ -52,14 +52,13 @@ Deno.serve(async (req) => {
       await supabase.from('restaurant_plans').upsert({ user_id: user.id, stripe_customer_id: customerId }, { onConflict: 'user_id' });
     }
 
-    // Cria sessão de checkout
+    // Cria sessão de checkout — sem trial (o trial já foi dado pelo ZapMenu)
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
-        trial_period_days: 7,
         metadata: { user_id: user.id, plan_slug: planSlug },
       },
       success_url: successUrl ?? `${req.headers.get('origin')}/dashboard?checkout=success`,
