@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
         // Desbloqueia cardápio se voltou ao normal
         if (status === 'active') {
           await supabase.from('restaurant_settings')
-            .update({ is_blocked: false })
+            .update({ blocked: false, blocked_reason: null })
             .eq('user_id', userId);
         }
 
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
 
         // Bloqueia cardápio
         await supabase.from('restaurant_settings')
-          .update({ is_blocked: true })
+          .update({ blocked: true, blocked_reason: 'Assinatura cancelada' })
           .eq('user_id', userId);
 
         const { data: rs } = await supabase.from('restaurant_settings').select('restaurant_name').eq('user_id', userId).maybeSingle();
@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
         }).eq('user_id', userId);
 
         await supabase.from('restaurant_settings')
-          .update({ is_blocked: false })
+          .update({ blocked: false, blocked_reason: null })
           .eq('user_id', userId);
         break;
       }
