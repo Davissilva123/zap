@@ -115,6 +115,56 @@ export default function RestaurantDetailPage() {
     }
   };
 
+  const printReceipt = (p: Payment) => {
+    if (!detail) return;
+    const fmt = (d: string) => new Date(d).toLocaleDateString('pt-BR');
+    const w = window.open('', '_blank', 'width=440,height=660');
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Comprovante - ZapMenu</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 32px 28px; color: #1e293b; }
+    .center { text-align: center; }
+    .logo { width: 52px; height: 52px; background: #10b981; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+    .logo span { color: #fff; font-weight: 900; font-size: 22px; }
+    h1 { font-size: 18px; font-weight: 900; margin-bottom: 2px; }
+    .sub { font-size: 12px; color: #94a3b8; }
+    .divider { border: none; border-top: 2px dashed #e2e8f0; margin: 16px 0; }
+    .row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 14px; }
+    .lbl { color: #94a3b8; }
+    .val { font-weight: 600; text-align: right; max-width: 60%; }
+    .amount { color: #059669; font-weight: 900; font-size: 20px; }
+    .paid { color: #059669; font-weight: 700; }
+    .notes-box { background: #f8fafc; border-radius: 8px; padding: 10px; margin-top: 8px; font-size: 12px; color: #64748b; font-style: italic; }
+    .footer { text-align: center; font-size: 10px; color: #cbd5e1; margin-top: 4px; }
+    @media print { body { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <div class="center" style="padding-bottom:16px;border-bottom:2px dashed #e2e8f0;margin-bottom:16px;">
+    <div class="logo"><span>Z</span></div>
+    <h1>ZapMenu</h1>
+    <p class="sub">Comprovante de Pagamento</p>
+  </div>
+  <div class="row"><span class="lbl">Restaurante</span><span class="val">${detail.restaurantName}</span></div>
+  <div class="row"><span class="lbl">Valor</span><span class="amount">${R(p.amount)}</span></div>
+  <div class="row"><span class="lbl">Método</span><span class="val">${p.method.toUpperCase()}</span></div>
+  <div class="row"><span class="lbl">Status</span><span class="paid">${p.status === 'paid' ? '✓ Pago' : p.status === 'overdue' ? 'Vencido' : 'Pendente'}</span></div>
+  ${p.paidAt ? `<div class="row"><span class="lbl">Data do pagamento</span><span class="val">${fmt(p.paidAt)}</span></div>` : ''}
+  ${p.reference ? `<div class="row"><span class="lbl">Referência</span><span class="val">${p.reference}</span></div>` : ''}
+  ${p.notes ? `<hr class="divider"><div class="notes-box"><strong>Obs:</strong> ${p.notes}</div>` : ''}
+  <hr class="divider">
+  <p class="footer">Emitido em ${new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })} · ZapMenu</p>
+  <script>window.onload = function(){ window.print(); window.onafterprint = function(){ window.close(); }; };<\/script>
+</body>
+</html>`);
+    w.document.close();
+  };
+
   const handleDeletePayment = async (paymentId: string) => {
     if (!confirm('Excluir este pagamento do histórico?')) return;
     try {
@@ -446,9 +496,9 @@ export default function RestaurantDetailPage() {
                       {p.createdBy && (
                         <div className="flex items-center gap-1 flex-shrink-0">
                           <button
-                            onClick={() => setReceiptPayment(p)}
+                            onClick={() => { setReceiptPayment(p); }}
                             className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-300 hover:text-blue-500 transition-colors"
-                            title="Ver comprovante"
+                            title="Ver / imprimir comprovante"
                           >
                             <Printer className="w-4 h-4" />
                           </button>
@@ -547,7 +597,7 @@ export default function RestaurantDetailPage() {
                   <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Comprovante</span>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => window.print()}
+                      onClick={() => receiptPayment && printReceipt(receiptPayment)}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition-colors"
                     >
                       <Printer className="w-3.5 h-3.5" /> Imprimir
