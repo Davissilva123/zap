@@ -112,14 +112,14 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {stats.map(stat => (
-          <div key={stat.label} className={`card p-5 border-l-4 ${stat.accent}`}>
-            <div className="flex items-start justify-between mb-3">
-              <p className="text-[13px] font-medium text-slate-500 leading-snug">{stat.label}</p>
-              <div className={`w-8 h-8 rounded-lg ${stat.iconBg} flex items-center justify-center flex-shrink-0`}>
-                <stat.icon className={`w-4 h-4 ${stat.iconColor}`} strokeWidth={1.75} />
+          <div key={stat.label} className={`card p-4 sm:p-5 border-l-4 ${stat.accent}`}>
+            <div className="flex items-start justify-between mb-2 sm:mb-3">
+              <p className="text-[11px] sm:text-[13px] font-medium text-slate-500 leading-snug">{stat.label}</p>
+              <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg ${stat.iconBg} flex items-center justify-center flex-shrink-0`}>
+                <stat.icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${stat.iconColor}`} strokeWidth={1.75} />
               </div>
             </div>
-            <p className="text-3xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">{stat.value}</p>
           </div>
         ))}
       </div>
@@ -134,14 +134,14 @@ export default function DashboardPage() {
             { label: 'Ticket médio', value: fmt(avgTicket), icon: BarChart2, iconBg: 'bg-blue-50', iconColor: 'text-blue-600', accent: 'border-l-blue-500' },
             { label: 'Pedidos do mês', value: monthOrders.length, icon: ShoppingBag, iconBg: 'bg-violet-50', iconColor: 'text-violet-600', accent: 'border-l-violet-500' },
           ].map(s => (
-            <div key={s.label} className={`card p-5 border-l-4 ${s.accent}`}>
-              <div className="flex items-start justify-between mb-3">
-                <p className="text-[13px] font-medium text-slate-500 leading-snug">{s.label}</p>
-                <div className={`w-8 h-8 rounded-lg ${s.iconBg} flex items-center justify-center flex-shrink-0`}>
-                  <s.icon className={`w-4 h-4 ${s.iconColor}`} strokeWidth={1.75} />
+            <div key={s.label} className={`card p-4 sm:p-5 border-l-4 ${s.accent}`}>
+              <div className="flex items-start justify-between mb-2 sm:mb-3">
+                <p className="text-[11px] sm:text-[13px] font-medium text-slate-500 leading-snug">{s.label}</p>
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg ${s.iconBg} flex items-center justify-center flex-shrink-0`}>
+                  <s.icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${s.iconColor}`} strokeWidth={1.75} />
                 </div>
               </div>
-              <p className="text-2xl font-bold text-slate-900 tracking-tight">{s.value}</p>
+              <p className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">{s.value}</p>
             </div>
           ))}
         </div>

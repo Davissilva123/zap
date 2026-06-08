@@ -74,7 +74,7 @@ export default function CouponsPage() {
       {showForm && (
         <div className="card p-5 space-y-4 border-2 border-emerald-100">
           <h3 className="font-semibold text-slate-900 text-sm">Novo cupom</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Código *</label>
               <input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}

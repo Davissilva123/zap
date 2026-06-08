@@ -166,7 +166,7 @@ export default function OperatorsPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nome *</label>
               <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input w-full" placeholder="João Silva" />
@@ -179,16 +179,16 @@ export default function OperatorsPage() {
 
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">Função *</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-4 gap-2">
               {ROLES.map(r => (
                 <button
                   key={r.value}
                   onClick={() => setForm(f => ({ ...f, role: r.value }))}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${form.role === r.value ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}
+                  className={`p-2.5 sm:p-3 rounded-xl border-2 text-left transition-all ${form.role === r.value ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'}`}
                 >
                   <r.icon className={`w-4 h-4 mb-1 ${form.role === r.value ? 'text-emerald-600' : 'text-slate-400'}`} />
                   <p className={`text-xs font-bold ${form.role === r.value ? 'text-emerald-700' : 'text-slate-700'}`}>{r.label}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{r.desc}</p>
+                  <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">{r.desc}</p>
                 </button>
               ))}
             </div>

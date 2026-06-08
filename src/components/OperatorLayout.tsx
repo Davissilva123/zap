@@ -162,7 +162,7 @@ export default function OperatorLayout() {
           </button>
         </header>
 
-        <main className="flex-1 p-5 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full overflow-x-hidden">
           <Outlet />
         </main>
       </div>

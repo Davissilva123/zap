@@ -177,12 +177,12 @@ export default function ReportsPage() {
             </button>
           </div>
           {range === 'custom' && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
               <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-slate-400" />
+                className="flex-1 sm:flex-none px-3 py-1.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-slate-400" />
               <span className="text-slate-400 text-sm">até</span>
               <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-slate-400" />
+                className="flex-1 sm:flex-none px-3 py-1.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:border-slate-400" />
             </div>
           )}
       </div>

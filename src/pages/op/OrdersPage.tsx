@@ -177,13 +177,13 @@ export default function OpOrdersPage() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <CalendarDays className="w-4 h-4 text-slate-400 flex-shrink-0" />
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-            className="input-field text-sm py-2 w-36" title="Data início" />
-          <span className="text-slate-400 text-sm">até</span>
+            className="input-field text-sm py-2 w-full sm:w-36" title="Data início" />
+          <span className="text-slate-400 text-sm flex-shrink-0">até</span>
           <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-            className="input-field text-sm py-2 w-36" title="Data fim" />
+            className="input-field text-sm py-2 w-full sm:w-36" title="Data fim" />
           {(dateFrom || dateTo) && (
             <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="p-1.5 rounded-lg hover:bg-slate-100">
               <X className="w-3.5 h-3.5 text-slate-400" />
@@ -329,7 +329,7 @@ export default function OpOrdersPage() {
 
               <div className="h-px bg-slate-100" />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
                 <div>
                   <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Pagamento</p>
                   <p className="text-sm text-slate-700 font-medium">{PAYMENT_METHOD_LABELS[selectedOrder.paymentMethod]?.emoji} {PAYMENT_METHOD_LABELS[selectedOrder.paymentMethod]?.label}</p>

@@ -190,7 +190,7 @@ export default function SettingsPage() {
               className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all ${form.accentColor === c.value ? 'border-slate-300 bg-slate-50 shadow-sm' : 'border-transparent hover:bg-slate-50'}`}
             >
               <div className="w-5 h-5 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: c.value }} />
-              <span className="text-[11px] font-semibold text-slate-700 truncate">{c.name}</span>
+              <span className="text-[10px] sm:text-[11px] font-semibold text-slate-700 truncate">{c.name}</span>
             </button>
           ))}
         </div>
