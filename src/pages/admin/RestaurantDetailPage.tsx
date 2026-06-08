@@ -50,6 +50,7 @@ export default function RestaurantDetailPage() {
   const [tab, setTab] = useState<'overview' | 'orders' | 'flags' | 'notes' | 'payments'>('overview');
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [paymentsError, setPaymentsError] = useState('');
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [recordForm, setRecordForm] = useState({ amount: '', method: 'pix', notes: '', reference: '' });
   const [recordingPayment, setRecordingPayment] = useState(false);
@@ -76,8 +77,16 @@ export default function RestaurantDetailPage() {
   const loadPayments = async () => {
     if (!userId) return;
     setLoadingPayments(true);
-    try { setPayments((await db.getRestaurantPaymentHistory(userId).catch(() => [])) as Payment[]); }
-    finally { setLoadingPayments(false); }
+    setPaymentsError('');
+    try {
+      const data = await db.getRestaurantPaymentHistory(userId);
+      setPayments(data as Payment[]);
+    } catch (e: any) {
+      console.error('getRestaurantPaymentHistory error:', e);
+      setPaymentsError(e?.message ?? 'Erro ao carregar pagamentos');
+    } finally {
+      setLoadingPayments(false);
+    }
   };
 
   useEffect(() => { if (tab === 'payments') loadPayments(); }, [tab]);
@@ -97,7 +106,6 @@ export default function RestaurantDetailPage() {
       setShowRecordModal(false);
       setRecordForm({ amount: '', method: 'pix', notes: '', reference: '' });
       await loadPayments();
-      await load();
     } catch (e: any) {
       console.error('record_payment error:', e);
       setRecordError(e?.message ?? 'Erro ao registrar pagamento. Verifique se o SQL foi executado no Supabase.');
@@ -373,6 +381,12 @@ export default function RestaurantDetailPage() {
               </button>
             </div>
           </div>
+
+          {paymentsError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+              Erro: {paymentsError}
+            </div>
+          )}
 
           <div className="card overflow-hidden">
             {loadingPayments ? (
