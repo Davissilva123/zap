@@ -10,7 +10,7 @@ import {
 type Detail = Awaited<ReturnType<typeof db.getRestaurantDetailAdmin>>;
 type Order = { id: string; status: string; total: number; customerName: string; deliveryType: string; paymentMethod: string; createdAt: string };
 type Note = { id: string; note: string; createdBy: string; createdAt: string };
-type Payment = { id: string; amount: number; method: string; status: string; reference: string | null; notes: string | null; paid_at: string | null; due_at: string | null; created_at: string };
+type Payment = { id: string; amount: number; method: string; status: string; reference: string | null; notes: string | null; paidAt: string | null; dueAt: string | null; createdAt: string };
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   PENDING:    { label: 'Pendente',   cls: 'bg-amber-50 text-amber-700' },
@@ -53,6 +53,7 @@ export default function RestaurantDetailPage() {
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [recordForm, setRecordForm] = useState({ amount: '', method: 'pix', notes: '', reference: '' });
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [recordError, setRecordError] = useState('');
 
   const load = async () => {
     if (!userId) return;
@@ -84,14 +85,22 @@ export default function RestaurantDetailPage() {
   const handleRecordPayment = async () => {
     if (!userId || !recordForm.amount) return;
     setRecordingPayment(true);
+    setRecordError('');
     try {
-      await db.recordPayment(userId, Number(recordForm.amount), recordForm.method, recordForm.notes || null, recordForm.reference || null);
+      await db.recordPayment(
+        userId,
+        Number(recordForm.amount),
+        recordForm.method,
+        recordForm.notes || undefined,
+        recordForm.reference || undefined,
+      );
       setShowRecordModal(false);
       setRecordForm({ amount: '', method: 'pix', notes: '', reference: '' });
       await loadPayments();
       await load();
     } catch (e: any) {
-      alert(e?.message ?? 'Erro ao registrar pagamento');
+      console.error('record_payment error:', e);
+      setRecordError(e?.message ?? 'Erro ao registrar pagamento. Verifique se o SQL foi executado no Supabase.');
     } finally {
       setRecordingPayment(false);
     }
@@ -400,11 +409,11 @@ export default function RestaurantDetailPage() {
                           <span className="text-[10px] text-slate-400 capitalize">{p.method.toUpperCase()}</span>
                         </div>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          {p.paid_at
-                            ? `Pago em ${new Date(p.paid_at).toLocaleDateString('pt-BR')}`
-                            : p.due_at
-                            ? `Vence ${new Date(p.due_at).toLocaleDateString('pt-BR')}`
-                            : `Registrado ${new Date(p.created_at).toLocaleDateString('pt-BR')}`}
+                          {p.paidAt
+                            ? `Pago em ${new Date(p.paidAt).toLocaleDateString('pt-BR')}`
+                            : p.dueAt
+                            ? `Vence ${new Date(p.dueAt).toLocaleDateString('pt-BR')}`
+                            : `Registrado ${new Date(p.createdAt).toLocaleDateString('pt-BR')}`}
                           {p.reference && ` · Ref: ${p.reference}`}
                         </p>
                         {p.notes && <p className="text-xs text-slate-500 mt-0.5 italic">{p.notes}</p>}
@@ -466,8 +475,13 @@ export default function RestaurantDetailPage() {
                     />
                   </div>
                 </div>
-                <div className="flex gap-2 mt-5">
-                  <button onClick={() => setShowRecordModal(false)} className="btn-secondary flex-1">Cancelar</button>
+                {recordError && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                    {recordError}
+                  </div>
+                )}
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => { setShowRecordModal(false); setRecordError(''); }} className="btn-secondary flex-1">Cancelar</button>
                   <button
                     onClick={handleRecordPayment}
                     disabled={recordingPayment || !recordForm.amount}
