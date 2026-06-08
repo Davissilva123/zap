@@ -1,17 +1,18 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../../lib/db';
 import type { RestaurantSettings } from '../../lib/types';
 import {
   Store, RefreshCw, ExternalLink, Copy, Check, Search,
   ShoppingBag, DollarSign, Clock, ChevronDown, AlertTriangle,
-  Ban, Unlock, Download, Mail, Filter, X, History,
+  Ban, Unlock, Download, Mail, X, History, Eye, CreditCard,
 } from 'lucide-react';
 
 type Stat = { userId: string; orderCount: number; totalRevenue: number; lastOrderAt: string | null };
 type Plan = {
   userId: string; planSlug: string; planName: string; planPrice: number;
   status: string; trialStartsAt: string | null; trialEndsAt: string | null;
-  blockedReason: string | null; expiresAt: string | null;
+  blockedReason: string | null; expiresAt: string | null; paymentStatus?: string;
 };
 type Email = { userId: string; email: string };
 type Log = { id: string; userId: string; oldPlanSlug: string | null; newPlanSlug: string; oldStatus: string | null; newStatus: string; notes: string | null; changedAt: string; changedByEmail: string | null };
@@ -59,6 +60,7 @@ const planColor = (slug: string) => {
 };
 
 export default function AdminRestaurantsPage() {
+  const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState<RestaurantSettings[]>([]);
   const [stats, setStats] = useState<Stat[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -303,11 +305,24 @@ export default function AdminRestaurantsPage() {
 
                         {/* Email + slug */}
                         <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <span className="flex items-center gap-1 text-xs text-slate-500">
-                            <Mail className="w-3 h-3 text-slate-400" /> {email}
-                          </span>
+                          {email !== '—' ? (
+                            <a
+                              href={`mailto:${email}?subject=ZapMenu - ${r.name}&body=Olá ${r.name},%0D%0A%0D%0AEntrando em contato sobre sua conta ZapMenu.`}
+                              className="flex items-center gap-1 text-xs text-slate-500 hover:text-violet-600 transition-colors"
+                              title="Enviar email"
+                            >
+                              <Mail className="w-3 h-3 text-slate-400" /> {email}
+                            </a>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-slate-400"><Mail className="w-3 h-3" /> —</span>
+                          )}
                           <span className="text-xs text-slate-300">·</span>
                           <span className="text-xs text-slate-400 font-mono">/m/{r.slug}</span>
+                          {plan?.paymentStatus === 'past_due' && (
+                            <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                              <CreditCard className="w-2.5 h-2.5" /> Pagamento atrasado
+                            </span>
+                          )}
                         </div>
 
                         {/* Stats */}
@@ -360,6 +375,11 @@ export default function AdminRestaurantsPage() {
                             <Ban className="w-4 h-4 text-red-400" />
                           </button>
                         )}
+
+                        {/* Detail page (impersonação) */}
+                        <button onClick={() => navigate(`/admin/restaurantes/${r.userId}`)} className="p-1.5 rounded-lg hover:bg-violet-50 transition-colors" title="Ver detalhes / entrar como restaurante">
+                          <Eye className="w-4 h-4 text-violet-400" />
+                        </button>
 
                         {/* History */}
                         <button onClick={() => openLog(r.userId)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Histórico de planos">

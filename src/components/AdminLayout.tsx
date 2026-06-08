@@ -1,13 +1,133 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { LayoutDashboard, Store, CreditCard, LogOut, Shield, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { LayoutDashboard, Store, CreditCard, LogOut, Shield, Menu, X, BarChart2, Bell } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { db } from '../lib/db';
+
+type Notification = { id: string; type: string; title: string; body: string | null; userId: string | null; read: boolean; createdAt: string };
 
 const navItems = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/admin/restaurantes', icon: Store, label: 'Restaurantes' },
-  { to: '/admin/planos', icon: CreditCard, label: 'Planos' },
+  { to: '/admin/analytics', icon: BarChart2, label: 'Analytics' },
+  { to: '/admin/planos', icon: CreditCard, label: 'Planos & Cupons' },
 ];
+
+const TYPE_ICONS: Record<string, string> = {
+  new_signup: '🆕',
+  trial_expiring: '⏰',
+  payment_failed: '💳',
+  restaurant_blocked: '🚫',
+  impersonation: '👁',
+  note_added: '📝',
+};
+
+function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const unread = notifications.filter(n => !n.read).length;
+
+  const loadNotifications = async () => {
+    setLoading(true);
+    try { setNotifications(await db.getAdminNotifications().catch(() => [])); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const markAllRead = async () => {
+    await db.markAllNotificationsRead().catch(() => {});
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  };
+
+  const markRead = async (id: string) => {
+    await db.markNotificationRead(id).catch(() => {});
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const ago = (d: string) => {
+    const diff = Date.now() - new Date(d).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'agora';
+    if (m < 60) return `${m}min`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h`;
+    return `${Math.floor(h / 24)}d`;
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => { setOpen(o => !o); if (!open) loadNotifications(); }}
+        className="relative p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-slate-100 transition-all"
+        title="Notificações"
+      >
+        <Bell className="w-5 h-5" />
+        {unread > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-violet-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <span className="text-sm font-bold text-slate-900">Notificações</span>
+            {unread > 0 && (
+              <button onClick={markAllRead} className="text-xs text-violet-600 hover:underline font-medium">Marcar todas como lidas</button>
+            )}
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-slate-200 border-t-violet-500 rounded-full animate-spin" />
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="py-8 text-center">
+                <Bell className="w-6 h-6 text-slate-200 mx-auto mb-2" />
+                <p className="text-slate-400 text-xs">Nenhuma notificação</p>
+              </div>
+            ) : notifications.map(n => (
+              <div
+                key={n.id}
+                onClick={() => markRead(n.id)}
+                className={`px-4 py-3 hover:bg-slate-50 cursor-pointer transition-colors border-b border-slate-50 last:border-0 ${!n.read ? 'bg-violet-50/40' : ''}`}
+              >
+                <div className="flex items-start gap-2.5">
+                  <span className="text-base flex-shrink-0 mt-0.5">{TYPE_ICONS[n.type] ?? '🔔'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={`text-xs font-semibold leading-snug ${!n.read ? 'text-slate-900' : 'text-slate-600'}`}>{n.title}</p>
+                      <span className="text-[10px] text-slate-400 flex-shrink-0">{ago(n.createdAt)}</span>
+                    </div>
+                    {n.body && <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>}
+                  </div>
+                  {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-violet-500 flex-shrink-0 mt-1.5" />}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
@@ -101,9 +221,15 @@ export default function AdminLayout() {
             </div>
             <span className="font-bold text-white text-sm tracking-tight">Super Admin</span>
           </div>
+          <NotificationBell />
           <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-white/5 text-slate-400">
             <X className="w-4 h-4" />
           </button>
+        </header>
+
+        {/* Desktop topbar with bell */}
+        <header className="hidden lg:flex sticky top-0 z-30 bg-white/80 backdrop-blur-sm border-b border-slate-200/60 px-8 py-3 items-center justify-end">
+          <NotificationBell />
         </header>
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full overflow-x-hidden">

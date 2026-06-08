@@ -598,6 +598,165 @@ export const db = {
     await supabase.from('drivers').delete().eq('id', id);
   },
 
+  // ---- Admin: Analytics ----
+  async getMrrByPlan(): Promise<Array<{ planSlug: string; planName: string; planPrice: number; activeCount: number; mrr: number }>> {
+    const { data, error } = await supabase.rpc('get_mrr_by_plan');
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      planSlug: r.plan_slug,
+      planName: r.plan_name,
+      planPrice: Number(r.plan_price ?? 0),
+      activeCount: Number(r.active_count ?? 0),
+      mrr: Number(r.mrr ?? 0),
+    }));
+  },
+
+  async getMrrHistory(): Promise<Array<{ month: string; mrrValue: number; activePaid: number; inTrial: number }>> {
+    const { data, error } = await supabase.rpc('get_mrr_history');
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      month: r.month,
+      mrrValue: Number(r.mrr_value ?? 0),
+      activePaid: Number(r.active_paid ?? 0),
+      inTrial: Number(r.in_trial ?? 0),
+    }));
+  },
+
+  async getOnboardingFunnel(): Promise<Array<{ stage: string; count: number }>> {
+    const { data, error } = await supabase.rpc('get_onboarding_funnel');
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({ stage: r.stage, count: Number(r.count ?? 0) }));
+  },
+
+  async getChurnReport(): Promise<Array<{ userId: string; restaurantName: string; oldPlan: string; churnReason: string; churnedAt: string }>> {
+    const { data, error } = await supabase.rpc('get_churn_report');
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      userId: r.user_id,
+      restaurantName: r.restaurant_name,
+      oldPlan: r.old_plan,
+      churnReason: r.churn_reason,
+      churnedAt: r.churned_at,
+    }));
+  },
+
+  // ---- Admin: Notas Internas ----
+  async getRestaurantNotes(userId: string): Promise<Array<{ id: string; note: string; createdBy: string; createdAt: string }>> {
+    const { data, error } = await supabase.rpc('get_restaurant_notes', { p_user_id: userId });
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({ id: r.id, note: r.note, createdBy: r.created_by, createdAt: r.created_at }));
+  },
+
+  async addRestaurantNote(userId: string, note: string): Promise<void> {
+    const { error } = await supabase.rpc('add_restaurant_note', { p_user_id: userId, p_note: note });
+    if (error) throw error;
+  },
+
+  async deleteRestaurantNote(noteId: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_restaurant_note', { p_note_id: noteId });
+    if (error) throw error;
+  },
+
+  // ---- Admin: Feature Flags ----
+  async getFeatureFlags(userId: string): Promise<Record<string, boolean>> {
+    const { data, error } = await supabase.rpc('get_feature_flags', { p_user_id: userId });
+    if (error) throw error;
+    const result: Record<string, boolean> = {};
+    ((data as any[]) ?? []).forEach(r => { result[r.flag_name] = r.enabled; });
+    return result;
+  },
+
+  async setFeatureFlag(userId: string, flagName: string, enabled: boolean): Promise<void> {
+    const { error } = await supabase.rpc('set_feature_flag', { p_user_id: userId, p_flag_name: flagName, p_enabled: enabled });
+    if (error) throw error;
+  },
+
+  // ---- Admin: Notificações ----
+  async getAdminNotifications(): Promise<Array<{ id: string; type: string; title: string; body: string | null; userId: string | null; read: boolean; createdAt: string }>> {
+    const { data, error } = await supabase.rpc('get_admin_notifications');
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      id: r.id, type: r.type, title: r.title, body: r.body ?? null,
+      userId: r.user_id ?? null, read: r.read, createdAt: r.created_at,
+    }));
+  },
+
+  async markNotificationRead(id: string): Promise<void> {
+    const { error } = await supabase.rpc('mark_notification_read', { p_id: id });
+    if (error) throw error;
+  },
+
+  async markAllNotificationsRead(): Promise<void> {
+    const { error } = await supabase.rpc('mark_all_notifications_read');
+    if (error) throw error;
+  },
+
+  // ---- Admin: Cupons de Assinatura ----
+  async getSubscriptionCoupons(): Promise<Array<{ id: string; code: string; discountType: string; discountValue: number; maxUses: number | null; usesCount: number; active: boolean; expiresAt: string | null; createdAt: string }>> {
+    const { data, error } = await supabase.rpc('get_subscription_coupons');
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      id: r.id, code: r.code, discountType: r.discount_type,
+      discountValue: Number(r.discount_value), maxUses: r.max_uses ?? null,
+      usesCount: Number(r.uses_count), active: r.active,
+      expiresAt: r.expires_at ?? null, createdAt: r.created_at,
+    }));
+  },
+
+  async createSubscriptionCoupon(code: string, discountType: string, discountValue: number, maxUses?: number | null, expiresAt?: string | null): Promise<void> {
+    const { error } = await supabase.rpc('create_subscription_coupon', {
+      p_code: code, p_discount_type: discountType, p_discount_value: discountValue,
+      p_max_uses: maxUses ?? null, p_expires_at: expiresAt ?? null,
+    });
+    if (error) throw error;
+  },
+
+  async toggleSubscriptionCoupon(id: string): Promise<void> {
+    const { error } = await supabase.rpc('toggle_subscription_coupon', { p_id: id });
+    if (error) throw error;
+  },
+
+  async deleteSubscriptionCoupon(id: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_subscription_coupon', { p_id: id });
+    if (error) throw error;
+  },
+
+  // ---- Admin: Detalhe do Restaurante (impersonação read-only) ----
+  async getRestaurantDetailAdmin(userId: string): Promise<{
+    restaurantName: string; slug: string; phone: string; address: string;
+    logoUrl: string; coverUrl: string; description: string;
+    planSlug: string; planName: string; planPrice: number;
+    planStatus: string; trialEndsAt: string | null;
+    paymentStatus: string; stripeSubscriptionId: string | null;
+    orderCount: number; totalRevenue: number; lastOrderAt: string | null;
+    blocked: boolean; blockedReason: string | null;
+  } | null> {
+    const { data, error } = await supabase.rpc('get_restaurant_detail_admin', { p_user_id: userId });
+    if (error) throw error;
+    const r = (data as any[])?.[0];
+    if (!r) return null;
+    return {
+      restaurantName: r.restaurant_name, slug: r.slug, phone: r.phone, address: r.address,
+      logoUrl: r.logo_url, coverUrl: r.cover_url, description: r.description,
+      planSlug: r.plan_slug, planName: r.plan_name, planPrice: Number(r.plan_price ?? 0),
+      planStatus: r.plan_status, trialEndsAt: r.trial_ends_at ?? null,
+      paymentStatus: r.payment_status, stripeSubscriptionId: r.stripe_subscription_id ?? null,
+      orderCount: Number(r.order_count ?? 0), totalRevenue: Number(r.total_revenue ?? 0),
+      lastOrderAt: r.last_order_at ?? null,
+      blocked: r.blocked ?? false, blockedReason: r.blocked_reason ?? null,
+    };
+  },
+
+  async getRestaurantOrdersAdmin(userId: string): Promise<Array<{ id: string; status: string; total: number; customerName: string; deliveryType: string; paymentMethod: string; createdAt: string }>> {
+    const { data, error } = await supabase.rpc('get_restaurant_orders_admin', { p_user_id: userId });
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      id: r.id, status: r.status, total: Number(r.total),
+      customerName: r.customer_name, deliveryType: r.delivery_type,
+      paymentMethod: r.payment_method, createdAt: r.created_at,
+    }));
+  },
+
   // ---- Driver Portal (sem auth, via access_token) ----
   async getDriverByToken(token: string): Promise<{ id: string; name: string; phone: string } | null> {
     const { data, error } = await supabase.rpc('get_driver_by_token', { p_token: token });
