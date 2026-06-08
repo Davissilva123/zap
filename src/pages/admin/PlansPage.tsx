@@ -64,7 +64,13 @@ export default function AdminPlansPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [prices, setPrices] = useState<Record<string, number>>({ basic: 39, pro: 89, premium: 149 });
   const [saved, setSaved] = useState<string | null>(null);
+  const [savingPrice, setSavingPrice] = useState<string | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
   const [tab, setTab] = useState<'plans' | 'coupons' | 'stripe'>('plans');
+
+  useEffect(() => {
+    db.getPlatformPlanPrices().then(p => setPrices(p)).catch(() => {});
+  }, []);
 
   // Coupons state
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -81,11 +87,21 @@ export default function AdminPlansPage() {
 
   useEffect(() => { if (tab === 'coupons') loadCoupons(); }, [tab]);
 
-  const savePrice = (slug: string, price: number) => {
-    setPrices(p => ({ ...p, [slug]: price }));
-    setEditing(null);
-    setSaved(slug);
-    setTimeout(() => setSaved(null), 2000);
+  const savePrice = async (slug: string, price: number) => {
+    if (!price || price <= 0) { setEditing(null); return; }
+    setSavingPrice(slug);
+    setPriceError(null);
+    try {
+      await db.updatePlatformPlanPrice(slug, price);
+      setPrices(p => ({ ...p, [slug]: price }));
+      setEditing(null);
+      setSaved(slug);
+      setTimeout(() => setSaved(null), 2500);
+    } catch (e: any) {
+      setPriceError(`Erro ao salvar ${slug}: ${e?.message ?? 'verifique o banco'}`);
+    } finally {
+      setSavingPrice(null);
+    }
   };
 
   const handleCreateCoupon = async () => {
@@ -140,6 +156,13 @@ export default function AdminPlansPage() {
       {/* ---- PLANS ---- */}
       {tab === 'plans' && (
         <div className="space-y-5">
+          {priceError && (
+            <div className="card p-3 bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
+              <X className="w-4 h-4 flex-shrink-0" /> {priceError}
+              <button onClick={() => setPriceError(null)} className="ml-auto text-red-400 hover:text-red-600">✕</button>
+            </div>
+          )}
+
           <div className="card p-4 bg-emerald-50 border border-emerald-200 flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
               <Zap className="w-4 h-4 text-emerald-600" />
@@ -168,7 +191,12 @@ export default function AdminPlansPage() {
                   <h3 className="text-lg font-black text-slate-900 mb-1">{plan.name}</h3>
                   <p className="text-xs text-slate-400 mb-4 leading-relaxed">{plan.description}</p>
                   <div className="mb-1">
-                    {isEditing ? (
+                    {savingPrice === plan.slug ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 border-2 border-slate-200 border-t-violet-500 rounded-full animate-spin" />
+                        <span className="text-sm text-slate-400">Salvando...</span>
+                      </div>
+                    ) : isEditing ? (
                       <div className="flex items-center gap-2">
                         <span className="text-slate-500 text-sm font-semibold">R$</span>
                         <input

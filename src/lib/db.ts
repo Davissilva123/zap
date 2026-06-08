@@ -835,4 +835,26 @@ export const db = {
   async completeDriverOrder(token: string, orderId: string): Promise<void> {
     await supabase.rpc('complete_driver_order', { p_token: token, p_order_id: orderId });
   },
+
+  // ---- Platform Plans (preços globais) ----
+  async getPlatformPlanPrices(): Promise<Record<string, number>> {
+    const { data } = await supabase
+      .from('plans')
+      .select('slug, price_brl')
+      .in('slug', ['basic', 'pro', 'premium']);
+    if (!data || data.length === 0) return { basic: 39, pro: 89, premium: 149 };
+    const result: Record<string, number> = { basic: 39, pro: 89, premium: 149 };
+    for (const row of data as Array<{ slug: string; price_brl: number }>) {
+      result[row.slug] = Number(row.price_brl);
+    }
+    return result;
+  },
+
+  async updatePlatformPlanPrice(slug: string, price: number): Promise<void> {
+    const { error } = await supabase
+      .from('plans')
+      .update({ price_brl: price })
+      .eq('slug', slug);
+    if (error) throw error;
+  },
 };
