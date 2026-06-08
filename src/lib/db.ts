@@ -79,6 +79,51 @@ export const db = {
     return (data as SettingsRow[] || []).map(toSettings);
   },
 
+  async getPlatformStats(): Promise<{ totalRestaurants: number; totalOrders: number; totalRevenue: number; ordersToday: number; revenueToday: number }> {
+    const { data, error } = await supabase.rpc('get_platform_stats');
+    if (error) throw error;
+    const r = (data as any[])?.[0] ?? {};
+    return {
+      totalRestaurants: Number(r.total_restaurants ?? 0),
+      totalOrders: Number(r.total_orders ?? 0),
+      totalRevenue: Number(r.total_revenue ?? 0),
+      ordersToday: Number(r.orders_today ?? 0),
+      revenueToday: Number(r.revenue_today ?? 0),
+    };
+  },
+
+  async getRestaurantStats(): Promise<Array<{ userId: string; orderCount: number; totalRevenue: number; lastOrderAt: string | null }>> {
+    const { data, error } = await supabase.rpc('get_restaurant_stats');
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      userId: r.user_id,
+      orderCount: Number(r.order_count ?? 0),
+      totalRevenue: Number(r.total_revenue ?? 0),
+      lastOrderAt: r.last_order_at ?? null,
+    }));
+  },
+
+  async getRestaurantPlans(): Promise<Array<{ userId: string; planSlug: string; planName: string; status: string; expiresAt: string | null }>> {
+    const { data, error } = await supabase.rpc('get_all_restaurant_plans');
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      userId: r.user_id,
+      planSlug: r.plan_slug,
+      planName: r.plan_name,
+      status: r.status,
+      expiresAt: r.expires_at ?? null,
+    }));
+  },
+
+  async setRestaurantPlan(targetUserId: string, planSlug: string): Promise<void> {
+    const { error } = await supabase.rpc('set_restaurant_plan', {
+      p_target_user_id: targetUserId,
+      p_plan_slug: planSlug,
+      p_expires_at: null,
+    });
+    if (error) throw error;
+  },
+
   async getSettings(userId: string): Promise<RestaurantSettings | null> {
     const { data, error } = await supabase.from('restaurant_settings').select('*').eq('user_id', userId).maybeSingle();
     if (error) { console.error('[db.getSettings]', error); return null; }
