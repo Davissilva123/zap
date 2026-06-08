@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import { Zap, ArrowRight, Check, ChefHat } from 'lucide-react';
-import PlanosPage from './PlanosPage';
+import TrialPage from './TrialPage';
 
 const RESTAURANT_TYPES = [
   { emoji: '🍕', label: 'Pizzaria' },
@@ -100,18 +100,9 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Step 3: Escolher plano — fora do card branco, ocupa tela toda */}
-        {step === 3 && (
-          <PlanosPage
-            reason="new"
-            onTrialStarted={() => {
-              localStorage.setItem(`zm_onboarded_${user?.id}`, '1');
-              navigate('/dashboard');
-            }}
-          />
-        )}
+        {/* Step 3: Ativar trial — dentro do card branco */}
 
-        {step !== 3 && <div className="bg-white rounded-3xl shadow-2xl shadow-black/30 p-7 sm:p-8">
+        <div className="bg-white rounded-3xl shadow-2xl shadow-black/30 p-7 sm:p-8">
           {/* Step 1: Restaurant name */}
           {step === 1 && (
             <div className="animate-fade-in">
@@ -199,7 +190,17 @@ export default function OnboardingPage() {
             </div>
           )}
 
-        </div>}
+          {/* Step 3: Ativar trial */}
+          {step === 3 && (
+            <TrialPage
+              restaurantName={restaurantName}
+              onActivated={() => {
+                localStorage.setItem(`zm_onboarded_${user?.id}`, '1');
+                navigate('/dashboard');
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -68,9 +68,37 @@ export default function AdminPlansPage() {
   const [priceError, setPriceError] = useState<string | null>(null);
   const [tab, setTab] = useState<'plans' | 'coupons' | 'stripe'>('plans');
 
+  // Trial days
+  const [trialDays, setTrialDays] = useState(7);
+  const [trialDaysInput, setTrialDaysInput] = useState('7');
+  const [savingTrial, setSavingTrial] = useState(false);
+  const [trialSaved, setTrialSaved] = useState(false);
+  const [trialError, setTrialError] = useState('');
+
   useEffect(() => {
     db.getPlatformPlanPrices().then(p => setPrices(p)).catch(() => {});
+    db.getTrialDays().then(d => { setTrialDays(d); setTrialDaysInput(String(d)); }).catch(() => {});
   }, []);
+
+  const saveTrialDays = async () => {
+    const days = parseInt(trialDaysInput, 10);
+    if (isNaN(days) || days < 1 || days > 90) {
+      setTrialError('Digite um número entre 1 e 90 dias.');
+      return;
+    }
+    setSavingTrial(true);
+    setTrialError('');
+    try {
+      await db.setTrialDays(days);
+      setTrialDays(days);
+      setTrialSaved(true);
+      setTimeout(() => setTrialSaved(false), 2500);
+    } catch (e: any) {
+      setTrialError(e?.message ?? 'Erro ao salvar');
+    } finally {
+      setSavingTrial(false);
+    }
+  };
 
   // Coupons state
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -162,6 +190,37 @@ export default function AdminPlansPage() {
               <button onClick={() => setPriceError(null)} className="ml-auto text-red-400 hover:text-red-600">✕</button>
             </div>
           )}
+
+          {/* Configuração de trial */}
+          <div className="card p-4 flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-sm font-bold text-slate-900">Período de teste gratuito</p>
+              <p className="text-xs text-slate-400 mt-0.5">Quantos dias um novo cliente pode testar antes de precisar assinar.</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={1} max={90}
+                  value={trialDaysInput}
+                  onChange={e => { setTrialDaysInput(e.target.value); setTrialError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && saveTrialDays()}
+                  className="input w-20 text-center font-bold text-lg"
+                />
+                <span className="text-sm text-slate-500 font-medium">dias</span>
+              </div>
+              <button
+                onClick={saveTrialDays}
+                disabled={savingTrial || trialDaysInput === String(trialDays)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-bold rounded-xl transition-colors"
+              >
+                {savingTrial
+                  ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : trialSaved ? <><Check className="w-3.5 h-3.5" /> Salvo</> : 'Salvar'}
+              </button>
+            </div>
+            {trialError && <p className="w-full text-xs text-red-500">{trialError}</p>}
+          </div>
 
           <div className="card p-4 bg-emerald-50 border border-emerald-200 flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">

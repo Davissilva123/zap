@@ -863,6 +863,32 @@ export const db = {
     if (error) throw error;
   },
 
+  async getTrialDays(): Promise<number> {
+    const { data, error } = await supabase.rpc('get_trial_days');
+    if (error || data === null) return 7;
+    return Number(data);
+  },
+
+  async setTrialDays(days: number): Promise<void> {
+    const { error } = await supabase.rpc('set_trial_days', { p_days: days });
+    if (error) throw error;
+  },
+
+  async checkoutWithStripe(planSlug: string): Promise<string> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) throw new Error('Não autenticado');
+    const supabaseUrl = (supabase as any).supabaseUrl as string;
+    const res = await fetch(`${supabaseUrl}/functions/v1/stripe-create-checkout`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planSlug }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? 'Erro ao criar checkout');
+    return json.url as string;
+  },
+
   // ---- Platform Plans (preços globais) ----
   async getPlatformPlanPrices(): Promise<Record<string, number>> {
     const { data, error } = await supabase.rpc('get_platform_plans');
