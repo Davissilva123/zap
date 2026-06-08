@@ -58,6 +58,8 @@ function OwnerRoute({ children }: { children: React.ReactNode }) {
   if (loading) return <Spinner />;
   if (!user) return <Navigate to="/" replace />;
   if (isOperator) return <Navigate to="/op/pedidos" replace />;
+  // Super admin nunca usa rotas de dono — sempre vai para o painel admin
+  if (user.email === SUPER_ADMIN_EMAIL) return <Navigate to="/admin" replace />;
   return <>{children}</>;
 }
 
@@ -81,7 +83,10 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isOperator } = useAuth();
   if (loading) return <Spinner />;
   if (user && isOperator) return <Navigate to="/op/pedidos" replace />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) {
+    if (user.email === SUPER_ADMIN_EMAIL) return <Navigate to="/admin" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
   return <>{children}</>;
 }
 

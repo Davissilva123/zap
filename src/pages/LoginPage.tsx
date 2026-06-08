@@ -3,6 +3,8 @@ import { useAuth } from '../lib/auth';
 import { ArrowRight, AtSign, Lock, User, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
+
 export default function LoginPage() {
   const { login, register: registerFn } = useAuth();
   const navigate = useNavigate();
@@ -24,7 +26,8 @@ export default function LoginPage() {
       const err = await registerFn(name, email, password);
       if (err) { setError(err); setSubmitting(false); return; }
     }
-    navigate('/dashboard');
+    // Super admin vai direto para o painel admin
+    navigate(email.trim().toLowerCase() === SUPER_ADMIN_EMAIL ? '/admin' : '/dashboard');
   };
 
   return (
