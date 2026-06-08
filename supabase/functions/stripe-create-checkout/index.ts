@@ -57,6 +57,7 @@ Deno.serve(async (req) => {
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card', 'boleto'],
+      allow_promotion_codes: true,
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
         metadata: { user_id: user.id, plan_slug: planSlug },
