@@ -4,8 +4,8 @@ import { CustomerAuthProvider } from './lib/customerAuth';
 import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
 import OnboardingPage from './pages/OnboardingPage';
-import AdminPage from './pages/AdminPage';
 import Layout from './components/Layout';
+import AdminLayout from './components/AdminLayout';
 import OperatorLayout from './components/OperatorLayout';
 import DashboardPage from './pages/DashboardPage';
 import MenuPage from './pages/MenuPage';
@@ -26,6 +26,11 @@ import OpKitchenPage from './pages/op/KitchenPage';
 import ReviewsPage from './pages/ReviewsPage';
 import PublicMenuPage from './pages/PublicMenuPage';
 import CustomerPortalPage from './pages/CustomerPortalPage';
+import AdminDashboardPage from './pages/admin/DashboardPage';
+import AdminRestaurantsPage from './pages/admin/RestaurantsPage';
+import AdminPlansPage from './pages/admin/PlansPage';
+
+const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
 const Spinner = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -37,7 +42,10 @@ function HomeRoute() {
   const { user, loading, isOperator } = useAuth();
   if (loading) return <Spinner />;
   if (user && isOperator) return <Navigate to="/op/pedidos" replace />;
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) {
+    const isSuperAdmin = user.email === SUPER_ADMIN_EMAIL;
+    return <Navigate to={isSuperAdmin ? '/admin' : '/dashboard'} replace />;
+  }
   return <LandingPage />;
 }
 
@@ -54,6 +62,14 @@ function OperatorRoute({ children }: { children: React.ReactNode }) {
   if (loading) return <Spinner />;
   if (!user) return <Navigate to="/" replace />;
   if (!isOperator) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
+
+function SuperAdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <Spinner />;
+  if (!user) return <Navigate to="/" replace />;
+  if (user.email !== SUPER_ADMIN_EMAIL) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
@@ -79,6 +95,13 @@ export default function App() {
           {/* Onboarding (owner auth required, no sidebar) */}
           <Route path="/onboarding" element={<OwnerRoute><OnboardingPage /></OwnerRoute>} />
 
+          {/* Super-Admin routes (own layout, violet theme) */}
+          <Route path="/admin" element={<SuperAdminRoute><AdminLayout /></SuperAdminRoute>}>
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="restaurantes" element={<AdminRestaurantsPage />} />
+            <Route path="planos" element={<AdminPlansPage />} />
+          </Route>
+
           {/* Owner routes (with sidebar Layout) */}
           <Route element={<OwnerRoute><Layout /></OwnerRoute>}>
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -94,7 +117,6 @@ export default function App() {
             <Route path="/operators" element={<OperatorsPage />} />
             <Route path="/qrcode" element={<QRCodePage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/admin" element={<AdminPage />} />
           </Route>
 
           {/* Operator routes */}

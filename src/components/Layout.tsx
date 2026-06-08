@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike, Shield } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState, useEffect } from 'react';
@@ -20,17 +20,12 @@ const BASE_NAV = [
   { to: '/settings', icon: Settings, label: 'Configurações' },
 ];
 
-const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
-
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const isSuperAdmin = !!(user?.email && SUPER_ADMIN_EMAIL && user.email === SUPER_ADMIN_EMAIL);
-  const navItems = isSuperAdmin
-    ? [...BASE_NAV, { to: '/admin', icon: Shield, label: 'Super Admin' }]
-    : BASE_NAV;
+  const navItems = BASE_NAV;
 
   useEffect(() => {
     if (!user) return;

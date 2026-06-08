@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Zap, QrCode, MessageCircle, CreditCard, ChefHat, Bike, BarChart2, Star, Tag, Check, ArrowRight, Smartphone, Shield, Users } from 'lucide-react';
+import { Zap, QrCode, MessageCircle, CreditCard, ChefHat, Bike, BarChart2, Star, Tag, Check, ArrowRight, Smartphone, Shield, Crown } from 'lucide-react';
 
 const features = [
   { icon: QrCode, title: 'Cardápio via QR Code', desc: 'Clientes acessam pelo celular sem baixar nenhum app' },
@@ -20,25 +20,39 @@ const steps = [
 
 const plans = [
   {
-    name: 'Grátis',
-    price: 'R$ 0',
-    period: 'para sempre',
+    name: 'Básico',
+    price: 'R$ 39',
+    period: 'mês',
+    trial: '7 dias grátis',
     highlight: false,
     btnClass: 'bg-slate-900 hover:bg-slate-800 text-white',
     borderClass: 'border-slate-200',
     label: 'Começar grátis',
-    items: ['Cardápio online com QR Code', 'Até 30 itens no cardápio', 'Portal do cliente com histórico', 'Pedidos manuais (WhatsApp)', 'Suporte por email'],
+    items: ['Cardápio online com QR Code', 'Até 50 itens', 'Portal do cliente', 'Pedidos via WhatsApp (manual)', '2 operadores', 'Suporte por email'],
   },
   {
     name: 'Pro',
-    price: 'R$ 79',
-    period: 'por mês',
+    price: 'R$ 89',
+    period: 'mês',
+    trial: '7 dias grátis',
     highlight: true,
     badge: 'Mais popular',
     btnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
     borderClass: 'border-emerald-500 ring-2 ring-emerald-500/20',
-    label: 'Assinar Pro',
-    items: ['Tudo do Grátis', 'Itens ilimitados', 'PIX automático (Mercado Pago)', 'WhatsApp automático', 'KDS para cozinha', 'Entregadores com GPS', 'Relatórios avançados', 'Operadores ilimitados', 'Cupons e promoções', 'Suporte prioritário'],
+    label: 'Começar grátis',
+    items: ['Tudo do Básico', 'Itens ilimitados', 'PIX automático', 'WhatsApp automático', 'Relatórios e análises', 'Cupons e promoções', 'Até 5 operadores', 'Suporte prioritário'],
+  },
+  {
+    name: 'Premium',
+    price: 'R$ 149',
+    period: 'mês',
+    trial: '7 dias grátis',
+    highlight: false,
+    badge: 'Completo',
+    btnClass: 'bg-violet-600 hover:bg-violet-700 text-white',
+    borderClass: 'border-violet-400 ring-2 ring-violet-400/20',
+    label: 'Começar grátis',
+    items: ['Tudo do Pro', 'Operadores ilimitados', 'KDS para cozinha', 'Entregadores com GPS', 'Comandas digitais', 'Avaliações dos clientes', 'Suporte via WhatsApp'],
   },
 ];
 
@@ -201,31 +215,32 @@ export default function LandingPage() {
 
       {/* Pricing */}
       <section id="precos" className="py-20 sm:py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-3 tracking-tight">Planos simples</h2>
-            <p className="text-slate-500 text-lg">Comece grátis e evolua quando precisar</p>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-3 tracking-tight">Planos simples e transparentes</h2>
+            <p className="text-slate-500 text-lg">Todos com <strong>7 dias grátis</strong> — sem cartão de crédito</p>
           </div>
-          <div className="grid sm:grid-cols-2 gap-6">
+          <div className="grid sm:grid-cols-3 gap-5">
             {plans.map((plan, i) => (
-              <div key={i} className={`relative p-8 rounded-3xl border-2 bg-white ${plan.borderClass}`}>
+              <div key={i} className={`relative p-7 rounded-3xl border-2 bg-white flex flex-col ${plan.borderClass}`}>
                 {plan.badge && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                    <span className="bg-emerald-600 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg shadow-emerald-500/20">
+                    <span className={`text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg ${plan.highlight ? 'bg-emerald-600' : 'bg-violet-600'}`}>
                       {plan.badge}
                     </span>
                   </div>
                 )}
-                <div className="mb-7">
-                  <h3 className="font-black text-slate-900 text-xl mb-3">{plan.name}</h3>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-4xl font-black text-slate-900">{plan.price}</span>
+                <div className="mb-6">
+                  <h3 className="font-black text-slate-900 text-lg mb-2">{plan.name}</h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-slate-900">{plan.price}</span>
                     <span className="text-slate-400 text-sm">/{plan.period}</span>
                   </div>
+                  <p className="text-xs text-emerald-600 font-semibold mt-1">{plan.trial}</p>
                 </div>
-                <ul className="space-y-3 mb-8">
+                <ul className="space-y-2.5 mb-7 flex-1">
                   {plan.items.map((item, j) => (
-                    <li key={j} className="flex items-start gap-2.5 text-sm text-slate-600">
+                    <li key={j} className="flex items-start gap-2 text-sm text-slate-600">
                       <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
                       {item}
                     </li>
@@ -233,7 +248,7 @@ export default function LandingPage() {
                 </ul>
                 <button
                   onClick={() => navigate('/login')}
-                  className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all hover:-translate-y-0.5 ${plan.btnClass}`}
+                  className={`w-full py-3 rounded-xl font-bold text-sm transition-all hover:-translate-y-0.5 ${plan.btnClass}`}
                 >
                   {plan.label}
                 </button>
