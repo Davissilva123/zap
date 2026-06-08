@@ -112,6 +112,8 @@ export interface RestaurantSettings {
   cashbackPercent: number;
   minimumOrder: number;
   manualClosed: boolean;
+  blocked?: boolean;
+  blockedReason?: string;
 }
 
 export interface OrderItem {

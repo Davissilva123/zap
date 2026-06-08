@@ -14,6 +14,8 @@ interface SettingsRow {
   minimum_order: number;
   mercado_pago_token: string;
   manual_closed: boolean;
+  blocked?: boolean;
+  blocked_reason?: string;
   created_at: string;
 }
 interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; available_from?: string | null; available_to?: string | null; created_at: string; }
@@ -48,6 +50,8 @@ function toSettings(r: SettingsRow): RestaurantSettings {
     minimumOrder: Number(r.minimum_order ?? 0),
     mercadoPagoToken: r.mercado_pago_token ?? '',
     manualClosed: r.manual_closed ?? false,
+    blocked: r.blocked ?? false,
+    blockedReason: r.blocked_reason ?? undefined,
   };
 }
 function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, availableFrom: r.available_from ?? undefined, availableTo: r.available_to ?? undefined, createdAt: r.created_at }; }
@@ -103,25 +107,77 @@ export const db = {
     }));
   },
 
-  async getRestaurantPlans(): Promise<Array<{ userId: string; planSlug: string; planName: string; status: string; expiresAt: string | null }>> {
+  async getRestaurantPlans(): Promise<Array<{ userId: string; planSlug: string; planName: string; planPrice: number; status: string; trialStartsAt: string | null; trialEndsAt: string | null; blockedReason: string | null; expiresAt: string | null }>> {
     const { data, error } = await supabase.rpc('get_all_restaurant_plans');
     if (error) throw error;
     return ((data as any[]) ?? []).map(r => ({
       userId: r.user_id,
       planSlug: r.plan_slug,
       planName: r.plan_name,
+      planPrice: Number(r.plan_price ?? 0),
       status: r.status,
+      trialStartsAt: r.trial_starts_at ?? null,
+      trialEndsAt: r.trial_ends_at ?? null,
+      blockedReason: r.blocked_reason ?? null,
       expiresAt: r.expires_at ?? null,
     }));
   },
 
-  async setRestaurantPlan(targetUserId: string, planSlug: string): Promise<void> {
+  async setRestaurantPlan(targetUserId: string, planSlug: string, status = 'active', notes?: string): Promise<void> {
     const { error } = await supabase.rpc('set_restaurant_plan', {
       p_target_user_id: targetUserId,
       p_plan_slug: planSlug,
-      p_expires_at: null,
+      p_status: status,
+      p_notes: notes ?? null,
     });
     if (error) throw error;
+  },
+
+  async getOwnerEmails(): Promise<Array<{ userId: string; email: string }>> {
+    const { data, error } = await supabase.rpc('get_owner_emails');
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({ userId: r.user_id, email: r.email }));
+  },
+
+  async getMrrStats(): Promise<{ mrrCurrent: number; arr: number; activePaid: number; inTrial: number; trialsExpiring7d: number; churnedMonth: number; totalRestaurants: number }> {
+    const { data, error } = await supabase.rpc('get_mrr_stats');
+    if (error) throw error;
+    const r = (data as any[])?.[0] ?? {};
+    return {
+      mrrCurrent: Number(r.mrr_current ?? 0),
+      arr: Number(r.arr ?? 0),
+      activePaid: Number(r.active_paid ?? 0),
+      inTrial: Number(r.in_trial ?? 0),
+      trialsExpiring7d: Number(r.trials_expiring_7d ?? 0),
+      churnedMonth: Number(r.churned_month ?? 0),
+      totalRestaurants: Number(r.total_restaurants ?? 0),
+    };
+  },
+
+  async blockRestaurant(userId: string, reason: string): Promise<void> {
+    const { error } = await supabase.rpc('block_restaurant', { p_user_id: userId, p_reason: reason });
+    if (error) throw error;
+  },
+
+  async unblockRestaurant(userId: string): Promise<void> {
+    const { error } = await supabase.rpc('unblock_restaurant', { p_user_id: userId });
+    if (error) throw error;
+  },
+
+  async getPlanChangeLog(userId?: string): Promise<Array<{ id: string; userId: string; oldPlanSlug: string | null; newPlanSlug: string; oldStatus: string | null; newStatus: string; notes: string | null; changedAt: string; changedByEmail: string | null }>> {
+    const { data, error } = await supabase.rpc('get_plan_change_log', { p_user_id: userId ?? null });
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      id: r.id,
+      userId: r.user_id,
+      oldPlanSlug: r.old_plan_slug ?? null,
+      newPlanSlug: r.new_plan_slug,
+      oldStatus: r.old_status ?? null,
+      newStatus: r.new_status,
+      notes: r.notes ?? null,
+      changedAt: r.changed_at,
+      changedByEmail: r.changed_by_email ?? null,
+    }));
   },
 
   async getSettings(userId: string): Promise<RestaurantSettings | null> {

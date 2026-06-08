@@ -433,6 +433,20 @@ export default function PublicMenuPage() {
     );
   }
 
+  if (settings.blocked) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center">
+        <div className="text-center px-6">
+          <div className="w-20 h-20 rounded-3xl bg-red-50 flex items-center justify-center mx-auto mb-5 text-4xl">
+            🚫
+          </div>
+          <h2 className="text-xl font-bold text-slate-800">Restaurante temporariamente indisponível</h2>
+          <p className="text-slate-400 mt-2 text-sm">Este cardápio está suspenso. Entre em contato com o restaurante.</p>
+        </div>
+      </div>
+    );
+  }
+
   const accent = settings.accentColor;
   const avgRating = publicReviews.length
     ? Math.round((publicReviews.reduce((s, r) => s + r.rating, 0) / publicReviews.length) * 10) / 10
