@@ -2,6 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { CustomerAuthProvider } from './lib/customerAuth';
 import LoginPage from './pages/LoginPage';
+import LandingPage from './pages/LandingPage';
+import OnboardingPage from './pages/OnboardingPage';
+import AdminPage from './pages/AdminPage';
 import Layout from './components/Layout';
 import OperatorLayout from './components/OperatorLayout';
 import DashboardPage from './pages/DashboardPage';
@@ -30,10 +33,18 @@ const Spinner = () => (
   </div>
 );
 
+function HomeRoute() {
+  const { user, loading, isOperator } = useAuth();
+  if (loading) return <Spinner />;
+  if (user && isOperator) return <Navigate to="/op/pedidos" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
+  return <LandingPage />;
+}
+
 function OwnerRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isOperator } = useAuth();
   if (loading) return <Spinner />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/" replace />;
   if (isOperator) return <Navigate to="/op/pedidos" replace />;
   return <>{children}</>;
 }
@@ -41,7 +52,7 @@ function OwnerRoute({ children }: { children: React.ReactNode }) {
 function OperatorRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isOperator } = useAuth();
   if (loading) return <Spinner />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/" replace />;
   if (!isOperator) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
@@ -59,24 +70,31 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          {/* Landing / home */}
+          <Route path="/" element={<HomeRoute />} />
+
+          {/* Auth */}
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
 
-          {/* Owner routes */}
-          <Route path="/" element={<OwnerRoute><Layout /></OwnerRoute>}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="menu" element={<MenuPage />} />
-            <Route path="categories" element={<CategoriesPage />} />
-            <Route path="orders" element={<OrdersPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="reviews" element={<ReviewsPage />} />
-            <Route path="coupons" element={<CouponsPage />} />
-            <Route path="tables" element={<TablesPage />} />
-            <Route path="comandas" element={<ComandasPage />} />
-            <Route path="drivers" element={<DriversPage />} />
-            <Route path="operators" element={<OperatorsPage />} />
-            <Route path="qrcode" element={<QRCodePage />} />
-            <Route path="settings" element={<SettingsPage />} />
+          {/* Onboarding (owner auth required, no sidebar) */}
+          <Route path="/onboarding" element={<OwnerRoute><OnboardingPage /></OwnerRoute>} />
+
+          {/* Owner routes (with sidebar Layout) */}
+          <Route element={<OwnerRoute><Layout /></OwnerRoute>}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/menu" element={<MenuPage />} />
+            <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/reviews" element={<ReviewsPage />} />
+            <Route path="/coupons" element={<CouponsPage />} />
+            <Route path="/tables" element={<TablesPage />} />
+            <Route path="/comandas" element={<ComandasPage />} />
+            <Route path="/drivers" element={<DriversPage />} />
+            <Route path="/operators" element={<OperatorsPage />} />
+            <Route path="/qrcode" element={<QRCodePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Route>
 
           {/* Operator routes */}

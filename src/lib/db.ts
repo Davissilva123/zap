@@ -73,6 +73,12 @@ export const db = {
     }, { onConflict: 'user_id', ignoreDuplicates: true });
   },
 
+  async getAllRestaurants(): Promise<RestaurantSettings[]> {
+    const { data, error } = await supabase.rpc('get_all_restaurants');
+    if (error) throw error;
+    return (data as SettingsRow[] || []).map(toSettings);
+  },
+
   async getSettings(userId: string): Promise<RestaurantSettings | null> {
     const { data, error } = await supabase.from('restaurant_settings').select('*').eq('user_id', userId).maybeSingle();
     if (error) { console.error('[db.getSettings]', error); return null; }
