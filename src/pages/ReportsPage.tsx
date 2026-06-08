@@ -173,7 +173,7 @@ export default function ReportsPage() {
             ))}
             <button onClick={() => setRange('custom')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${range === 'custom' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
-              Custom
+              Personalizado
             </button>
           </div>
           {range === 'custom' && (

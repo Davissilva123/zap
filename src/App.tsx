@@ -31,6 +31,7 @@ import AdminRestaurantsPage from './pages/admin/RestaurantsPage';
 import AdminPlansPage from './pages/admin/PlansPage';
 import AdminAnalyticsPage from './pages/admin/AnalyticsPage';
 import AdminRestaurantDetailPage from './pages/admin/RestaurantDetailPage';
+import AdminCobrancasPage from './pages/admin/CobrancasPage';
 
 const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
@@ -103,6 +104,7 @@ export default function App() {
             <Route path="restaurantes" element={<AdminRestaurantsPage />} />
             <Route path="restaurantes/:userId" element={<AdminRestaurantDetailPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
+            <Route path="cobrancas" element={<AdminCobrancasPage />} />
             <Route path="planos" element={<AdminPlansPage />} />
           </Route>
 

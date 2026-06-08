@@ -273,7 +273,7 @@ export default function KitchenPage() {
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${autoPrint ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-slate-100 border-slate-200 text-slate-400'}`}
           >
             <Printer className="w-3.5 h-3.5" />
-            {autoPrint ? 'Auto-print ON' : 'Auto-print'}
+            {autoPrint ? 'Auto-imprimir ON' : 'Auto-imprimir'}
           </button>
           <div className="flex items-center gap-1.5 text-xs text-slate-400">
             <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />

@@ -34,6 +34,8 @@ export default function AdminDashboardPage() {
         db.getPlatformStats().catch(() => null),
       ]);
       setMrr(m); setStats(s); setPlatform(p);
+      // Executa auto-bloqueio por inadimplência (silencioso)
+      db.autoBlockOverdueRestaurants().catch(() => {});
     } catch (e: any) { setError(e?.message ?? 'Erro'); }
     finally { setLoading(false); }
   };

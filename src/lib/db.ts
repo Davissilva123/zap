@@ -757,6 +757,67 @@ export const db = {
     }));
   },
 
+  // ---- Admin: Cobranças e Bloqueio Automático ----
+  async getOverdueRestaurants(): Promise<Array<{
+    userId: string; restaurantName: string; ownerEmail: string; ownerPhone: string;
+    planName: string; planPrice: number; status: string; overdueSince: string | null;
+    daysOverdue: number; daysUntilAutoBlock: number; reminderCount: number;
+    lastReminderAt: string | null; blocked: boolean;
+  }>> {
+    const { data, error } = await supabase.rpc('get_overdue_restaurants');
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      userId: r.user_id,
+      restaurantName: r.restaurant_name,
+      ownerEmail: r.owner_email,
+      ownerPhone: r.owner_phone ?? '',
+      planName: r.plan_name,
+      planPrice: Number(r.plan_price ?? 0),
+      status: r.status,
+      overdueSince: r.overdue_since ?? null,
+      daysOverdue: Number(r.days_overdue ?? 0),
+      daysUntilAutoBlock: Number(r.days_until_auto_block ?? 15),
+      reminderCount: Number(r.reminder_count ?? 0),
+      lastReminderAt: r.last_reminder_at ?? null,
+      blocked: r.blocked ?? false,
+    }));
+  },
+
+  async autoBlockOverdueRestaurants(): Promise<number> {
+    const { data, error } = await supabase.rpc('auto_block_overdue_restaurants');
+    if (error) throw error;
+    return Number(data ?? 0);
+  },
+
+  async markPaymentReceived(userId: string, notes?: string): Promise<void> {
+    const { error } = await supabase.rpc('mark_payment_received', {
+      p_user_id: userId,
+      p_notes: notes ?? null,
+    });
+    if (error) throw error;
+  },
+
+  async logBillingReminder(userId: string, message?: string, channel = 'email'): Promise<void> {
+    const { error } = await supabase.rpc('log_billing_reminder', {
+      p_user_id: userId,
+      p_message: message ?? null,
+      p_channel: channel,
+    });
+    if (error) throw error;
+  },
+
+  async getBillingSummary(): Promise<{ totalOverdue: number; totalOverdueAmount: number; criticalCount: number; autoBlockedToday: number }> {
+    const { data, error } = await supabase.rpc('get_billing_summary');
+    if (error) throw error;
+    const r = (data as any[])?.[0] ?? {};
+    return {
+      totalOverdue: Number(r.total_overdue ?? 0),
+      totalOverdueAmount: Number(r.total_overdue_amount ?? 0),
+      criticalCount: Number(r.critical_count ?? 0),
+      autoBlockedToday: Number(r.auto_blocked_today ?? 0),
+    };
+  },
+
   // ---- Driver Portal (sem auth, via access_token) ----
   async getDriverByToken(token: string): Promise<{ id: string; name: string; phone: string } | null> {
     const { data, error } = await supabase.rpc('get_driver_by_token', { p_token: token });
