@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { db } from '../../lib/db';
 import {
   AlertTriangle, RefreshCw, Mail, CheckCircle, Ban, Clock,
-  DollarSign, Zap, Phone, ChevronDown, ChevronUp, Send,
+  DollarSign, Zap, Phone, ChevronDown, ChevronUp, MessageCircle,
 } from 'lucide-react';
 
 type Overdue = Awaited<ReturnType<typeof db.getOverdueRestaurants>>[number];
@@ -23,16 +23,25 @@ function urgencyColor(daysOverdue: number, blocked: boolean) {
   return { bar: 'bg-amber-400', badge: 'bg-amber-100 text-amber-700', row: '' };
 }
 
-function EmailTemplate(restaurantName: string, planName: string, planPrice: number, daysOverdue: number) {
-  return encodeURIComponent(
-    `Olá, tudo bem?\n\n` +
-    `Notamos que sua assinatura do ZapMenu (Plano ${planName} - ${R(planPrice)}/mês) está ` +
-    `com ${daysOverdue} dia${daysOverdue !== 1 ? 's' : ''} de atraso.\n\n` +
-    `Para continuar usando o ZapMenu sem interrupções, por favor regularize seu pagamento o quanto antes.\n\n` +
-    `⚠️ Atenção: após 15 dias de atraso, o cardápio online é bloqueado automaticamente.\n\n` +
-    `Em caso de dúvidas, responda este e-mail ou entre em contato diretamente.\n\n` +
-    `Atenciosamente,\nEquipe ZapMenu`
-  );
+function whatsAppPhone(raw: string | null): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return null;
+  // Se já começar com 55 e tiver 12-13 dígitos, usa como está
+  if (digits.startsWith('55') && digits.length >= 12) return digits;
+  // Se tiver 10-11 dígitos (DDD + número), adiciona 55
+  if (digits.length >= 10) return '55' + digits;
+  return null;
+}
+
+function WhatsAppTemplate(restaurantName: string, planName: string, planPrice: number, daysOverdue: number): string {
+  const msg =
+    `Olá! 👋 Aqui é a equipe ZapMenu.\n\n` +
+    `Identificamos que a assinatura do *${restaurantName}* (Plano *${planName}* - *${R(planPrice)}/mês*) está com *${daysOverdue} dia${daysOverdue !== 1 ? 's' : ''} de atraso*.\n\n` +
+    `Para não ter seu cardápio online bloqueado, regularize o pagamento o quanto antes.\n\n` +
+    `⚠️ *Atenção:* após 15 dias de inadimplência o cardápio é bloqueado automaticamente.\n\n` +
+    `Qualquer dúvida, pode responder aqui! 😊`;
+  return encodeURIComponent(msg);
 }
 
 export default function AdminCobrancasPage() {
@@ -96,8 +105,8 @@ export default function AdminCobrancasPage() {
     }
   };
 
-  const handleLogReminder = async (userId: string, email: string, name: string, planName: string, planPrice: number, daysOverdue: number) => {
-    await db.logBillingReminder(userId, `E-mail de cobrança enviado para ${email}`, 'email').catch(() => {});
+  const handleLogReminder = async (userId: string, phone: string) => {
+    await db.logBillingReminder(userId, `Mensagem de cobrança enviada via WhatsApp para ${phone}`, 'whatsapp').catch(() => {});
     await load();
   };
 
@@ -300,17 +309,29 @@ export default function AdminCobrancasPage() {
 
                       {/* Actions */}
                       <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                        {/* Enviar cobrança por email */}
-                        {!r.blocked && (
-                          <a
-                            href={`mailto:${r.ownerEmail}?subject=ZapMenu — Fatura em aberto (${r.daysOverdue} dias)&body=${EmailTemplate(r.restaurantName, r.planName, r.planPrice, r.daysOverdue)}`}
-                            onClick={() => handleLogReminder(r.userId, r.ownerEmail, r.restaurantName, r.planName, r.planPrice, r.daysOverdue)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-semibold transition-colors"
-                            title="Enviar cobrança por email"
-                          >
-                            <Send className="w-3.5 h-3.5" /> Cobrar
-                          </a>
-                        )}
+                        {/* Enviar cobrança por WhatsApp */}
+                        {!r.blocked && (() => {
+                          const waPhone = whatsAppPhone(r.ownerPhone);
+                          return waPhone ? (
+                            <a
+                              href={`https://wa.me/${waPhone}?text=${WhatsAppTemplate(r.restaurantName, r.planName, r.planPrice, r.daysOverdue)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => handleLogReminder(r.userId, r.ownerPhone!)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-xl text-xs font-semibold transition-colors"
+                              title="Enviar cobrança via WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" /> Cobrar
+                            </a>
+                          ) : (
+                            <span
+                              title="Telefone não cadastrado — adicione o número nas configurações do restaurante"
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-400 rounded-xl text-xs font-semibold cursor-not-allowed"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" /> Cobrar
+                            </span>
+                          );
+                        })()}
 
                         {/* Confirmar pagamento */}
                         <button
@@ -355,12 +376,12 @@ export default function AdminCobrancasPage() {
                         </span>
                       </div>
 
-                      {/* Template de email de cobrança */}
+                      {/* Preview da mensagem WhatsApp */}
                       {!r.blocked && (
                         <details className="mt-2">
-                          <summary className="text-xs text-violet-600 cursor-pointer hover:underline font-medium">Ver template do e-mail de cobrança</summary>
-                          <div className="mt-2 p-3 bg-slate-50 rounded-xl text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed max-h-40 overflow-y-auto">
-                            {decodeURIComponent(EmailTemplate(r.restaurantName, r.planName, r.planPrice, r.daysOverdue))}
+                          <summary className="text-xs text-green-600 cursor-pointer hover:underline font-medium">Ver mensagem do WhatsApp</summary>
+                          <div className="mt-2 p-3 bg-green-50 rounded-xl text-xs text-slate-700 whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto border border-green-100">
+                            {decodeURIComponent(WhatsAppTemplate(r.restaurantName, r.planName, r.planPrice, r.daysOverdue))}
                           </div>
                         </details>
                       )}
