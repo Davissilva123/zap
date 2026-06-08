@@ -133,7 +133,7 @@ BEGIN
     overdue_since = NULL
   WHERE user_id = p_user_id;
 
-  UPDATE restaurant_settings SET is_blocked = FALSE WHERE user_id = p_user_id;
+  UPDATE restaurant_settings SET blocked = false, blocked_reason = NULL WHERE user_id = p_user_id;
 
   RETURN v_id;
 END;
