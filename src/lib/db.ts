@@ -889,6 +889,39 @@ export const db = {
     return json.url as string;
   },
 
+  // ---- PIX Settings ----
+  async getPixSettings(): Promise<{ pixKey: string; pixKeyType: string; pixBeneficiary: string }> {
+    const { data } = await supabase.rpc('get_pix_settings');
+    const r = (data as any[])?.[0] ?? {};
+    return { pixKey: r.pix_key ?? '', pixKeyType: r.pix_key_type ?? 'cpf', pixBeneficiary: r.pix_beneficiary ?? 'ZapMenu' };
+  },
+
+  async setPixSettings(pixKey: string, pixKeyType: string, pixBeneficiary: string): Promise<void> {
+    const { error } = await supabase.rpc('set_pix_settings', { p_key: pixKey, p_key_type: pixKeyType, p_beneficiary: pixBeneficiary });
+    if (error) throw error;
+  },
+
+  // ---- Payment History (admin) ----
+  async getRestaurantPaymentHistory(userId: string): Promise<Array<{
+    id: string; amount: number; method: string; status: string;
+    reference: string | null; notes: string | null; paidAt: string | null; dueAt: string | null; createdAt: string;
+  }>> {
+    const { data, error } = await supabase.rpc('get_restaurant_payment_history', { p_user_id: userId });
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      id: r.id, amount: Number(r.amount), method: r.method, status: r.status,
+      reference: r.reference, notes: r.notes, paidAt: r.paid_at, dueAt: r.due_at, createdAt: r.created_at,
+    }));
+  },
+
+  async recordPayment(userId: string, amount: number, method = 'pix', notes?: string, reference?: string): Promise<void> {
+    const { error } = await supabase.rpc('record_payment', {
+      p_user_id: userId, p_amount: amount, p_method: method,
+      p_notes: notes ?? null, p_reference: reference ?? null,
+    });
+    if (error) throw error;
+  },
+
   // ---- Platform Plans (preços globais) ----
   async getPlatformPlanPrices(): Promise<Record<string, number>> {
     const { data, error } = await supabase.rpc('get_platform_plans');

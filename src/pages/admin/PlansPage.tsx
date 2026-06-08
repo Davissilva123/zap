@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from '../../lib/db';
-import { Check, X, Zap, Star, Crown, Plus, Trash2, Tag, CreditCard, RefreshCw } from 'lucide-react';
+import { Check, X, Zap, Star, Crown, Plus, Trash2, Tag, CreditCard, RefreshCw, Key } from 'lucide-react';
 
 const PLANS = [
   {
@@ -97,6 +97,42 @@ export default function AdminPlansPage() {
       setTrialError(e?.message ?? 'Erro ao salvar');
     } finally {
       setSavingTrial(false);
+    }
+  };
+
+  // PIX settings state
+  const [pixKey, setPixKey] = useState('');
+  const [pixKeyType, setPixKeyType] = useState('cpf');
+  const [pixBeneficiary, setPixBeneficiary] = useState('');
+  const [savingPix, setSavingPix] = useState(false);
+  const [pixSaved, setPixSaved] = useState(false);
+  const [pixError, setPixError] = useState('');
+
+  useEffect(() => {
+    db.getPixSettings().then(s => {
+      if (s) {
+        setPixKey(s.pixKey ?? '');
+        setPixKeyType(s.pixKeyType ?? 'cpf');
+        setPixBeneficiary(s.pixBeneficiary ?? '');
+      }
+    }).catch(() => {});
+  }, []);
+
+  const savePixSettings = async () => {
+    if (!pixKey.trim() || !pixBeneficiary.trim()) {
+      setPixError('Preencha a chave PIX e o beneficiário.');
+      return;
+    }
+    setSavingPix(true);
+    setPixError('');
+    try {
+      await db.setPixSettings(pixKey.trim(), pixKeyType, pixBeneficiary.trim());
+      setPixSaved(true);
+      setTimeout(() => setPixSaved(false), 2500);
+    } catch (e: any) {
+      setPixError(e?.message ?? 'Erro ao salvar');
+    } finally {
+      setSavingPix(false);
     }
   };
 
@@ -229,6 +265,61 @@ export default function AdminPlansPage() {
             <div>
               <p className="text-sm font-bold text-emerald-800">Trial de 7 dias grátis em todos os planos</p>
               <p className="text-xs text-emerald-700 mt-0.5">Após o trial, o cliente precisa confirmar o pagamento para continuar.</p>
+            </div>
+          </div>
+
+          {/* Configuração de PIX */}
+          <div className="card p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <Key className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-900">Chave PIX para pagamento manual</p>
+                <p className="text-xs text-slate-400 mt-0.5">Exibida para clientes que escolherem pagar via PIX (fora do Stripe).</p>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label className="label">Tipo de chave</label>
+                <select value={pixKeyType} onChange={e => setPixKeyType(e.target.value)} className="input text-sm">
+                  <option value="cpf">CPF</option>
+                  <option value="cnpj">CNPJ</option>
+                  <option value="email">E-mail</option>
+                  <option value="phone">Telefone</option>
+                  <option value="random">Chave aleatória</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Chave PIX</label>
+                <input
+                  value={pixKey}
+                  onChange={e => { setPixKey(e.target.value); setPixError(''); }}
+                  className="input text-sm font-mono"
+                  placeholder="000.000.000-00"
+                />
+              </div>
+              <div>
+                <label className="label">Nome do beneficiário</label>
+                <input
+                  value={pixBeneficiary}
+                  onChange={e => { setPixBeneficiary(e.target.value); setPixError(''); }}
+                  className="input text-sm"
+                  placeholder="ZapMenu"
+                />
+              </div>
+            </div>
+            {pixError && <p className="text-xs text-red-500">{pixError}</p>}
+            <div className="flex justify-end">
+              <button
+                onClick={savePixSettings}
+                disabled={savingPix}
+                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-bold rounded-xl transition-colors"
+              >
+                {savingPix
+                  ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : pixSaved ? <><Check className="w-3.5 h-3.5" /> Salvo</> : 'Salvar chave PIX'}
+              </button>
             </div>
           </div>
 

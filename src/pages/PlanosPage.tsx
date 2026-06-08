@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/db';
-import { Check, X, Zap, Star, Crown, Lock, ExternalLink } from 'lucide-react';
+import { Check, X, Zap, Star, Crown, Lock, ExternalLink, Copy, CheckCircle } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 
 const PLANS = [
@@ -67,10 +67,30 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [prices, setPrices] = useState<Record<string, number>>({ basic: 39, pro: 89, premium: 149 });
+  const [pixSettings, setPixSettings] = useState<{ pixKey: string; pixKeyType: string; pixBeneficiary: string } | null>(null);
+  const [showPixModal, setShowPixModal] = useState(false);
+  const [selectedPlanForPix, setSelectedPlanForPix] = useState<{ name: string; price: number } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     db.getPlatformPlanPrices().then(setPrices).catch(() => {});
+    db.getPixSettings().then(setPixSettings).catch(() => {});
   }, []);
+
+  const handleCopyPix = () => {
+    if (!pixSettings?.pixKey) return;
+    navigator.clipboard.writeText(pixSettings.pixKey).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
+  const openPixModal = (slug: string) => {
+    const price = prices[slug] ?? PLANS.find(p => p.slug === slug)?.price ?? 0;
+    const name = PLANS.find(p => p.slug === slug)?.name ?? slug;
+    setSelectedPlanForPix({ name, price });
+    setShowPixModal(true);
+  };
 
   const handleSubscribe = async (slug: string) => {
     setLoading(slug);
@@ -190,6 +210,17 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
                     'Assinar via WhatsApp'
                   )}
                 </button>
+
+                {/* Opção PIX manual */}
+                {pixSettings?.pixKey && (
+                  <button
+                    onClick={() => openPixModal(plan.slug)}
+                    disabled={!!loading}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 text-sm font-semibold rounded-xl transition-all mt-2"
+                  >
+                    <span className="text-base">⚡</span> Pagar via PIX
+                  </button>
+                )}
               </div>
             );
           })}
@@ -207,6 +238,59 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
           </button>
         </div>
       </div>
+
+      {/* Modal PIX */}
+      {showPixModal && selectedPlanForPix && pixSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowPixModal(false)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm z-10 p-6 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">⚡</span>
+            </div>
+            <h3 className="text-lg font-black text-slate-900 mb-1">Pagamento via PIX</h3>
+            <p className="text-sm text-slate-500 mb-1">
+              Plano <strong>{selectedPlanForPix.name}</strong>
+            </p>
+            <p className="text-2xl font-black text-emerald-600 mb-5">
+              R$ {selectedPlanForPix.price.toFixed(2).replace('.', ',')}
+            </p>
+
+            <div className="bg-slate-50 rounded-2xl p-4 mb-4 text-left space-y-2">
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Beneficiário</p>
+                <p className="text-sm font-bold text-slate-800">{pixSettings.pixBeneficiary}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 mb-0.5">Chave PIX ({pixSettings.pixKeyType.toUpperCase()})</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-mono font-semibold text-slate-800 flex-1 break-all">{pixSettings.pixKey}</p>
+                  <button
+                    onClick={handleCopyPix}
+                    className={`flex-shrink-0 p-1.5 rounded-lg transition-colors ${copied ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 hover:bg-slate-300 text-slate-600'}`}
+                    title="Copiar chave PIX"
+                  >
+                    {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-5 text-left">
+              <p className="text-xs text-amber-800 font-semibold mb-1">Após fazer o PIX:</p>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                Envie o comprovante para nosso WhatsApp. Seu acesso será liberado em até 1 hora útil.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowPixModal(false)}
+              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors text-sm"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

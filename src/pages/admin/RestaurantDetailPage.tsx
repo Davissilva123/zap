@@ -4,11 +4,13 @@ import { db } from '../../lib/db';
 import {
   ArrowLeft, Store, ShoppingBag, DollarSign, Phone, MapPin,
   FileText, Plus, Trash2, Settings, RefreshCw, Mail, AlertTriangle, Clock,
+  CheckCircle, XCircle, Wallet,
 } from 'lucide-react';
 
 type Detail = Awaited<ReturnType<typeof db.getRestaurantDetailAdmin>>;
 type Order = { id: string; status: string; total: number; customerName: string; deliveryType: string; paymentMethod: string; createdAt: string };
 type Note = { id: string; note: string; createdBy: string; createdAt: string };
+type Payment = { id: string; amount: number; method: string; status: string; reference: string | null; notes: string | null; paid_at: string | null; due_at: string | null; created_at: string };
 
 const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
   PENDING:    { label: 'Pendente',   cls: 'bg-amber-50 text-amber-700' },
@@ -45,7 +47,12 @@ export default function RestaurantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [newNote, setNewNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
-  const [tab, setTab] = useState<'overview' | 'orders' | 'flags' | 'notes'>('overview');
+  const [tab, setTab] = useState<'overview' | 'orders' | 'flags' | 'notes' | 'payments'>('overview');
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [showRecordModal, setShowRecordModal] = useState(false);
+  const [recordForm, setRecordForm] = useState({ amount: '', method: 'pix', notes: '', reference: '' });
+  const [recordingPayment, setRecordingPayment] = useState(false);
 
   const load = async () => {
     if (!userId) return;
@@ -64,6 +71,31 @@ export default function RestaurantDetailPage() {
   };
 
   useEffect(() => { load(); }, [userId]);
+
+  const loadPayments = async () => {
+    if (!userId) return;
+    setLoadingPayments(true);
+    try { setPayments((await db.getRestaurantPaymentHistory(userId).catch(() => [])) as Payment[]); }
+    finally { setLoadingPayments(false); }
+  };
+
+  useEffect(() => { if (tab === 'payments') loadPayments(); }, [tab]);
+
+  const handleRecordPayment = async () => {
+    if (!userId || !recordForm.amount) return;
+    setRecordingPayment(true);
+    try {
+      await db.recordPayment(userId, Number(recordForm.amount), recordForm.method, recordForm.notes || null, recordForm.reference || null);
+      setShowRecordModal(false);
+      setRecordForm({ amount: '', method: 'pix', notes: '', reference: '' });
+      await loadPayments();
+      await load();
+    } catch (e: any) {
+      alert(e?.message ?? 'Erro ao registrar pagamento');
+    } finally {
+      setRecordingPayment(false);
+    }
+  };
 
   const handleAddNote = async () => {
     if (!userId || !newNote.trim()) return;
@@ -161,7 +193,7 @@ export default function RestaurantDetailPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit overflow-x-auto">
-        {([['overview', 'Visão geral'], ['orders', 'Pedidos'], ['flags', 'Feature flags'], ['notes', 'Notas']] as const).map(([key, label]) => (
+        {([['overview', 'Visão geral'], ['orders', 'Pedidos'], ['payments', 'Pagamentos'], ['flags', 'Feature flags'], ['notes', 'Notas']] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -312,6 +344,141 @@ export default function RestaurantDetailPage() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* ---- PAGAMENTOS ---- */}
+      {tab === 'payments' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">Histórico de pagamentos</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Pagamentos manuais registrados pelo admin</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={loadPayments} className="btn-secondary" disabled={loadingPayments}>
+                <RefreshCw className={`w-4 h-4 ${loadingPayments ? 'animate-spin' : ''}`} />
+              </button>
+              <button onClick={() => setShowRecordModal(true)} className="btn-primary text-xs">
+                <Plus className="w-3.5 h-3.5" /> Registrar pagamento
+              </button>
+            </div>
+          </div>
+
+          <div className="card overflow-hidden">
+            {loadingPayments ? (
+              <div className="p-10 flex items-center justify-center">
+                <div className="w-7 h-7 border-4 border-slate-200 border-t-violet-500 rounded-full animate-spin" />
+              </div>
+            ) : payments.length === 0 ? (
+              <div className="p-8 text-center">
+                <Wallet className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                <p className="text-slate-400 text-sm">Nenhum pagamento registrado</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {payments.map(p => {
+                  const isPaid = p.status === 'paid';
+                  const isOverdue = p.status === 'overdue';
+                  return (
+                    <div key={p.id} className="px-5 py-3.5 flex items-center gap-3">
+                      <div className="flex-shrink-0">
+                        {isPaid
+                          ? <CheckCircle className="w-5 h-5 text-emerald-500" />
+                          : isOverdue
+                          ? <XCircle className="w-5 h-5 text-red-400" />
+                          : <Clock className="w-5 h-5 text-amber-400" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-slate-900">{R(p.amount)}</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            isPaid ? 'bg-emerald-50 text-emerald-700' : isOverdue ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+                          }`}>
+                            {isPaid ? 'Pago' : isOverdue ? 'Vencido' : 'Pendente'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 capitalize">{p.method.toUpperCase()}</span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {p.paid_at
+                            ? `Pago em ${new Date(p.paid_at).toLocaleDateString('pt-BR')}`
+                            : p.due_at
+                            ? `Vence ${new Date(p.due_at).toLocaleDateString('pt-BR')}`
+                            : `Registrado ${new Date(p.created_at).toLocaleDateString('pt-BR')}`}
+                          {p.reference && ` · Ref: ${p.reference}`}
+                        </p>
+                        {p.notes && <p className="text-xs text-slate-500 mt-0.5 italic">{p.notes}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Modal: Registrar pagamento */}
+          {showRecordModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowRecordModal(false)} />
+              <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm z-10 p-6">
+                <h3 className="text-base font-black text-slate-900 mb-4">Registrar pagamento</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="label">Valor (R$)</label>
+                    <input
+                      type="number"
+                      value={recordForm.amount}
+                      onChange={e => setRecordForm(f => ({ ...f, amount: e.target.value }))}
+                      className="input"
+                      placeholder="89.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Forma de pagamento</label>
+                    <select
+                      value={recordForm.method}
+                      onChange={e => setRecordForm(f => ({ ...f, method: e.target.value }))}
+                      className="input"
+                    >
+                      <option value="pix">PIX</option>
+                      <option value="card">Cartão</option>
+                      <option value="boleto">Boleto</option>
+                      <option value="manual">Outro (manual)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Referência (mês, número do pedido…)</label>
+                    <input
+                      value={recordForm.reference}
+                      onChange={e => setRecordForm(f => ({ ...f, reference: e.target.value }))}
+                      className="input"
+                      placeholder="2026-06"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Observações (opcional)</label>
+                    <textarea
+                      value={recordForm.notes}
+                      onChange={e => setRecordForm(f => ({ ...f, notes: e.target.value }))}
+                      rows={2}
+                      className="input resize-none"
+                      placeholder="Comprovante recebido via WhatsApp"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-5">
+                  <button onClick={() => setShowRecordModal(false)} className="btn-secondary flex-1">Cancelar</button>
+                  <button
+                    onClick={handleRecordPayment}
+                    disabled={recordingPayment || !recordForm.amount}
+                    className="btn-primary flex-1"
+                  >
+                    {recordingPayment ? 'Registrando...' : 'Confirmar pago'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
