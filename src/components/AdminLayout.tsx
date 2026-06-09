@@ -1,18 +1,22 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { LayoutDashboard, Store, CreditCard, LogOut, Shield, Menu, X, BarChart2, Bell, AlertCircle, Globe } from 'lucide-react';
+import { AdminContext } from '../lib/adminContext';
+import { LayoutDashboard, Store, CreditCard, LogOut, Shield, Menu, X, BarChart2, Bell, AlertCircle, Globe, Users } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 
 type Notification = { id: string; type: string; title: string; body: string | null; userId: string | null; read: boolean; createdAt: string };
 
-const navItems = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/restaurantes', icon: Store, label: 'Restaurantes' },
-  { to: '/admin/analytics', icon: BarChart2, label: 'Analytics' },
-  { to: '/admin/cobrancas', icon: AlertCircle, label: 'Cobranças' },
-  { to: '/admin/planos', icon: CreditCard, label: 'Planos & Cupons' },
-  { to: '/admin/marketing', icon: Globe, label: 'Pág. Marketing' },
+const RESTRICTED_FOR_LIMITED = new Set(['/admin/cobrancas', '/admin/planos', '/admin/marketing']);
+
+const ALL_NAV_ITEMS = [
+  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, superOnly: false },
+  { to: '/admin/restaurantes', icon: Store, label: 'Restaurantes', end: false, superOnly: false },
+  { to: '/admin/analytics', icon: BarChart2, label: 'Analytics', end: false, superOnly: false },
+  { to: '/admin/cobrancas', icon: AlertCircle, label: 'Cobranças', end: false, superOnly: false },
+  { to: '/admin/planos', icon: CreditCard, label: 'Planos & Cupons', end: false, superOnly: false },
+  { to: '/admin/marketing', icon: Globe, label: 'Pág. Marketing', end: false, superOnly: false },
+  { to: '/admin/equipe', icon: Users, label: 'Equipe', end: false, superOnly: true },
 ];
 
 const TYPE_ICONS: Record<string, string> = {
@@ -132,11 +136,20 @@ function NotificationBell() {
 }
 
 export default function AdminLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, adminRole } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = async () => { await logout(); navigate('/'); };
+
+  const isSuperAdmin = adminRole === 'super';
+  const visibleNavItems = ALL_NAV_ITEMS.filter(item => {
+    if (item.superOnly && !isSuperAdmin) return false;
+    if (adminRole === 'limited' && RESTRICTED_FOR_LIMITED.has(item.to)) return false;
+    return true;
+  });
+
+  const roleBadge = isSuperAdmin ? 'Super Admin' : adminRole === 'full' ? 'Acesso Total' : 'Limitado';
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150 ${
@@ -154,7 +167,7 @@ export default function AdminLayout() {
             <Shield className="w-[18px] h-[18px] text-white" />
           </div>
           <div>
-            <p className="text-white font-bold text-[15px] tracking-tight leading-none">Super Admin</p>
+            <p className="text-white font-bold text-[15px] tracking-tight leading-none">Admin Panel</p>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="w-1.5 h-1.5 rounded-full bg-violet-400 block" />
               <span className="text-[10px] text-violet-400/70 font-medium">ZapMenu</span>
@@ -166,7 +179,7 @@ export default function AdminLayout() {
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         <p className="px-3 text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">Painel</p>
-        {navItems.map(item => (
+        {visibleNavItems.map(item => (
           <NavLink key={item.to} to={item.to} end={item.end} className={linkClass} onClick={() => setMobileOpen(false)}>
             <item.icon className="w-[17px] h-[17px] flex-shrink-0" strokeWidth={1.75} />
             <span>{item.label}</span>
@@ -179,7 +192,7 @@ export default function AdminLayout() {
         <div className="px-3 py-2.5">
           <p className="text-slate-300 text-[12px] font-semibold truncate">{user?.email}</p>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 mt-1 inline-block">
-            Super Admin
+            {roleBadge}
           </span>
         </div>
         <button
@@ -194,6 +207,7 @@ export default function AdminLayout() {
   );
 
   return (
+    <AdminContext.Provider value={adminRole}>
     <div className="min-h-screen bg-slate-100 flex">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-[220px] bg-[#0d0d1a] fixed inset-y-0 border-r border-white/[0.04]">
@@ -221,7 +235,7 @@ export default function AdminLayout() {
             <div className="w-7 h-7 rounded-lg bg-violet-600 flex items-center justify-center">
               <Shield className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-bold text-white text-sm tracking-tight">Super Admin</span>
+            <span className="font-bold text-white text-sm tracking-tight">Admin Panel</span>
           </div>
           <NotificationBell />
           <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-white/5 text-slate-400">
@@ -239,5 +253,6 @@ export default function AdminLayout() {
         </main>
       </div>
     </div>
+    </AdminContext.Provider>
   );
 }

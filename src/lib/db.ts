@@ -1067,4 +1067,39 @@ export const db = {
       }, { onConflict: 'id' });
     if (error) throw error;
   },
+
+  // --- Admin Team ---
+
+  async getAdminTeam(): Promise<Array<{ id: string; email: string; name: string; role: string; active: boolean; createdAt: string }>> {
+    const { data, error } = await supabase.rpc('get_admin_team');
+    if (error || !data) return [];
+    return (data as any[]).map(r => ({
+      id: r.id,
+      email: r.email,
+      name: r.name,
+      role: r.role,
+      active: r.active,
+      createdAt: r.created_at,
+    }));
+  },
+
+  async upsertAdminTeamMember(email: string, name: string, role: string): Promise<void> {
+    const { error } = await supabase.rpc('upsert_admin_team_member', { p_email: email, p_name: name, p_role: role });
+    if (error) throw error;
+  },
+
+  async toggleAdminTeamMember(email: string): Promise<void> {
+    const { error } = await supabase.rpc('toggle_admin_team_member', { p_email: email });
+    if (error) throw error;
+  },
+
+  async deleteAdminTeamMember(email: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_admin_team_member', { p_email: email });
+    if (error) throw error;
+  },
+
+  async getSuperAdminUserId(): Promise<string | null> {
+    const { data } = await supabase.rpc('get_super_admin_user_id');
+    return (data as string | null) ?? null;
+  },
 };

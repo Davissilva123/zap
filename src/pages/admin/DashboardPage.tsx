@@ -24,15 +24,18 @@ export default function AdminDashboardPage() {
   const [platform, setPlatform] = useState<{ totalOrders: number; totalRevenue: number; ordersToday: number; revenueToday: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [superAdminId, setSuperAdminId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const [m, s, p] = await Promise.all([
+      const [m, s, p, saId] = await Promise.all([
         db.getMrrStats().catch(() => null),
         db.getRestaurantStats().catch(() => []),
         db.getPlatformStats().catch(() => null),
+        db.getSuperAdminUserId().catch(() => null),
       ]);
+      setSuperAdminId(saId);
       setMrr(m); setStats(s); setPlatform(p);
       // Executa auto-bloqueio por inadimplência (silencioso)
       db.autoBlockOverdueRestaurants().catch(() => {});
@@ -48,7 +51,8 @@ export default function AdminDashboardPage() {
       : 0
     : 0;
 
-  const topRestaurants = [...stats].sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, 5);
+  const filteredStats = superAdminId ? stats.filter(s => s.userId !== superAdminId) : stats;
+  const topRestaurants = [...filteredStats].sort((a, b) => b.totalRevenue - a.totalRevenue).slice(0, 5);
 
   return (
     <div className="space-y-6 animate-fade-in">

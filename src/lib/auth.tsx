@@ -11,11 +11,14 @@ export interface OperatorInfo {
   operatorName: string;
 }
 
+export type AdminRole = 'super' | 'full' | 'limited' | null;
+
 interface AuthCtx {
   user: User | null;
   loading: boolean;
   isOperator: boolean;
   operatorInfo: OperatorInfo | null;
+  adminRole: AdminRole;
   login: (email: string, password: string) => Promise<string | null>;
   register: (name: string, email: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
@@ -40,7 +43,15 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   ]);
 }
 
-async function detectAndSetup(su: SupabaseUser): Promise<{ isOperator: boolean; operatorInfo: OperatorInfo | null }> {
+const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com').toLowerCase();
+
+async function detectAndSetup(su: SupabaseUser): Promise<{ isOperator: boolean; operatorInfo: OperatorInfo | null; adminRole: AdminRole }> {
+  // Super admin — never creates restaurant settings
+  if ((su.email ?? '').toLowerCase() === SUPER_ADMIN_EMAIL) {
+    return { isOperator: false, operatorInfo: null, adminRole: 'super' };
+  }
+
+  // Operator (garçom, caixa, cozinha)
   const opInfo = await db.getOperatorByEmail(su.email ?? '');
   if (opInfo) {
     await supabase
@@ -48,13 +59,23 @@ async function detectAndSetup(su: SupabaseUser): Promise<{ isOperator: boolean; 
       .update({ user_id: su.id })
       .eq('email', (su.email ?? '').toLowerCase())
       .is('user_id', null);
-    return { isOperator: true, operatorInfo: opInfo };
+    return { isOperator: true, operatorInfo: opInfo, adminRole: null };
   }
+
+  // Admin team member
+  const { data: roleData } = await supabase.rpc('get_my_admin_role', { p_email: su.email ?? '' });
+  if (roleData) {
+    return { isOperator: false, operatorInfo: null, adminRole: roleData as 'full' | 'limited' };
+  }
+
+  // Regular restaurant owner
   await db.ensureSettings(su.id, (su.user_metadata?.name as string) ?? su.email ?? '');
-  return { isOperator: false, operatorInfo: null };
+  return { isOperator: false, operatorInfo: null, adminRole: null };
 }
 
-const FALLBACK = { isOperator: false, operatorInfo: null };
+const FALLBACK: { isOperator: boolean; operatorInfo: OperatorInfo | null; adminRole: AdminRole } = {
+  isOperator: false, operatorInfo: null, adminRole: null,
+};
 
 async function safeDetectAndSetup(su: SupabaseUser) {
   try {
@@ -70,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isOperator, setIsOperator] = useState(false);
   const [operatorInfo, setOperatorInfo] = useState<OperatorInfo | null>(null);
+  const [adminRole, setAdminRole] = useState<AdminRole>(null);
 
   useEffect(() => {
     // Safety net: always clear loading after 8s no matter what
@@ -79,9 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) console.error('[Auth] getSession error:', error);
       if (session?.user) {
         const u = toUser(session.user);
-        const { isOperator: op, operatorInfo: opInfo } = await safeDetectAndSetup(session.user);
+        const { isOperator: op, operatorInfo: opInfo, adminRole: ar } = await safeDetectAndSetup(session.user);
         setIsOperator(op);
         setOperatorInfo(opInfo);
+        setAdminRole(ar);
         setUser(u);
       }
       clearTimeout(safetyTimer);
@@ -97,14 +120,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
           const u = toUser(session.user);
-          const { isOperator: op, operatorInfo: opInfo } = await safeDetectAndSetup(session.user);
+          const { isOperator: op, operatorInfo: opInfo, adminRole: ar } = await safeDetectAndSetup(session.user);
           setIsOperator(op);
           setOperatorInfo(opInfo);
+          setAdminRole(ar);
           setUser(u);
         } else {
           setUser(null);
           setIsOperator(false);
           setOperatorInfo(null);
+          setAdminRole(null);
         }
       });
       subscription = data.subscription;
@@ -150,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isOperator, operatorInfo, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, isOperator, operatorInfo, adminRole, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

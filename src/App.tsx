@@ -53,6 +53,7 @@ import AdminAnalyticsPage from './pages/admin/AnalyticsPage';
 import AdminRestaurantDetailPage from './pages/admin/RestaurantDetailPage';
 import AdminCobrancasPage from './pages/admin/CobrancasPage';
 import AdminMarketingPage from './pages/admin/MarketingPage';
+import AdminTeamPage from './pages/admin/TeamPage';
 import PlanosPage from './pages/PlanosPage';
 import UpgradePage from './pages/UpgradePage';
 
@@ -65,23 +66,22 @@ const Spinner = () => (
 );
 
 function HomeRoute() {
-  const { user, loading, isOperator } = useAuth();
+  const { user, loading, isOperator, adminRole } = useAuth();
   if (loading) return <Spinner />;
   if (user && isOperator) return <Navigate to="/op/pedidos" replace />;
   if (user) {
-    const isSuperAdmin = user.email === SUPER_ADMIN_EMAIL;
-    return <Navigate to={isSuperAdmin ? '/admin' : '/dashboard'} replace />;
+    if (adminRole) return <Navigate to="/admin" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
   return <LandingPage />;
 }
 
 function OwnerRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, isOperator } = useAuth();
+  const { user, loading, isOperator, adminRole } = useAuth();
   if (loading) return <Spinner />;
   if (!user) return <Navigate to="/" replace />;
   if (isOperator) return <Navigate to="/op/pedidos" replace />;
-  // Super admin nunca usa rotas de dono — sempre vai para o painel admin
-  if (user.email === SUPER_ADMIN_EMAIL) return <Navigate to="/admin" replace />;
+  if (adminRole) return <Navigate to="/admin" replace />;
   return <>{children}</>;
 }
 
@@ -94,19 +94,19 @@ function OperatorRoute({ children }: { children: React.ReactNode }) {
 }
 
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, adminRole } = useAuth();
   if (loading) return <Spinner />;
   if (!user) return <Navigate to="/" replace />;
-  if (user.email !== SUPER_ADMIN_EMAIL) return <Navigate to="/dashboard" replace />;
+  if (!adminRole) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading, isOperator } = useAuth();
+  const { user, loading, isOperator, adminRole } = useAuth();
   if (loading) return <Spinner />;
   if (user && isOperator) return <Navigate to="/op/pedidos" replace />;
   if (user) {
-    if (user.email === SUPER_ADMIN_EMAIL) return <Navigate to="/admin" replace />;
+    if (adminRole) return <Navigate to="/admin" replace />;
     return <Navigate to="/dashboard" replace />;
   }
   return <>{children}</>;
@@ -139,6 +139,7 @@ export default function App() {
             <Route path="cobrancas" element={<AdminCobrancasPage />} />
             <Route path="planos" element={<AdminPlansPage />} />
             <Route path="marketing" element={<AdminMarketingPage />} />
+            <Route path="equipe" element={<AdminTeamPage />} />
           </Route>
 
           {/* Owner routes (with sidebar Layout) */}

@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../../lib/db';
+import { useAdminRole } from '../../lib/adminContext';
 import type { RestaurantSettings } from '../../lib/types';
 import {
   Store, RefreshCw, ExternalLink, Copy, Check, Search,
   ShoppingBag, DollarSign, Clock, ChevronDown, AlertTriangle,
   Ban, Unlock, Download, Mail, X, History, Eye, CreditCard,
 } from 'lucide-react';
+
+const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com').toLowerCase();
 
 type Stat = { userId: string; orderCount: number; totalRevenue: number; lastOrderAt: string | null };
 type Plan = {
@@ -61,6 +64,8 @@ const planColor = (slug: string) => {
 
 export default function AdminRestaurantsPage() {
   const navigate = useNavigate();
+  const adminRole = useAdminRole();
+  const canBlock = adminRole !== 'limited';
   const [restaurants, setRestaurants] = useState<RestaurantSettings[]>([]);
   const [stats, setStats] = useState<Stat[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -92,7 +97,13 @@ export default function AdminRestaurantsPage() {
         db.getRestaurantPlans().catch(() => []),
         db.getOwnerEmails().catch(() => []),
       ]);
-      setRestaurants(r); setStats(s); setPlans(p); setEmails(e);
+      // Exclude super admin from all views
+      const superAdminUserId = e.find((em: { userId: string; email: string }) => em.email.toLowerCase() === SUPER_ADMIN_EMAIL)?.userId;
+      const filteredR = superAdminUserId ? r.filter(x => x.userId !== superAdminUserId) : r;
+      const filteredS = superAdminUserId ? s.filter((x: any) => x.userId !== superAdminUserId) : s;
+      const filteredP = superAdminUserId ? p.filter((x: any) => x.userId !== superAdminUserId) : p;
+      const filteredE = superAdminUserId ? e.filter((x: any) => x.userId !== superAdminUserId) : e;
+      setRestaurants(filteredR); setStats(filteredS); setPlans(filteredP); setEmails(filteredE);
     } catch (e: any) { alert('Erro: ' + (e?.message ?? e)); }
     finally { setLoading(false); }
   };
@@ -365,8 +376,8 @@ export default function AdminRestaurantsPage() {
                           </div>
                         )}
 
-                        {/* Block / Unblock */}
-                        {isBlocked ? (
+                        {/* Block / Unblock — hidden for limited role */}
+                        {canBlock && (isBlocked ? (
                           <button onClick={() => handleUnblock(r.userId)} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs font-semibold transition-colors" title="Desbloquear">
                             <Unlock className="w-3.5 h-3.5" /> Desbloquear
                           </button>
@@ -374,7 +385,7 @@ export default function AdminRestaurantsPage() {
                           <button onClick={() => { setBlockTarget(r); setBlockReason(''); }} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors" title="Bloquear restaurante">
                             <Ban className="w-4 h-4 text-red-400" />
                           </button>
-                        )}
+                        ))}
 
                         {/* Detail page (impersonação) */}
                         <button onClick={() => navigate(`/admin/restaurantes/${r.userId}`)} className="p-1.5 rounded-lg hover:bg-violet-50 transition-colors" title="Ver detalhes / entrar como restaurante">
