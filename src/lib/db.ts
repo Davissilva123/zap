@@ -948,6 +948,21 @@ export const db = {
     }
   },
 
+  async cancelStripeSubscription(): Promise<{ cancelled: boolean }> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return { cancelled: false };
+    const supabaseUrl = (supabase as any).supabaseUrl as string;
+    const res = await fetch(`${supabaseUrl}/functions/v1/stripe-cancel-subscription`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? 'Erro ao cancelar assinatura');
+    return { cancelled: json.cancelled ?? false };
+  },
+
   async validateSubscriptionCoupon(code: string): Promise<{
     valid: boolean; discountType?: string; discountValue?: number; message?: string;
   }> {

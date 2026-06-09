@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(() => !new URLSearchParams(window.location.search).has('register'));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

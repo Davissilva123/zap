@@ -4,7 +4,8 @@ import { useAuth } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { RestaurantSettings, PaymentMethod } from '../lib/types';
-import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift } from 'lucide-react';
+import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift, Crown, XCircle, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { DeliveryNeighborhood, DayHours } from '../lib/types';
 
 const allPaymentMethods: PaymentMethod[] = ['pix', 'credit_card', 'debit_card', 'cash', 'meal_voucher'];
@@ -65,9 +66,16 @@ function ImageUploadField({ label, preview, onFileChange, onRemove, inputRef, hi
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [form, setForm] = useState<RestaurantSettings | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Plano
+  const [plan, setPlan] = useState<{ planName: string; status: string; nextBillingAt: string | null; daysRemaining: number } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [cancelError, setCancelError] = useState('');
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState('');
@@ -85,6 +93,9 @@ export default function SettingsPage() {
         setCoverPreview(s.coverUrl || '');
       }
     });
+    db.getMyPlan().then(p => {
+      if (p) setPlan({ planName: p.planName, status: p.status, nextBillingAt: p.nextBillingAt, daysRemaining: p.daysRemaining });
+    }).catch(() => {});
   }, [user]);
 
   if (!user || !form) return null;
@@ -434,6 +445,93 @@ export default function SettingsPage() {
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
         {saving ? 'Salvando...' : saved ? 'Salvo com sucesso!' : 'Salvar configurações'}
       </button>
+
+      {/* Seção Meu Plano */}
+      {plan && (
+        <SectionCard icon={Crown} title="Meu Plano" description="Informações da sua assinatura">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Plano atual</p>
+              <p className="font-bold text-slate-900 text-base capitalize">{plan.planName}</p>
+              <p className={`text-xs font-semibold mt-0.5 ${plan.status === 'active' ? 'text-emerald-600' : plan.status === 'trial' ? 'text-amber-600' : 'text-red-600'}`}>
+                {plan.status === 'active' ? 'Ativo' : plan.status === 'trial' ? 'Período de teste' : plan.status === 'cancelled' ? 'Cancelado' : plan.status}
+              </p>
+            </div>
+            {plan.nextBillingAt && (
+              <div className="text-right">
+                <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
+                  {plan.status === 'trial' ? 'Teste encerra em' : plan.status === 'cancelled' ? 'Acesso até' : 'Próxima cobrança'}
+                </p>
+                <p className="font-bold text-slate-900 text-sm">
+                  {new Date(plan.nextBillingAt).toLocaleDateString('pt-BR')}
+                </p>
+                {plan.daysRemaining > 0 && (
+                  <p className="text-xs text-slate-400 mt-0.5">{plan.daysRemaining} dia{plan.daysRemaining !== 1 ? 's' : ''} restante{plan.daysRemaining !== 1 ? 's' : ''}</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-100">
+            <button
+              onClick={() => navigate('/planos')}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all"
+            >
+              <ExternalLink className="w-4 h-4" />
+              {plan.status === 'trial' ? 'Assinar agora' : 'Mudar plano'}
+            </button>
+
+            {plan.status === 'active' && !cancelConfirm && (
+              <button
+                onClick={() => setCancelConfirm(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold rounded-xl transition-all"
+              >
+                <XCircle className="w-4 h-4" /> Cancelar assinatura
+              </button>
+            )}
+
+            {cancelConfirm && (
+              <div className="flex-1 bg-red-50 border border-red-200 rounded-xl p-3">
+                <p className="text-sm text-red-800 font-semibold mb-2">
+                  Confirmar cancelamento? Você poderá usar até o fim do período pago.
+                </p>
+                {cancelError && <p className="text-xs text-red-600 mb-2">{cancelError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      setCancelling(true);
+                      setCancelError('');
+                      try {
+                        await db.cancelStripeSubscription();
+                        setPlan(p => p ? { ...p, status: 'cancelled' } : p);
+                        setCancelConfirm(false);
+                      } catch (e: any) {
+                        setCancelError(e?.message ?? 'Erro ao cancelar. Tente novamente.');
+                      } finally {
+                        setCancelling(false);
+                      }
+                    }}
+                    disabled={cancelling}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-xs font-bold rounded-lg transition-colors"
+                  >
+                    {cancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+                    {cancelling ? 'Cancelando...' : 'Sim, cancelar'}
+                  </button>
+                  <button
+                    onClick={() => { setCancelConfirm(false); setCancelError(''); }}
+                    className="px-3 py-1.5 border border-slate-200 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    Voltar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-slate-400">
+            Você pode cancelar a qualquer momento sem custo. O acesso continua até o fim do período já pago.
+          </p>
+        </SectionCard>
+      )}
     </div>
   );
 }

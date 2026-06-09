@@ -83,7 +83,7 @@ export default function Layout() {
             return;
           }
           setDaysRemaining(plan.daysRemaining);
-          setPlanStatus(plan.daysRemaining <= 3 ? 'trial_warning' : 'ok');
+          setPlanStatus('trial_warning');
           return;
         }
         setPlanStatus('ok');
@@ -198,14 +198,17 @@ export default function Layout() {
           </div>
         </header>
 
-        {/* Banner: trial expirando */}
+        {/* Banner: período de teste */}
         {planStatus === 'trial_warning' && (
-          <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-amber-800 text-sm font-semibold">
-              ⚠️ Seu período gratuito encerra em <strong>{daysRemaining} dia{daysRemaining !== 1 ? 's' : ''}</strong>. Assine agora para não perder o acesso.
+          <div className={`border-b px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap ${daysRemaining <= 2 ? 'bg-red-50 border-red-200' : daysRemaining <= 5 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+            <p className={`text-sm font-semibold ${daysRemaining <= 2 ? 'text-red-800' : daysRemaining <= 5 ? 'text-amber-800' : 'text-emerald-800'}`}>
+              {daysRemaining <= 2 ? '🚨' : daysRemaining <= 5 ? '⚠️' : '🎉'}{' '}
+              {daysRemaining === 0
+                ? 'Seu período de teste encerra hoje! Assine para continuar.'
+                : <>Você está no <strong>período de teste</strong> — restam <strong>{daysRemaining} dia{daysRemaining !== 1 ? 's' : ''}</strong>.</>}
             </p>
-            <button onClick={() => navigate('/planos')} className="text-xs font-bold px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors flex-shrink-0">
-              Ver planos
+            <button onClick={() => navigate('/planos')} className={`text-xs font-bold px-3 py-1.5 text-white rounded-lg transition-colors flex-shrink-0 ${daysRemaining <= 2 ? 'bg-red-600 hover:bg-red-700' : daysRemaining <= 5 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+              Ver preços
             </button>
           </div>
         )}
