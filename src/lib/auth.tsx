@@ -133,10 +133,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!name.trim()) return 'Nome é obrigatório';
     if (!email.trim()) return 'E-mail é obrigatório';
     if (password.length < 6) return 'Senha deve ter pelo menos 6 caracteres';
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
     if (error) {
       if (error.message.toLowerCase().includes('already registered')) return 'Este e-mail já está cadastrado';
       return error.message;
+    }
+    // Cria trial como backup caso o trigger do banco não tenha disparado ainda
+    if (data.user) {
+      await supabase.rpc('create_trial_plan', { p_user_id: data.user.id }).catch(() => {});
     }
     return null;
   };

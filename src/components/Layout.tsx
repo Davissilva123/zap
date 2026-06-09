@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState, useEffect } from 'react';
 import { db } from '../lib/db';
+import { supabase } from '../lib/supabase';
 
 const BASE_NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -73,8 +74,15 @@ export default function Layout() {
 
       // Verifica plano (paywall)
       try {
-        const plan = await db.getMyPlan();
-        if (!plan || plan.status === 'none') { navigate('/planos'); return; }
+        let plan = await db.getMyPlan();
+
+        // Novo usuário sem plano — tenta criar trial automaticamente
+        if (!plan || plan.status === 'none') {
+          await supabase.rpc('create_trial_plan', { p_user_id: user.id }).catch(() => {});
+          plan = await db.getMyPlan().catch(() => null);
+        }
+
+        if (!plan || plan.status === 'none') { navigate('/planos?new=1'); return; }
         if (plan.isBlocked) { setPlanStatus('blocked'); return; }
         if (plan.status === 'cancelled' || plan.status === 'expired') { navigate('/planos'); return; }
         if (plan.status === 'trial') {
