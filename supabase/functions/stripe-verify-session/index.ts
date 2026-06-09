@@ -62,6 +62,27 @@ Deno.serve(async (req) => {
       .update({ blocked: false, blocked_reason: null })
       .eq('user_id', user.id);
 
+    // Registra no histórico (evita duplicata se webhook já inseriu)
+    const { data: existing } = await supabase
+      .from('payment_history')
+      .select('id')
+      .eq('reference', sessionId)
+      .maybeSingle();
+
+    if (!existing) {
+      const amount = (session.amount_total ?? 0) / 100;
+      await supabase.from('payment_history').insert({
+        user_id:    user.id,
+        amount,
+        method:     'stripe',
+        status:     'paid',
+        reference:  sessionId,
+        notes:      `Pagamento via Stripe Checkout — Plano ${planSlug}`,
+        paid_at:    new Date().toISOString(),
+        created_by: null,
+      });
+    }
+
     return new Response(JSON.stringify({ activated: true, plan: planSlug }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -128,6 +128,27 @@ Deno.serve(async (req) => {
         await supabase.from('restaurant_settings')
           .update({ blocked: false, blocked_reason: null })
           .eq('user_id', userId);
+
+        // Registra no histórico (evita duplicata pela reference do invoice)
+        const { data: existingInv } = await supabase
+          .from('payment_history')
+          .select('id')
+          .eq('reference', inv.id)
+          .maybeSingle();
+
+        if (!existingInv) {
+          const planSlug = (inv as any).subscription_details?.metadata?.plan_slug ?? 'pro';
+          await supabase.from('payment_history').insert({
+            user_id:    userId,
+            amount:     (inv.amount_paid ?? 0) / 100,
+            method:     'stripe',
+            status:     'paid',
+            reference:  inv.id,
+            notes:      `Cobrança automática via Stripe — Plano ${planSlug}`,
+            paid_at:    new Date().toISOString(),
+            created_by: null,
+          });
+        }
         break;
       }
 
