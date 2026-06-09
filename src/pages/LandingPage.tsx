@@ -136,6 +136,7 @@ export default function LandingPage() {
   const [contactPhone, setContactPhone] = useState('+55 (11) 99999-9999');
   const [heroTitle, setHeroTitle] = useState('Cardápio digital para o seu restaurante');
   const [heroSubtitle, setHeroSubtitle] = useState('Crie seu cardápio, gere QR Codes e receba pedidos com pagamento via PIX — tudo em um só lugar.');
+  const [businessHours, setBusinessHours] = useState('Segunda a sexta, das 9h às 18h. Suporte via WhatsApp.');
 
   useEffect(() => {
     db.getMarketingSettings().then(s => {
@@ -146,6 +147,7 @@ export default function LandingPage() {
       if (s.contactPhone) setContactPhone(s.contactPhone);
       if (s.heroTitle) setHeroTitle(s.heroTitle);
       if (s.heroSubtitle) setHeroSubtitle(s.heroSubtitle);
+      if (s.businessHours) setBusinessHours(s.businessHours);
     }).catch(() => {});
   }, []);
 
@@ -399,7 +401,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <p className="font-bold text-slate-900 text-sm">Horário de atendimento</p>
-                <p className="text-slate-500 text-xs">Segunda a sexta, das 9h às 18h. Suporte via WhatsApp.</p>
+                <p className="text-slate-500 text-xs">{businessHours}</p>
               </div>
             </div>
             <button

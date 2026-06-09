@@ -8,9 +8,13 @@ CREATE TABLE IF NOT EXISTS marketing_settings (
   hero_title TEXT NOT NULL DEFAULT 'Cardápio digital para o seu restaurante',
   hero_subtitle TEXT NOT NULL DEFAULT 'Crie seu cardápio, gere QR Codes e receba pedidos com pagamento via PIX — tudo em um só lugar.',
   company_name TEXT NOT NULL DEFAULT 'ZapMenu',
+  business_hours TEXT NOT NULL DEFAULT 'Segunda a sexta, das 9h às 18h. Suporte via WhatsApp.',
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT single_row CHECK (id = 1)
 );
+
+-- Adiciona coluna se a tabela já existia sem ela
+ALTER TABLE marketing_settings ADD COLUMN IF NOT EXISTS business_hours TEXT NOT NULL DEFAULT 'Segunda a sexta, das 9h às 18h. Suporte via WhatsApp.';
 
 -- Insere a linha padrão se não existir
 INSERT INTO marketing_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;

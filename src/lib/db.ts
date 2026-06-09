@@ -1001,6 +1001,7 @@ export const db = {
     heroTitle: string;
     heroSubtitle: string;
     companyName: string;
+    businessHours: string;
   } | null> {
     const { data, error } = await supabase
       .from('marketing_settings')
@@ -1016,6 +1017,7 @@ export const db = {
       heroTitle: data.hero_title ?? '',
       heroSubtitle: data.hero_subtitle ?? '',
       companyName: data.company_name ?? '',
+      businessHours: data.business_hours ?? '',
     };
   },
 
@@ -1027,6 +1029,7 @@ export const db = {
     heroTitle: string;
     heroSubtitle: string;
     companyName: string;
+    businessHours: string;
   }): Promise<void> {
     const { error } = await supabase
       .from('marketing_settings')
@@ -1039,6 +1042,7 @@ export const db = {
         hero_title: settings.heroTitle,
         hero_subtitle: settings.heroSubtitle,
         company_name: settings.companyName,
+        business_hours: settings.businessHours,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' });
     if (error) throw error;

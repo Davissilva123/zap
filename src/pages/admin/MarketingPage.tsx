@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/db';
-import { Save, Check, Loader2, Globe, MessageCircle, Mail, Phone, Type, AlignLeft, Building2 } from 'lucide-react';
+import { Save, Check, Loader2, Globe, MessageCircle, Mail, Phone, Type, AlignLeft, Building2, Clock } from 'lucide-react';
 
 type Settings = {
   whatsappNumber: string;
@@ -10,6 +10,7 @@ type Settings = {
   heroTitle: string;
   heroSubtitle: string;
   companyName: string;
+  businessHours: string;
 };
 
 const DEFAULT: Settings = {
@@ -20,6 +21,7 @@ const DEFAULT: Settings = {
   heroTitle: 'Cardápio digital para o seu restaurante',
   heroSubtitle: 'Crie seu cardápio, gere QR Codes e receba pedidos com pagamento via PIX — tudo em um só lugar.',
   companyName: 'ZapMenu',
+  businessHours: 'Segunda a sexta, das 9h às 18h. Suporte via WhatsApp.',
 };
 
 function Field({ label, icon: Icon, children }: { label: string; icon: typeof Globe; children: React.ReactNode }) {
@@ -136,6 +138,28 @@ export default function MarketingPage() {
             placeholder="+55 (11) 99999-9999"
           />
           <p className="text-xs text-slate-400 mt-1">Exibido apenas como texto na seção de contato.</p>
+        </Field>
+
+        <Field label="Horário de atendimento" icon={Clock}>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, businessHours: '24 horas por dia, 7 dias por semana.' }))}
+                className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${form.businessHours === '24 horas por dia, 7 dias por semana.' ? 'bg-violet-600 border-violet-600 text-white' : 'border-slate-200 text-slate-500 hover:border-violet-400 hover:text-violet-600'}`}
+              >
+                🕐 24 horas / 7 dias
+              </button>
+              <span className="text-xs text-slate-400">ou preencha abaixo</span>
+            </div>
+            <input
+              value={form.businessHours}
+              onChange={set('businessHours')}
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              placeholder="Ex: Segunda a sexta, das 9h às 18h. Suporte via WhatsApp."
+            />
+          </div>
+          <p className="text-xs text-slate-400 mt-1">Texto exibido na seção de contato da página de marketing.</p>
         </Field>
       </div>
 
