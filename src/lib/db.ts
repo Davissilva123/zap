@@ -991,4 +991,56 @@ export const db = {
     });
     if (error) throw error;
   },
+
+  // ---- Marketing Settings ----
+  async getMarketingSettings(): Promise<{
+    whatsappNumber: string;
+    whatsappMessage: string;
+    contactEmail: string;
+    contactPhone: string;
+    heroTitle: string;
+    heroSubtitle: string;
+    companyName: string;
+  } | null> {
+    const { data, error } = await supabase
+      .from('marketing_settings')
+      .select('*')
+      .eq('id', 1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      whatsappNumber: data.whatsapp_number ?? '',
+      whatsappMessage: data.whatsapp_message ?? '',
+      contactEmail: data.contact_email ?? '',
+      contactPhone: data.contact_phone ?? '',
+      heroTitle: data.hero_title ?? '',
+      heroSubtitle: data.hero_subtitle ?? '',
+      companyName: data.company_name ?? '',
+    };
+  },
+
+  async saveMarketingSettings(settings: {
+    whatsappNumber: string;
+    whatsappMessage: string;
+    contactEmail: string;
+    contactPhone: string;
+    heroTitle: string;
+    heroSubtitle: string;
+    companyName: string;
+  }): Promise<void> {
+    const { error } = await supabase
+      .from('marketing_settings')
+      .upsert({
+        id: 1,
+        whatsapp_number: settings.whatsappNumber,
+        whatsapp_message: settings.whatsappMessage,
+        contact_email: settings.contactEmail,
+        contact_phone: settings.contactPhone,
+        hero_title: settings.heroTitle,
+        hero_subtitle: settings.heroSubtitle,
+        company_name: settings.companyName,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+    if (error) throw error;
+  },
 };

@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Zap, QrCode, MessageCircle, CreditCard, ChefHat, Bike, BarChart2, Star, Tag, Check,
   ArrowRight, Smartphone, Shield, Crown, X, Phone, Mail, MapPin, Send,
   ClipboardList, Users, LayoutDashboard, Package, Percent, Printer, Wifi, Clock,
 } from 'lucide-react';
+import { db } from '../lib/db';
 
-const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_CONTACT ?? '5511999999999';
-const WHATSAPP_MSG = encodeURIComponent('Olá! Tenho interesse em saber mais sobre o ZapMenu para meu restaurante. Pode me ajudar?');
+const FALLBACK_WA_NUMBER = import.meta.env.VITE_WHATSAPP_CONTACT ?? '5511999999999';
+const FALLBACK_WA_MSG = 'Olá! Tenho interesse em saber mais sobre o ZapMenu para meu restaurante. Pode me ajudar?';
 
 const features = [
   { icon: QrCode,         title: 'Cardápio via QR Code',       desc: 'Clientes acessam pelo celular sem baixar nenhum app' },
@@ -129,6 +130,26 @@ const demoModules = [
 export default function LandingPage() {
   const navigate = useNavigate();
   const [showDemo, setShowDemo] = useState(false);
+  const [waNumber, setWaNumber] = useState(FALLBACK_WA_NUMBER);
+  const [waMsg, setWaMsg] = useState(FALLBACK_WA_MSG);
+  const [contactEmail, setContactEmail] = useState('contato@zapmenu.com.br');
+  const [contactPhone, setContactPhone] = useState('+55 (11) 99999-9999');
+  const [heroTitle, setHeroTitle] = useState('Cardápio digital para o seu restaurante');
+  const [heroSubtitle, setHeroSubtitle] = useState('Crie seu cardápio, gere QR Codes e receba pedidos com pagamento via PIX — tudo em um só lugar.');
+
+  useEffect(() => {
+    db.getMarketingSettings().then(s => {
+      if (!s) return;
+      if (s.whatsappNumber) setWaNumber(s.whatsappNumber);
+      if (s.whatsappMessage) setWaMsg(s.whatsappMessage);
+      if (s.contactEmail) setContactEmail(s.contactEmail);
+      if (s.contactPhone) setContactPhone(s.contactPhone);
+      if (s.heroTitle) setHeroTitle(s.heroTitle);
+      if (s.heroSubtitle) setHeroSubtitle(s.heroSubtitle);
+    }).catch(() => {});
+  }, []);
+
+  const waLink = (msg?: string) => `https://wa.me/${waNumber.replace(/\D/g, '')}?text=${encodeURIComponent(msg ?? waMsg)}`;
 
   const goRegister = () => navigate('/login?register=1');
 
@@ -341,19 +362,19 @@ export default function LandingPage() {
               {
                 icon: MessageCircle, color: 'bg-emerald-100 text-emerald-600',
                 title: 'WhatsApp', value: 'Atendimento rápido',
-                action: () => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`, '_blank'),
+                action: () => window.open(waLink(), '_blank'),
                 btn: 'Falar no WhatsApp',
               },
               {
                 icon: Mail, color: 'bg-blue-100 text-blue-600',
-                title: 'E-mail', value: 'contato@zapmenu.com.br',
-                action: () => window.open('mailto:contato@zapmenu.com.br', '_blank'),
+                title: 'E-mail', value: contactEmail,
+                action: () => window.open(`mailto:${contactEmail}`, '_blank'),
                 btn: 'Enviar e-mail',
               },
               {
                 icon: Phone, color: 'bg-violet-100 text-violet-600',
-                title: 'Telefone / WhatsApp', value: 'Seg – Sex, 9h às 18h',
-                action: () => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`, '_blank'),
+                title: 'Telefone / WhatsApp', value: contactPhone,
+                action: () => window.open(waLink(), '_blank'),
                 btn: 'Ligar / Chamar',
               },
             ].map((c, i) => (
@@ -382,7 +403,7 @@ export default function LandingPage() {
               </div>
             </div>
             <button
-              onClick={() => window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`, '_blank')}
+              onClick={() => window.open(waLink(), '_blank')}
               className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all flex-shrink-0"
             >
               <Send className="w-4 h-4" /> Falar com a equipe
@@ -417,7 +438,7 @@ export default function LandingPage() {
 
       {/* WhatsApp flutuante */}
       <a
-        href={`https://wa.me/${WHATSAPP_NUMBER}?text=${WHATSAPP_MSG}`}
+        href={waLink()}
         target="_blank"
         rel="noreferrer"
         className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-[#25D366] hover:bg-[#20bd5a] rounded-full flex items-center justify-center shadow-2xl shadow-green-500/40 transition-all hover:scale-110 hover:-translate-y-1"

@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { LayoutDashboard, Store, CreditCard, LogOut, Shield, Menu, X, BarChart2, Bell, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Store, CreditCard, LogOut, Shield, Menu, X, BarChart2, Bell, AlertCircle, Globe } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 
@@ -12,6 +12,7 @@ const navItems = [
   { to: '/admin/analytics', icon: BarChart2, label: 'Analytics' },
   { to: '/admin/cobrancas', icon: AlertCircle, label: 'Cobranças' },
   { to: '/admin/planos', icon: CreditCard, label: 'Planos & Cupons' },
+  { to: '/admin/marketing', icon: Globe, label: 'Pág. Marketing' },
 ];
 
 const TYPE_ICONS: Record<string, string> = {
