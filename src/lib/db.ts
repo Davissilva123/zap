@@ -992,6 +992,26 @@ export const db = {
     if (error) throw error;
   },
 
+  async getPlanTrialSettings(): Promise<Array<{ slug: string; name: string; trialEnabled: boolean; trialDays: number }>> {
+    const { data, error } = await supabase.rpc('get_plan_trial_settings');
+    if (error || !data) return [];
+    return (data as any[]).map(r => ({
+      slug: r.slug,
+      name: r.name,
+      trialEnabled: r.trial_enabled,
+      trialDays: r.trial_days,
+    }));
+  },
+
+  async updatePlanTrial(slug: string, enabled: boolean, days: number): Promise<void> {
+    const { error } = await supabase.rpc('update_plan_trial', {
+      p_slug: slug,
+      p_enabled: enabled,
+      p_days: days,
+    });
+    if (error) throw error;
+  },
+
   // ---- Marketing Settings ----
   async getMarketingSettings(): Promise<{
     whatsappNumber: string;

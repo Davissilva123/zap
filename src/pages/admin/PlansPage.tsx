@@ -68,36 +68,35 @@ export default function AdminPlansPage() {
   const [priceError, setPriceError] = useState<string | null>(null);
   const [tab, setTab] = useState<'plans' | 'coupons' | 'stripe'>('plans');
 
-  // Trial days
-  const [trialDays, setTrialDays] = useState(7);
-  const [trialDaysInput, setTrialDaysInput] = useState('7');
-  const [savingTrial, setSavingTrial] = useState(false);
-  const [trialSaved, setTrialSaved] = useState(false);
-  const [trialError, setTrialError] = useState('');
+  // Trial settings por plano
+  const [trialSettings, setTrialSettings] = useState<Record<string, { enabled: boolean; days: number; daysInput: string; saving: boolean; saved: boolean }>>({});
 
   useEffect(() => {
     db.getPlatformPlanPrices().then(p => setPrices(p)).catch(() => {});
-    db.getTrialDays().then(d => { setTrialDays(d); setTrialDaysInput(String(d)); }).catch(() => {});
+    db.getPlanTrialSettings().then(list => {
+      const map: typeof trialSettings = {};
+      list.forEach(p => { map[p.slug] = { enabled: p.trialEnabled, days: p.trialDays, daysInput: String(p.trialDays), saving: false, saved: false }; });
+      setTrialSettings(map);
+    }).catch(() => {});
   }, []);
 
-  const saveTrialDays = async () => {
-    const days = parseInt(trialDaysInput, 10);
-    if (isNaN(days) || days < 1 || days > 90) {
-      setTrialError('Digite um número entre 1 e 90 dias.');
-      return;
-    }
-    setSavingTrial(true);
-    setTrialError('');
+  const saveTrial = async (slug: string) => {
+    const s = trialSettings[slug];
+    if (!s) return;
+    const days = parseInt(s.daysInput, 10);
+    if (s.enabled && (isNaN(days) || days < 1 || days > 90)) return;
+    setTrialSettings(prev => ({ ...prev, [slug]: { ...prev[slug], saving: true } }));
     try {
-      await db.setTrialDays(days);
-      setTrialDays(days);
-      setTrialSaved(true);
-      setTimeout(() => setTrialSaved(false), 2500);
-    } catch (e: any) {
-      setTrialError(e?.message ?? 'Erro ao salvar');
-    } finally {
-      setSavingTrial(false);
+      await db.updatePlanTrial(slug, s.enabled, s.enabled ? days : (s.days || 7));
+      setTrialSettings(prev => ({ ...prev, [slug]: { ...prev[slug], days: s.enabled ? days : prev[slug].days, saving: false, saved: true } }));
+      setTimeout(() => setTrialSettings(prev => ({ ...prev, [slug]: { ...prev[slug], saved: false } })), 2000);
+    } catch {
+      setTrialSettings(prev => ({ ...prev, [slug]: { ...prev[slug], saving: false } }));
     }
+  };
+
+  const toggleTrial = (slug: string) => {
+    setTrialSettings(prev => ({ ...prev, [slug]: { ...prev[slug], enabled: !prev[slug].enabled, saved: false } }));
   };
 
   // PIX settings state
@@ -227,44 +226,13 @@ export default function AdminPlansPage() {
             </div>
           )}
 
-          {/* Configuração de trial */}
-          <div className="card p-4 flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <p className="text-sm font-bold text-slate-900">Período de teste gratuito</p>
-              <p className="text-xs text-slate-400 mt-0.5">Quantos dias um novo cliente pode testar antes de precisar assinar.</p>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min={1} max={90}
-                  value={trialDaysInput}
-                  onChange={e => { setTrialDaysInput(e.target.value); setTrialError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && saveTrialDays()}
-                  className="input w-20 text-center font-bold text-lg"
-                />
-                <span className="text-sm text-slate-500 font-medium">dias</span>
-              </div>
-              <button
-                onClick={saveTrialDays}
-                disabled={savingTrial || trialDaysInput === String(trialDays)}
-                className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-bold rounded-xl transition-colors"
-              >
-                {savingTrial
-                  ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  : trialSaved ? <><Check className="w-3.5 h-3.5" /> Salvo</> : 'Salvar'}
-              </button>
-            </div>
-            {trialError && <p className="w-full text-xs text-red-500">{trialError}</p>}
-          </div>
-
-          <div className="card p-4 bg-emerald-50 border border-emerald-200 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-              <Zap className="w-4 h-4 text-emerald-600" />
+          <div className="card p-4 bg-violet-50 border border-violet-200 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
+              <Zap className="w-4 h-4 text-violet-600" />
             </div>
             <div>
-              <p className="text-sm font-bold text-emerald-800">Trial de 7 dias grátis em todos os planos</p>
-              <p className="text-xs text-emerald-700 mt-0.5">Após o trial, o cliente precisa confirmar o pagamento para continuar.</p>
+              <p className="text-sm font-bold text-violet-900">Período de teste gratuito por plano</p>
+              <p className="text-xs text-violet-700 mt-0.5">Configure individualmente quais planos oferecem trial e por quantos dias. Clientes que se cadastram recebem trial do plano Básico (se habilitado).</p>
             </div>
           </div>
 
@@ -366,7 +334,55 @@ export default function AdminPlansPage() {
                       </button>
                     )}
                   </div>
-                  <p className="text-xs text-emerald-600 font-semibold mb-5">{plan.trial}</p>
+                  {/* Trial control */}
+                  {trialSettings[plan.slug] !== undefined ? (() => {
+                    const ts = trialSettings[plan.slug];
+                    return (
+                      <div className={`rounded-xl p-3 mb-4 border ${ts.enabled ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-slate-700">Trial gratuito</span>
+                          <button
+                            onClick={() => toggleTrial(plan.slug)}
+                            className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${ts.enabled ? 'bg-emerald-400' : 'bg-slate-300'}`}
+                          >
+                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${ts.enabled ? 'left-4' : 'left-0.5'}`} />
+                          </button>
+                        </div>
+                        {ts.enabled ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number" min={1} max={90}
+                              value={ts.daysInput}
+                              onChange={e => setTrialSettings(prev => ({ ...prev, [plan.slug]: { ...prev[plan.slug], daysInput: e.target.value, saved: false } }))}
+                              className="w-14 border border-slate-200 rounded-lg px-2 py-1 text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                            />
+                            <span className="text-xs text-slate-500">dias grátis</span>
+                            <button
+                              onClick={() => saveTrial(plan.slug)}
+                              disabled={ts.saving}
+                              className="ml-auto flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold rounded-lg transition-colors"
+                            >
+                              {ts.saving ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : ts.saved ? <><Check className="w-3 h-3" /> Salvo</> : 'Salvar'}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-slate-400">Sem trial — assinatura imediata</p>
+                            <button
+                              onClick={() => saveTrial(plan.slug)}
+                              disabled={ts.saving}
+                              className="flex items-center gap-1 px-2.5 py-1 bg-slate-500 hover:bg-slate-600 disabled:opacity-50 text-white text-[10px] font-bold rounded-lg transition-colors"
+                            >
+                              {ts.saving ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : ts.saved ? <><Check className="w-3 h-3" /> Salvo</> : 'Salvar'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })() : (
+                    <p className="text-xs text-emerald-600 font-semibold mb-4">{plan.trial}</p>
+                  )}
+
                   <ul className="space-y-2.5">
                     {plan.features.map((f, i) => (
                       <li key={i} className={`flex items-start gap-2 text-xs ${f.ok ? 'text-slate-600' : 'text-slate-300'}`}>
