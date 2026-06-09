@@ -114,6 +114,8 @@ export interface RestaurantSettings {
   manualClosed: boolean;
   blocked?: boolean;
   blockedReason?: string;
+  disabled?: boolean;
+  disabledReason?: string | null;
 }
 
 export interface OrderItem {

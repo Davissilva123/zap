@@ -34,7 +34,7 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [planStatus, setPlanStatus] = useState<'loading' | 'ok' | 'trial_warning' | 'expired' | 'blocked'>('loading');
+  const [planStatus, setPlanStatus] = useState<'loading' | 'ok' | 'trial_warning' | 'expired' | 'blocked' | 'disabled'>('loading');
   const [daysRemaining, setDaysRemaining] = useState(0);
   const [planSlug, setPlanSlug] = useState<PlanSlug>('');
   const [planDisplayName, setPlanDisplayName] = useState('');
@@ -78,28 +78,35 @@ export default function Layout() {
       }
 
       try {
-        let plan = await db.getMyPlan();
+        const [plan, settings] = await Promise.all([
+          db.getMyPlan(),
+          db.getSettings(user.id).catch(() => null),
+        ]);
 
-        if (!plan || plan.status === 'none') {
+        // Restaurante desativado pelo admin
+        if (settings?.disabled) { setPlanStatus('disabled'); return; }
+
+        let resolvedPlan = plan;
+        if (!resolvedPlan || resolvedPlan.status === 'none') {
           await supabase.rpc('create_trial_plan', { p_user_id: user.id }).catch(() => {});
-          plan = await db.getMyPlan().catch(() => null);
+          resolvedPlan = await db.getMyPlan().catch(() => null);
         }
 
-        if (!plan || plan.status === 'none') { navigate('/planos?new=1'); return; }
-        if (plan.isBlocked) { setPlanStatus('blocked'); return; }
-        if (plan.status === 'cancelled' || plan.status === 'expired') { navigate('/planos'); return; }
+        if (!resolvedPlan || resolvedPlan.status === 'none') { navigate('/planos?new=1'); return; }
+        if (resolvedPlan.isBlocked) { setPlanStatus('blocked'); return; }
+        if (resolvedPlan.status === 'cancelled' || resolvedPlan.status === 'expired') { navigate('/planos'); return; }
 
         // Armazena o plano para feature gating
-        const slug = (plan.planSlug ?? 'basic') as PlanSlug;
+        const slug = (resolvedPlan.planSlug ?? 'basic') as PlanSlug;
         setPlanSlug(slug);
-        setPlanDisplayName(plan.planName ?? PLAN_DISPLAY[slug] ?? 'Básico');
+        setPlanDisplayName(resolvedPlan.planName ?? PLAN_DISPLAY[slug] ?? 'Básico');
 
-        if (plan.status === 'trial') {
-          if (plan.trialEndsAt && new Date(plan.trialEndsAt) < new Date()) {
+        if (resolvedPlan.status === 'trial') {
+          if (resolvedPlan.trialEndsAt && new Date(resolvedPlan.trialEndsAt) < new Date()) {
             navigate('/planos');
             return;
           }
-          setDaysRemaining(plan.daysRemaining);
+          setDaysRemaining(resolvedPlan.daysRemaining);
           setPlanStatus('trial_warning');
           return;
         }
@@ -280,14 +287,29 @@ export default function Layout() {
             </div>
           )}
 
-          {/* Tela de bloqueio */}
-          {planStatus === 'blocked' ? (
+          {/* Tela de desativação pelo admin */}
+          {planStatus === 'disabled' ? (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-center max-w-sm">
+                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">⛔</span>
+                </div>
+                <h2 className="text-xl font-black text-slate-900 mb-2">Restaurante desativado</h2>
+                <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                  Esta conta foi desativada pela administração. Entre em contato com o suporte para mais informações.
+                </p>
+                <button onClick={handleLogout} className="w-full py-3 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl transition-colors text-sm">
+                  Sair da conta
+                </button>
+              </div>
+            </div>
+          ) : planStatus === 'blocked' ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="text-center max-w-sm">
                 <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
                   <span className="text-3xl">🚫</span>
                 </div>
-                <h2 className="text-xl font-black text-slate-900 mb-2">Cardápio suspenso</h2>
+                <h2 className="text-xl font-black text-slate-900 mb-2">Acesso suspenso</h2>
                 <p className="text-slate-500 text-sm mb-6 leading-relaxed">
                   Seu acesso foi suspenso por falta de pagamento. Entre em contato com o suporte para regularizar.
                 </p>

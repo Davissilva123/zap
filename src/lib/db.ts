@@ -16,6 +16,8 @@ interface SettingsRow {
   manual_closed: boolean;
   blocked?: boolean;
   blocked_reason?: string;
+  disabled?: boolean;
+  disabled_reason?: string | null;
   created_at: string;
 }
 interface CategoryRow { id: string; user_id: string; name: string; emoji: string; order: number; available_from?: string | null; available_to?: string | null; created_at: string; }
@@ -52,6 +54,8 @@ function toSettings(r: SettingsRow): RestaurantSettings {
     manualClosed: r.manual_closed ?? false,
     blocked: r.blocked ?? false,
     blockedReason: r.blocked_reason ?? undefined,
+    disabled: r.disabled ?? false,
+    disabledReason: r.disabled_reason ?? null,
   };
 }
 function toCategory(r: CategoryRow): Category { return { id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji, order: r.order, availableFrom: r.available_from ?? undefined, availableTo: r.available_to ?? undefined, createdAt: r.created_at }; }
@@ -730,6 +734,7 @@ export const db = {
     paymentStatus: string; stripeSubscriptionId: string | null;
     orderCount: number; totalRevenue: number; lastOrderAt: string | null;
     blocked: boolean; blockedReason: string | null;
+    disabled: boolean; disabledReason: string | null;
   } | null> {
     const { data, error } = await supabase.rpc('get_restaurant_detail_admin', { p_user_id: userId });
     if (error) throw error;
@@ -744,7 +749,28 @@ export const db = {
       orderCount: Number(r.order_count ?? 0), totalRevenue: Number(r.total_revenue ?? 0),
       lastOrderAt: r.last_order_at ?? null,
       blocked: r.blocked ?? false, blockedReason: r.blocked_reason ?? null,
+      disabled: r.disabled ?? false, disabledReason: r.disabled_reason ?? null,
     };
+  },
+
+  async updateRestaurantSettingsAdmin(userId: string, data: { name: string; phone: string; address: string; description: string }): Promise<void> {
+    const { error } = await supabase.rpc('update_restaurant_settings_admin', {
+      p_user_id: userId,
+      p_name: data.name,
+      p_phone: data.phone,
+      p_address: data.address,
+      p_description: data.description,
+    });
+    if (error) throw error;
+  },
+
+  async toggleRestaurantDisabled(userId: string, disabled: boolean, reason?: string): Promise<void> {
+    const { error } = await supabase.rpc('toggle_restaurant_disabled', {
+      p_user_id: userId,
+      p_disabled: disabled,
+      p_reason: reason ?? null,
+    });
+    if (error) throw error;
   },
 
   async getRestaurantOrdersAdmin(userId: string): Promise<Array<{ id: string; status: string; total: number; customerName: string; deliveryType: string; paymentMethod: string; createdAt: string }>> {

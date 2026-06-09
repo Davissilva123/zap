@@ -6,7 +6,7 @@ import type { RestaurantSettings } from '../../lib/types';
 import {
   Store, RefreshCw, ExternalLink, Copy, Check, Search,
   ShoppingBag, DollarSign, Clock, ChevronDown, AlertTriangle,
-  Ban, Unlock, Download, Mail, X, History, Eye, CreditCard,
+  Ban, Unlock, Download, Mail, X, History, Eye, CreditCard, Power, EyeOff,
 } from 'lucide-react';
 
 const SUPER_ADMIN_EMAIL = (import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com').toLowerCase();
@@ -78,10 +78,16 @@ export default function AdminRestaurantsPage() {
   const [changingPlan, setChangingPlan] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
+  const [hideInactive, setHideInactive] = useState(false);
+
   // Block modal
   const [blockTarget, setBlockTarget] = useState<RestaurantSettings | null>(null);
   const [blockReason, setBlockReason] = useState('');
   const [blockLoading, setBlockLoading] = useState(false);
+
+  // Disable modal
+  const [disableTarget, setDisableTarget] = useState<RestaurantSettings | null>(null);
+  const [disableLoading, setDisableLoading] = useState(false);
 
   // Log drawer
   const [logTarget, setLogTarget] = useState<string | null>(null);
@@ -137,6 +143,19 @@ export default function AdminRestaurantsPage() {
     catch (e: any) { alert('Erro: ' + (e?.message ?? e)); }
   };
 
+  const handleDisable = async () => {
+    if (!disableTarget) return;
+    setDisableLoading(true);
+    try { await db.toggleRestaurantDisabled(disableTarget.userId, true); setDisableTarget(null); await load(); }
+    catch (e: any) { alert('Erro: ' + (e?.message ?? e)); }
+    finally { setDisableLoading(false); }
+  };
+
+  const handleEnable = async (userId: string) => {
+    try { await db.toggleRestaurantDisabled(userId, false); await load(); }
+    catch (e: any) { alert('Erro: ' + (e?.message ?? e)); }
+  };
+
   const openLog = async (userId: string) => {
     setLogTarget(userId); setLogLoading(true);
     try { const l = await db.getPlanChangeLog(userId); setLogData(l); }
@@ -180,6 +199,7 @@ export default function AdminRestaurantsPage() {
 
   const filtered = restaurants
     .filter(r => {
+      if (hideInactive && (r.disabled || r.blocked)) return false;
       const q = search.toLowerCase();
       const email = getEmail(r.userId).toLowerCase();
       const matchSearch = r.name.toLowerCase().includes(q) || r.slug.includes(q) || email.includes(q) || (r.phone ?? '').includes(q);
@@ -188,7 +208,8 @@ export default function AdminRestaurantsPage() {
       const status = plan?.status ?? 'none';
       const matchPlan = filterPlan === 'all' || planSlug === filterPlan;
       const matchStatus = filterStatus === 'all' || status === filterStatus
-        || (filterStatus === 'expiring' && status === 'trial' && (trialDaysLeft(plan?.trialEndsAt ?? null) ?? 99) <= 3);
+        || (filterStatus === 'expiring' && status === 'trial' && (trialDaysLeft(plan?.trialEndsAt ?? null) ?? 99) <= 3)
+        || (filterStatus === 'disabled' && r.disabled);
       return matchSearch && matchPlan && matchStatus;
     })
     .sort((a, b) => {
@@ -203,6 +224,7 @@ export default function AdminRestaurantsPage() {
     });
 
   const blockedCount = restaurants.filter(r => r.blocked).length;
+  const disabledCount = restaurants.filter(r => r.disabled).length;
   const expiringCount = plans.filter(p => p.status === 'trial' && (trialDaysLeft(p.trialEndsAt) ?? 99) <= 3 && (trialDaysLeft(p.trialEndsAt) ?? -1) >= 0).length;
 
   return (
@@ -214,6 +236,17 @@ export default function AdminRestaurantsPage() {
           <p className="text-slate-500 text-sm mt-0.5">{restaurants.length} clientes cadastrados</p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => setHideInactive(v => !v)}
+            className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border transition-colors ${
+              hideInactive
+                ? 'bg-slate-800 text-white border-slate-800'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            <EyeOff className="w-3.5 h-3.5" />
+            {hideInactive ? 'Mostrar inativos' : 'Ocultar inativos'}
+          </button>
           <button onClick={exportCsv} className="btn-secondary text-xs">
             <Download className="w-3.5 h-3.5" /> Exportar CSV
           </button>
@@ -224,10 +257,15 @@ export default function AdminRestaurantsPage() {
       </div>
 
       {/* Quick stats bar */}
-      {(blockedCount > 0 || expiringCount > 0) && (
+      {(blockedCount > 0 || disabledCount > 0 || expiringCount > 0) && (
         <div className="flex gap-2 flex-wrap">
+          {disabledCount > 0 && (
+            <button onClick={() => { setFilterStatus('disabled'); setHideInactive(false); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-300 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200 transition-colors">
+              <Power className="w-3.5 h-3.5" /> {disabledCount} desativado{disabledCount > 1 ? 's' : ''}
+            </button>
+          )}
           {blockedCount > 0 && (
-            <button onClick={() => setFilterStatus('blocked')} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors">
+            <button onClick={() => { setFilterStatus('blocked'); setHideInactive(false); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors">
               <Ban className="w-3.5 h-3.5" /> {blockedCount} bloqueado{blockedCount > 1 ? 's' : ''}
             </button>
           )}
@@ -291,10 +329,11 @@ export default function AdminRestaurantsPage() {
                 const planSlug = plan?.planSlug ?? 'basic';
                 const isChanging = changingPlan === r.userId;
                 const isBlocked = r.blocked || plan?.status === 'blocked';
+                const isDisabled = r.disabled ?? false;
                 const daysLeft = trialDaysLeft(plan?.trialEndsAt ?? null);
 
                 return (
-                  <div key={r.userId} className={`px-4 sm:px-5 py-4 hover:bg-slate-50/40 transition-colors ${isBlocked ? 'bg-red-50/30' : ''}`}>
+                  <div key={r.userId} className={`px-4 sm:px-5 py-4 hover:bg-slate-50/40 transition-colors ${isDisabled ? 'bg-slate-50/80 opacity-60' : isBlocked ? 'bg-red-50/30' : ''}`}>
                     <div className="flex items-start gap-3">
                       {/* Logo */}
                       {r.logoUrl ? (
@@ -376,8 +415,19 @@ export default function AdminRestaurantsPage() {
                           </div>
                         )}
 
+                        {/* Disable / Enable */}
+                        {canBlock && (isDisabled ? (
+                          <button onClick={() => handleEnable(r.userId)} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs font-semibold transition-colors" title="Reativar restaurante">
+                            <Power className="w-3.5 h-3.5" /> Reativar
+                          </button>
+                        ) : (
+                          <button onClick={() => setDisableTarget(r)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Desativar restaurante">
+                            <Power className="w-4 h-4 text-slate-400" />
+                          </button>
+                        ))}
+
                         {/* Block / Unblock — hidden for limited role */}
-                        {canBlock && (isBlocked ? (
+                        {canBlock && !isDisabled && (isBlocked ? (
                           <button onClick={() => handleUnblock(r.userId)} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs font-semibold transition-colors" title="Desbloquear">
                             <Unlock className="w-3.5 h-3.5" /> Desbloquear
                           </button>
@@ -449,6 +499,35 @@ export default function AdminRestaurantsPage() {
                 {blockLoading
                   ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   : <><Ban className="w-4 h-4" /> Bloquear</>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Disable modal */}
+      {disableTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDisableTarget(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm z-10 animate-scale-in p-6">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+              <Power className="w-6 h-6 text-slate-600" />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 text-center mb-1">Desativar restaurante</h3>
+            <p className="text-sm text-slate-500 text-center mb-5">
+              <strong>{disableTarget.name}</strong> ficará inacessível para o dono e seus clientes. Você pode reativar a qualquer momento.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setDisableTarget(null)} className="flex-1 btn-secondary">Cancelar</button>
+              <button
+                onClick={handleDisable}
+                disabled={disableLoading}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-sm"
+              >
+                {disableLoading
+                  ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <><Power className="w-4 h-4" /> Desativar</>
                 }
               </button>
             </div>

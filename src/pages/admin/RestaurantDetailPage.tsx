@@ -4,7 +4,7 @@ import { db } from '../../lib/db';
 import {
   ArrowLeft, Store, ShoppingBag, DollarSign, Phone, MapPin,
   FileText, Plus, Trash2, Settings, RefreshCw, Mail, AlertTriangle, Clock,
-  CheckCircle, XCircle, Wallet, Printer, X,
+  CheckCircle, XCircle, Wallet, Printer, X, Power, Edit3,
 } from 'lucide-react';
 
 type Detail = Awaited<ReturnType<typeof db.getRestaurantDetailAdmin>>;
@@ -47,7 +47,11 @@ export default function RestaurantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [newNote, setNewNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
-  const [tab, setTab] = useState<'overview' | 'orders' | 'flags' | 'notes' | 'payments'>('overview');
+  const [tab, setTab] = useState<'overview' | 'orders' | 'flags' | 'notes' | 'payments' | 'edit'>('overview');
+  const [editForm, setEditForm] = useState({ name: '', phone: '', address: '', description: '' });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [disableLoading, setDisableLoading] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [paymentsError, setPaymentsError] = useState('');
@@ -68,6 +72,7 @@ export default function RestaurantDetailPage() {
         db.getFeatureFlags(userId).catch(() => ({})),
       ]);
       setDetail(d); setOrders(o); setNotes(n); setFlags(f);
+      if (d) setEditForm({ name: d.restaurantName, phone: d.phone ?? '', address: d.address ?? '', description: d.description ?? '' });
     } finally {
       setLoading(false);
     }
@@ -194,6 +199,25 @@ export default function RestaurantDetailPage() {
     setNotes(prev => prev.filter(n => n.id !== noteId));
   };
 
+  const handleSaveEdit = async () => {
+    if (!userId || !editForm.name.trim()) { setEditError('Nome é obrigatório'); return; }
+    setEditLoading(true); setEditError('');
+    try {
+      await db.updateRestaurantSettingsAdmin(userId, editForm);
+      await load();
+      setTab('overview');
+    } catch (e: any) { setEditError(e?.message ?? 'Erro ao salvar'); }
+    finally { setEditLoading(false); }
+  };
+
+  const handleToggleDisabled = async (disabled: boolean) => {
+    if (!userId) return;
+    setDisableLoading(true);
+    try { await db.toggleRestaurantDisabled(userId, disabled); await load(); }
+    catch (e: any) { alert('Erro: ' + (e?.message ?? e)); }
+    finally { setDisableLoading(false); }
+  };
+
   const handleSettingsFlag = async (flagKey: string) => {
     if (!userId) return;
     const newVal = !flags[flagKey];
@@ -242,14 +266,35 @@ export default function RestaurantDetailPage() {
               {detail.planName} · {detail.planStatus}
             </span>
             {detail.blocked && (
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Bloqueado</span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">🚫 Bloqueado</span>
+            )}
+            {detail.disabled && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">⛔ Desativado</span>
             )}
           </div>
           <p className="text-slate-400 text-sm truncate">/{detail.slug}</p>
         </div>
-        <button onClick={load} className="btn-secondary flex-shrink-0">
-          <RefreshCw className="w-4 h-4" />
-        </button>
+        <div className="flex gap-2 flex-shrink-0">
+          <button
+            onClick={() => handleToggleDisabled(!detail.disabled)}
+            disabled={disableLoading}
+            title={detail.disabled ? 'Reativar restaurante' : 'Desativar restaurante'}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 ${
+              detail.disabled
+                ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            }`}
+          >
+            <Power className="w-3.5 h-3.5" />
+            {detail.disabled ? 'Reativar' : 'Desativar'}
+          </button>
+          <button onClick={() => setTab('edit')} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors">
+            <Edit3 className="w-3.5 h-3.5" /> Editar dados
+          </button>
+          <button onClick={load} className="btn-secondary flex-shrink-0">
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Stats rápidos */}
@@ -271,7 +316,7 @@ export default function RestaurantDetailPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit overflow-x-auto">
-        {([['overview', 'Visão geral'], ['orders', 'Pedidos'], ['payments', 'Pagamentos'], ['flags', 'Feature flags'], ['notes', 'Notas']] as const).map(([key, label]) => (
+        {([['overview', 'Visão geral'], ['edit', 'Editar dados'], ['orders', 'Pedidos'], ['payments', 'Pagamentos'], ['flags', 'Feature flags'], ['notes', 'Notas']] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -338,6 +383,25 @@ export default function RestaurantDetailPage() {
             </div>
           </div>
 
+          {detail.disabled && (
+            <div className="card p-4 bg-slate-100 border border-slate-300">
+              <div className="flex items-start gap-3">
+                <Power className="w-5 h-5 text-slate-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-slate-800">Restaurante desativado</p>
+                  {detail.disabledReason && <p className="text-xs text-slate-600 mt-0.5">{detail.disabledReason}</p>}
+                </div>
+                <button
+                  onClick={() => handleToggleDisabled(false)}
+                  disabled={disableLoading}
+                  className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
+                >
+                  Reativar
+                </button>
+              </div>
+            </div>
+          )}
+
           {detail.blocked && (
             <div className="card p-4 bg-red-50 border border-red-200">
               <div className="flex items-start gap-3">
@@ -362,6 +426,75 @@ export default function RestaurantDetailPage() {
               <p className="text-xs text-slate-400">Abre seu cliente de e-mail com o assunto preenchido</p>
             </div>
           </a>
+        </div>
+      )}
+
+      {/* ---- EDITAR DADOS ---- */}
+      {tab === 'edit' && (
+        <div className="card p-6 space-y-5">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Editar dados do restaurante</p>
+          <p className="text-xs text-slate-500 -mt-2">As alterações são refletidas imediatamente no painel do dono.</p>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nome do restaurante</label>
+              <input
+                type="text"
+                value={editForm.name}
+                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                className="input w-full"
+                placeholder="Nome do restaurante"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Telefone / WhatsApp</label>
+              <input
+                type="text"
+                value={editForm.phone}
+                onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                className="input w-full"
+                placeholder="(11) 99999-9999"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Endereço</label>
+              <input
+                type="text"
+                value={editForm.address}
+                onChange={e => setEditForm(f => ({ ...f, address: e.target.value }))}
+                className="input w-full"
+                placeholder="Rua, número, bairro, cidade"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Descrição</label>
+              <textarea
+                value={editForm.description}
+                onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                rows={3}
+                className="input w-full resize-none"
+                placeholder="Breve descrição do restaurante"
+              />
+            </div>
+          </div>
+
+          {editError && <p className="text-sm text-red-600 font-medium">{editError}</p>}
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => { setTab('overview'); setEditError(''); }} className="flex-1 btn-secondary">
+              Cancelar
+            </button>
+            <button
+              onClick={handleSaveEdit}
+              disabled={editLoading}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-bold rounded-xl transition-colors text-sm"
+            >
+              {editLoading
+                ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <><CheckCircle className="w-4 h-4" /> Salvar alterações</>
+              }
+            </button>
+          </div>
         </div>
       )}
 
