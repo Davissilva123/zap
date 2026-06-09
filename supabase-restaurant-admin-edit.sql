@@ -1,33 +1,12 @@
--- =============================================================
--- Edição de restaurante pelo admin + campo disabled
--- Rode no Supabase SQL Editor
--- =============================================================
+-- Restaurant admin edit + disabled field
+-- Run in Supabase SQL Editor
 
--- 1. Adiciona colunas de desativação
+-- 1. Add disabled columns to restaurant_settings
 ALTER TABLE public.restaurant_settings
   ADD COLUMN IF NOT EXISTS disabled        BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS disabled_reason TEXT;
 
--- 2. Recria get_all_restaurants para incluir as novas colunas (SETOF já retorna tudo)
-CREATE OR REPLACE FUNCTION public.get_all_restaurants()
-RETURNS SETOF public.restaurant_settings
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT rs.*
-  FROM public.restaurant_settings rs
-  WHERE EXISTS (
-    SELECT 1 FROM auth.users u
-    WHERE u.id = auth.uid()
-    AND (
-      u.email = 'sdavi6790@gmail.com'
-      OR EXISTS (SELECT 1 FROM public.admin_team t WHERE t.email = u.email AND t.active = true)
-    )
-  )
-  ORDER BY rs.created_at DESC;
-$$;
-
--- 3. Recria get_restaurant_detail_admin adicionando disabled e disabled_reason
+-- 2. Update get_restaurant_detail_admin to include disabled fields
 CREATE OR REPLACE FUNCTION public.get_restaurant_detail_admin(p_user_id UUID)
 RETURNS TABLE(
   restaurant_name TEXT, slug TEXT, phone TEXT, address TEXT,
@@ -81,12 +60,12 @@ BEGIN
 END;
 $$;
 
--- 4. Editar dados do restaurante via painel admin
+-- 3. Edit restaurant data from admin panel
 CREATE OR REPLACE FUNCTION public.update_restaurant_settings_admin(
-  p_user_id    UUID,
-  p_name       TEXT,
-  p_phone      TEXT,
-  p_address    TEXT,
+  p_user_id     UUID,
+  p_name        TEXT,
+  p_phone       TEXT,
+  p_address     TEXT,
   p_description TEXT
 )
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -107,7 +86,7 @@ BEGIN
 END;
 $$;
 
--- 5. Desativar / reativar restaurante
+-- 4. Disable / enable restaurant
 CREATE OR REPLACE FUNCTION public.toggle_restaurant_disabled(
   p_user_id UUID,
   p_disabled BOOLEAN,
@@ -131,7 +110,6 @@ BEGIN
 END;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.get_restaurant_detail_admin(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.update_restaurant_settings_admin(UUID, TEXT, TEXT, TEXT, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.toggle_restaurant_disabled(UUID, BOOLEAN, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_restaurant_detail_admin(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_all_restaurants() TO authenticated;
