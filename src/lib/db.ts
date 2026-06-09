@@ -886,6 +886,8 @@ export const db = {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error ?? 'Erro ao criar checkout');
+    // Salva sessionId para verificação no retorno do Stripe
+    if (json.sessionId) localStorage.setItem('stripe_session_id', json.sessionId);
     return json.url as string;
   },
 
@@ -926,6 +928,24 @@ export const db = {
   async deletePayment(paymentId: string): Promise<void> {
     const { error } = await supabase.rpc('delete_payment', { p_id: paymentId });
     if (error) throw error;
+  },
+
+  async verifyStripeSession(sessionId: string): Promise<{ activated: boolean; plan?: string }> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return { activated: false };
+    const supabaseUrl = (supabase as any).supabaseUrl as string;
+    try {
+      const res = await fetch(`${supabaseUrl}/functions/v1/stripe-verify-session`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+      const json = await res.json();
+      return { activated: json.activated ?? false, plan: json.plan };
+    } catch {
+      return { activated: false };
+    }
   },
 
   async validateSubscriptionCoupon(code: string): Promise<{

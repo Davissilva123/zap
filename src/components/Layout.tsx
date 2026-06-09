@@ -40,6 +40,23 @@ export default function Layout() {
       return;
     }
 
+    // Verifica se voltou de um checkout Stripe bem-sucedido
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      const sessionId = localStorage.getItem('stripe_session_id');
+      if (sessionId) {
+        localStorage.removeItem('stripe_session_id');
+        db.verifyStripeSession(sessionId).then(result => {
+          if (result.activated) {
+            // Remove query param sem reload
+            window.history.replaceState({}, '', window.location.pathname);
+            setPlanStatus('ok');
+            return;
+          }
+        });
+      }
+    }
+
     // Verifica onboarding
     const key = `zm_onboarded_${user.id}`;
     if (!localStorage.getItem(key)) {
