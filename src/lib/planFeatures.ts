@@ -47,3 +47,11 @@ export function canAccess(userPlan: PlanSlug, feature: FeatureKey): boolean {
 export function requiredPlan(feature: FeatureKey): PlanSlug {
   return FEATURE_MIN_PLAN[feature];
 }
+
+// Quantidade máxima de operadores por plano (-1 = ilimitado)
+export const OPERATOR_LIMIT: Record<PlanSlug, number> = {
+  '':       0,
+  basic:    2,
+  pro:      5,
+  premium:  -1,
+};

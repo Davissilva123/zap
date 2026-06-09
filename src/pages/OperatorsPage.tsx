@@ -4,7 +4,10 @@ import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { supabaseNoSession } from '../lib/supabaseNoSession';
 import type { Operator } from '../lib/types';
-import { Plus, Trash2, ToggleLeft, ToggleRight, Users, Shield, UtensilsCrossed, CreditCard, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff, Send, Copy, Check, X, ChefHat } from 'lucide-react';
+import { Plus, Trash2, ToggleLeft, ToggleRight, Users, Shield, UtensilsCrossed, CreditCard, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff, Send, Copy, Check, X, ChefHat, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { usePlan } from '../lib/planContext';
+import { OPERATOR_LIMIT, PLAN_DISPLAY } from '../lib/planFeatures';
 
 const ROLES: { value: Operator['role']; label: string; desc: string; icon: typeof Shield }[] = [
   { value: 'admin',   label: 'Admin',   desc: 'Acesso completo ao painel', icon: Shield },
@@ -19,6 +22,8 @@ interface SuccessBanner { name: string; email: string; password: string }
 
 export default function OperatorsPage() {
   const { user } = useAuth();
+  const { planSlug } = usePlan();
+  const navigate = useNavigate();
   const [operators, setOperators] = useState<Operator[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -28,6 +33,9 @@ export default function OperatorsPage() {
   const [success, setSuccess] = useState<SuccessBanner | null>(null);
   const [resetSent, setResetSent] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState('');
+
+  const limit = OPERATOR_LIMIT[planSlug] ?? 2;
+  const atLimit = limit !== -1 && operators.length >= limit;
 
   const load = () => { if (user) db.getOperators(user.id).then(setOperators); };
   useEffect(() => { load(); }, [user]);
@@ -40,6 +48,10 @@ export default function OperatorsPage() {
   };
 
   const save = async () => {
+    if (atLimit) {
+      setError(`Limite de ${limit} operador${limit !== 1 ? 'es' : ''} do plano ${PLAN_DISPLAY[planSlug]} atingido. Faça upgrade para adicionar mais.`);
+      return;
+    }
     if (!form.email.trim() || !form.name.trim()) { setError('Nome e e-mail são obrigatórios'); return; }
     if (form.password && form.password.length < 6) { setError('Senha deve ter pelo menos 6 caracteres'); return; }
     setSaving(true);
@@ -104,15 +116,56 @@ export default function OperatorsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Operadores</h1>
-          <p className="text-slate-500 mt-0.5 text-sm">Gerencie quem tem acesso ao sistema</p>
+          <p className="text-slate-500 mt-0.5 text-sm">
+            {limit === -1
+              ? `${operators.length} operador${operators.length !== 1 ? 'es' : ''} cadastrado${operators.length !== 1 ? 's' : ''} — ilimitado`
+              : `${operators.length} de ${limit} operador${limit !== 1 ? 'es' : ''} usados (Plano ${PLAN_DISPLAY[planSlug]})`}
+          </p>
         </div>
-        <button onClick={() => { setShowForm(s => !s); setError(''); }} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Adicionar operador
-        </button>
+        {atLimit ? (
+          <button
+            onClick={() => navigate('/upgrade?feature=operators')}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 text-sm font-bold rounded-xl hover:bg-amber-100 transition-colors"
+          >
+            <Lock className="w-4 h-4" />
+            Limite atingido — Fazer upgrade
+          </button>
+        ) : (
+          <button onClick={() => { setShowForm(s => !s); setError(''); }} className="btn-primary flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Adicionar operador
+          </button>
+        )}
       </div>
+
+      {/* Barra de progresso do limite */}
+      {limit !== -1 && (
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-slate-500">Operadores utilizados</span>
+            <span className={`text-xs font-bold ${atLimit ? 'text-red-600' : 'text-slate-700'}`}>
+              {operators.length} / {limit}
+            </span>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-2">
+            <div
+              className={`h-2 rounded-full transition-all ${atLimit ? 'bg-red-500' : operators.length / limit >= 0.75 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+              style={{ width: `${Math.min((operators.length / limit) * 100, 100)}%` }}
+            />
+          </div>
+          {atLimit && (
+            <p className="text-xs text-red-600 mt-2">
+              Limite atingido.{' '}
+              <button onClick={() => navigate('/upgrade?feature=operators')} className="underline font-semibold">
+                Faça upgrade
+              </button>{' '}
+              para adicionar mais operadores.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Roles legend */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
