@@ -40,53 +40,57 @@ export default function Layout() {
       return;
     }
 
-    // Verifica se voltou de um checkout Stripe bem-sucedido
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('checkout') === 'success') {
-      const sessionId = localStorage.getItem('stripe_session_id');
-      if (sessionId) {
-        localStorage.removeItem('stripe_session_id');
-        db.verifyStripeSession(sessionId).then(result => {
-          if (result.activated) {
-            // Remove query param sem reload
-            window.history.replaceState({}, '', window.location.pathname);
-            setPlanStatus('ok');
-            return;
+    (async () => {
+      // Se voltou de checkout Stripe, verifica sessão ANTES do paywall
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('checkout') === 'success') {
+        const sessionId = localStorage.getItem('stripe_session_id');
+        if (sessionId) {
+          localStorage.removeItem('stripe_session_id');
+          try {
+            const result = await db.verifyStripeSession(sessionId);
+            if (result.activated) {
+              window.history.replaceState({}, '', window.location.pathname);
+              setPlanStatus('ok');
+              return; // plano ativo — não executa paywall abaixo
+            }
+          } catch {
+            // falha na verificação: segue para checar getMyPlan normalmente
           }
-        });
+        }
       }
-    }
 
-    // Verifica onboarding
-    const key = `zm_onboarded_${user.id}`;
-    if (!localStorage.getItem(key)) {
-      db.getSettings(user.id).then(s => {
+      // Verifica onboarding
+      const key = `zm_onboarded_${user.id}`;
+      if (!localStorage.getItem(key)) {
+        const s = await db.getSettings(user.id).catch(() => null);
         if (s && s.name && s.name.includes('@')) {
           navigate('/onboarding');
-        } else {
-          localStorage.setItem(key, '1');
-        }
-      });
-    }
-    // Verifica plano (paywall)
-    db.getMyPlan().then(plan => {
-      if (!plan || plan.status === 'none') {
-        navigate('/planos');
-        return;
-      }
-      if (plan.isBlocked) { setPlanStatus('blocked'); return; }
-      if (plan.status === 'cancelled' || plan.status === 'expired') { navigate('/planos'); return; }
-      if (plan.status === 'trial') {
-        if (plan.trialEndsAt && new Date(plan.trialEndsAt) < new Date()) {
-          navigate('/planos');
           return;
         }
-        setDaysRemaining(plan.daysRemaining);
-        setPlanStatus(plan.daysRemaining <= 3 ? 'trial_warning' : 'ok');
-        return;
+        localStorage.setItem(key, '1');
       }
-      setPlanStatus('ok');
-    }).catch(() => setPlanStatus('ok')); // em caso de erro na RPC, não bloqueia
+
+      // Verifica plano (paywall)
+      try {
+        const plan = await db.getMyPlan();
+        if (!plan || plan.status === 'none') { navigate('/planos'); return; }
+        if (plan.isBlocked) { setPlanStatus('blocked'); return; }
+        if (plan.status === 'cancelled' || plan.status === 'expired') { navigate('/planos'); return; }
+        if (plan.status === 'trial') {
+          if (plan.trialEndsAt && new Date(plan.trialEndsAt) < new Date()) {
+            navigate('/planos');
+            return;
+          }
+          setDaysRemaining(plan.daysRemaining);
+          setPlanStatus(plan.daysRemaining <= 3 ? 'trial_warning' : 'ok');
+          return;
+        }
+        setPlanStatus('ok');
+      } catch {
+        setPlanStatus('ok'); // em caso de erro na RPC, não bloqueia
+      }
+    })();
   }, [user?.id]);
 
   const handleLogout = async () => {
