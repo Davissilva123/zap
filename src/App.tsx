@@ -1,5 +1,25 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Component, type ReactNode } from 'react';
 import { AuthProvider, useAuth } from './lib/auth';
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 24, fontFamily: 'monospace', background: '#fff1f2', color: '#9f1239', minHeight: '100vh' }}>
+          <h2 style={{ fontSize: 18, marginBottom: 12 }}>Erro na renderização</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>{this.state.error.message}{'\n\n'}{this.state.error.stack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { CustomerAuthProvider } from './lib/customerAuth';
 import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
@@ -94,6 +114,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <AuthProvider>
         <Routes>
@@ -164,5 +185,6 @@ export default function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
