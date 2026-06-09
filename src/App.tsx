@@ -34,6 +34,7 @@ import AdminRestaurantDetailPage from './pages/admin/RestaurantDetailPage';
 import AdminCobrancasPage from './pages/admin/CobrancasPage';
 import AdminMarketingPage from './pages/admin/MarketingPage';
 import PlanosPage from './pages/PlanosPage';
+import UpgradePage from './pages/UpgradePage';
 
 const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
@@ -121,19 +122,20 @@ export default function App() {
 
           {/* Owner routes (with sidebar Layout) */}
           <Route element={<OwnerRoute><Layout /></OwnerRoute>}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/menu" element={<MenuPage />} />
+            <Route path="/dashboard"  element={<DashboardPage />} />
+            <Route path="/menu"       element={<MenuPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
-            <Route path="/orders" element={<OrdersPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/reviews" element={<ReviewsPage />} />
-            <Route path="/coupons" element={<CouponsPage />} />
-            <Route path="/tables" element={<TablesPage />} />
-            <Route path="/comandas" element={<ComandasPage />} />
-            <Route path="/drivers" element={<DriversPage />} />
-            <Route path="/operators" element={<OperatorsPage />} />
-            <Route path="/qrcode" element={<QRCodePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/orders"     element={<OrdersPage />} />
+            <Route path="/reports"    element={<ReportsPage />} />
+            <Route path="/reviews"    element={<ReviewsPage />} />
+            <Route path="/coupons"    element={<CouponsPage />} />
+            <Route path="/tables"     element={<TablesPage />} />
+            <Route path="/comandas"   element={<ComandasPage />} />
+            <Route path="/drivers"    element={<DriversPage />} />
+            <Route path="/operators"  element={<OperatorsPage />} />
+            <Route path="/qrcode"     element={<QRCodePage />} />
+            <Route path="/settings"   element={<SettingsPage />} />
+            <Route path="/upgrade"    element={<UpgradePage />} />
           </Route>
 
           {/* Operator routes */}

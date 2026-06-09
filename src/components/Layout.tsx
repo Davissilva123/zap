@@ -1,24 +1,33 @@
-import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike, Lock } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState, useEffect } from 'react';
 import { db } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import { PlanContext } from '../lib/planContext';
+import { canAccess, PLAN_DISPLAY, FEATURE_MIN_PLAN, type PlanSlug, type FeatureKey } from '../lib/planFeatures';
 
-const BASE_NAV = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/menu', icon: UtensilsCrossed, label: 'Cardápio' },
-  { to: '/categories', icon: Grid3X3, label: 'Categorias' },
-  { to: '/orders', icon: Receipt, label: 'Pedidos' },
-  { to: '/reports', icon: BarChart2, label: 'Relatórios' },
-  { to: '/reviews', icon: Star, label: 'Avaliações' },
-  { to: '/coupons', icon: Tag, label: 'Cupons' },
-  { to: '/tables', icon: LayoutGrid, label: 'Mesas' },
-  { to: '/comandas', icon: ClipboardList, label: 'Comandas' },
-  { to: '/drivers', icon: Bike, label: 'Entregadores' },
-  { to: '/operators', icon: Users, label: 'Operadores' },
-  { to: '/qrcode', icon: QrCode, label: 'QR Code' },
-  { to: '/settings', icon: Settings, label: 'Configurações' },
+type NavItem = {
+  to: string;
+  icon: typeof LayoutDashboard;
+  label: string;
+  feature: FeatureKey;
+};
+
+const BASE_NAV: NavItem[] = [
+  { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',      feature: 'dashboard'  },
+  { to: '/menu',       icon: UtensilsCrossed, label: 'Cardápio',        feature: 'menu'       },
+  { to: '/categories', icon: Grid3X3,         label: 'Categorias',      feature: 'categories' },
+  { to: '/orders',     icon: Receipt,         label: 'Pedidos',         feature: 'orders'     },
+  { to: '/reports',    icon: BarChart2,       label: 'Relatórios',      feature: 'reports'    },
+  { to: '/coupons',    icon: Tag,             label: 'Cupons',          feature: 'coupons'    },
+  { to: '/tables',     icon: LayoutGrid,      label: 'Mesas',           feature: 'tables'     },
+  { to: '/reviews',    icon: Star,            label: 'Avaliações',      feature: 'reviews'    },
+  { to: '/comandas',   icon: ClipboardList,   label: 'Comandas',        feature: 'comandas'   },
+  { to: '/drivers',    icon: Bike,            label: 'Entregadores',    feature: 'drivers'    },
+  { to: '/operators',  icon: Users,           label: 'Operadores',      feature: 'operators'  },
+  { to: '/qrcode',     icon: QrCode,          label: 'QR Code',         feature: 'qrcode'     },
+  { to: '/settings',   icon: Settings,        label: 'Configurações',   feature: 'settings'   },
 ];
 
 export default function Layout() {
@@ -27,22 +36,21 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [planStatus, setPlanStatus] = useState<'loading' | 'ok' | 'trial_warning' | 'expired' | 'blocked'>('loading');
   const [daysRemaining, setDaysRemaining] = useState(0);
-
-  const navItems = BASE_NAV;
+  const [planSlug, setPlanSlug] = useState<PlanSlug>('');
+  const [planDisplayName, setPlanDisplayName] = useState('');
 
   const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
   useEffect(() => {
     if (!user) return;
 
-    // Super admin nunca passa pelo paywall
     if (user.email === SUPER_ADMIN_EMAIL) {
       setPlanStatus('ok');
+      setPlanSlug('premium'); // superadmin acessa tudo
       return;
     }
 
     (async () => {
-      // Se voltou de checkout Stripe, verifica sessão ANTES do paywall
       const params = new URLSearchParams(window.location.search);
       if (params.get('checkout') === 'success') {
         const sessionId = localStorage.getItem('stripe_session_id');
@@ -53,15 +61,12 @@ export default function Layout() {
             if (result.activated) {
               window.history.replaceState({}, '', window.location.pathname);
               setPlanStatus('ok');
-              return; // plano ativo — não executa paywall abaixo
+              return;
             }
-          } catch {
-            // falha na verificação: segue para checar getMyPlan normalmente
-          }
+          } catch { /* segue para checar getMyPlan */ }
         }
       }
 
-      // Verifica onboarding
       const key = `zm_onboarded_${user.id}`;
       if (!localStorage.getItem(key)) {
         const s = await db.getSettings(user.id).catch(() => null);
@@ -72,11 +77,9 @@ export default function Layout() {
         localStorage.setItem(key, '1');
       }
 
-      // Verifica plano (paywall)
       try {
         let plan = await db.getMyPlan();
 
-        // Novo usuário sem plano — tenta criar trial automaticamente
         if (!plan || plan.status === 'none') {
           await supabase.rpc('create_trial_plan', { p_user_id: user.id }).catch(() => {});
           plan = await db.getMyPlan().catch(() => null);
@@ -85,6 +88,12 @@ export default function Layout() {
         if (!plan || plan.status === 'none') { navigate('/planos?new=1'); return; }
         if (plan.isBlocked) { setPlanStatus('blocked'); return; }
         if (plan.status === 'cancelled' || plan.status === 'expired') { navigate('/planos'); return; }
+
+        // Armazena o plano para feature gating
+        const slug = (plan.planSlug ?? 'basic') as PlanSlug;
+        setPlanSlug(slug);
+        setPlanDisplayName(plan.planName ?? PLAN_DISPLAY[slug] ?? 'Básico');
+
         if (plan.status === 'trial') {
           if (plan.trialEndsAt && new Date(plan.trialEndsAt) < new Date()) {
             navigate('/planos');
@@ -96,7 +105,7 @@ export default function Layout() {
         }
         setPlanStatus('ok');
       } catch {
-        setPlanStatus('ok'); // em caso de erro na RPC, não bloqueia
+        setPlanStatus('ok');
       }
     })();
   }, [user?.id]);
@@ -113,12 +122,12 @@ export default function Layout() {
     .join('')
     .toUpperCase() || '?';
 
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150 ${
-      isActive
-        ? 'bg-emerald-500/10 text-emerald-400'
-        : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
-    }`;
+  const handleNavClick = (item: NavItem) => {
+    setMobileOpen(false);
+    if (!canAccess(planSlug, item.feature)) {
+      navigate(`/upgrade?feature=${item.feature}`);
+    }
+  };
 
   const sidebar = (
     <div className="flex flex-col h-full overflow-hidden">
@@ -141,13 +150,62 @@ export default function Layout() {
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         <p className="px-3 text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">Menu</p>
-        {navItems.map(item => (
-          <NavLink key={item.to} to={item.to} className={linkClass} onClick={() => setMobileOpen(false)}>
-            <item.icon className="w-[17px] h-[17px] flex-shrink-0" strokeWidth={1.75} />
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+        {BASE_NAV.map(item => {
+          const locked = planSlug !== '' && !canAccess(planSlug, item.feature);
+          const minPlan = FEATURE_MIN_PLAN[item.feature];
+          if (locked) {
+            return (
+              <button
+                key={item.to}
+                onClick={() => handleNavClick(item)}
+                title={`Requer plano ${PLAN_DISPLAY[minPlan]}`}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium text-slate-600/50 hover:bg-white/5 hover:text-slate-400 transition-all duration-150 group"
+              >
+                <item.icon className="w-[17px] h-[17px] flex-shrink-0 opacity-50" strokeWidth={1.75} />
+                <span className="flex-1 text-left opacity-60">{item.label}</span>
+                <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Lock className="w-3 h-3" />
+                  <span className="text-[10px] font-bold">{PLAN_DISPLAY[minPlan]}</span>
+                </span>
+                <Lock className="w-3 h-3 opacity-40 group-hover:opacity-0 transition-opacity" />
+              </button>
+            );
+          }
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150 ${
+                  isActive
+                    ? 'bg-emerald-500/10 text-emerald-400'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+                }`
+              }
+              onClick={() => setMobileOpen(false)}
+            >
+              <item.icon className="w-[17px] h-[17px] flex-shrink-0" strokeWidth={1.75} />
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
+
+      {/* Plano badge */}
+      {planSlug && (
+        <div className="px-4 py-2 border-t border-white/[0.06]">
+          <button
+            onClick={() => navigate('/planos')}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider">Plano</span>
+              <span className="text-xs font-bold text-emerald-400">{planDisplayName || PLAN_DISPLAY[planSlug]}</span>
+            </div>
+            <span className="text-[10px] text-slate-600 group-hover:text-slate-400 transition-colors">Upgrade →</span>
+          </button>
+        </div>
+      )}
 
       {/* User */}
       <div className="px-3 pb-4 border-t border-white/[0.06] pt-3 space-y-1">
@@ -172,78 +230,80 @@ export default function Layout() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 flex">
-      {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-[230px] bg-[#0d1117] fixed inset-y-0 border-r border-white/[0.04]">
-        {sidebar}
-      </aside>
+    <PlanContext.Provider value={{ planSlug, planName: planDisplayName || PLAN_DISPLAY[planSlug] || 'Básico' }}>
+      <div className="min-h-screen bg-slate-100 flex">
+        {/* Desktop sidebar */}
+        <aside className="hidden lg:flex flex-col w-[230px] bg-[#0d1117] fixed inset-y-0 border-r border-white/[0.04]">
+          {sidebar}
+        </aside>
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden animate-fade-in">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-          <aside className="fixed inset-y-0 left-0 w-[230px] bg-[#0d1117] z-50 flex flex-col border-r border-white/[0.04] shadow-2xl animate-slide-in-right">
-            {sidebar}
-          </aside>
-        </div>
-      )}
-
-      {/* Main */}
-      <div className="flex-1 lg:ml-[230px] min-h-screen flex flex-col">
-        {/* Mobile header */}
-        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200/60 px-4 py-3 flex items-center gap-3">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="p-2 -ml-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-600"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="font-bold text-slate-900 text-sm tracking-tight">ZapMenu</span>
+        {/* Mobile overlay */}
+        {mobileOpen && (
+          <div className="fixed inset-0 z-40 lg:hidden animate-fade-in">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+            <aside className="fixed inset-y-0 left-0 w-[230px] bg-[#0d1117] z-50 flex flex-col border-r border-white/[0.04] shadow-2xl animate-slide-in-right">
+              {sidebar}
+            </aside>
           </div>
-        </header>
+        )}
 
-        {/* Banner: período de teste */}
-        {planStatus === 'trial_warning' && (
-          <div className={`border-b px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap ${daysRemaining <= 2 ? 'bg-red-50 border-red-200' : daysRemaining <= 5 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
-            <p className={`text-sm font-semibold ${daysRemaining <= 2 ? 'text-red-800' : daysRemaining <= 5 ? 'text-amber-800' : 'text-emerald-800'}`}>
-              {daysRemaining <= 2 ? '🚨' : daysRemaining <= 5 ? '⚠️' : '🎉'}{' '}
-              {daysRemaining === 0
-                ? 'Seu período de teste encerra hoje! Assine para continuar.'
-                : <>Você está no <strong>período de teste</strong> — restam <strong>{daysRemaining} dia{daysRemaining !== 1 ? 's' : ''}</strong>.</>}
-            </p>
-            <button onClick={() => navigate('/planos')} className={`text-xs font-bold px-3 py-1.5 text-white rounded-lg transition-colors flex-shrink-0 ${daysRemaining <= 2 ? 'bg-red-600 hover:bg-red-700' : daysRemaining <= 5 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-              Ver preços
+        {/* Main */}
+        <div className="flex-1 lg:ml-[230px] min-h-screen flex flex-col">
+          {/* Mobile header */}
+          <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200/60 px-4 py-3 flex items-center gap-3">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="p-2 -ml-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-600"
+            >
+              <Menu className="w-5 h-5" />
             </button>
-          </div>
-        )}
-
-        {/* Tela de bloqueio */}
-        {planStatus === 'blocked' ? (
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="text-center max-w-sm">
-              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">🚫</span>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center">
+                <Zap className="w-3.5 h-3.5 text-white" />
               </div>
-              <h2 className="text-xl font-black text-slate-900 mb-2">Cardápio suspenso</h2>
-              <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-                Seu acesso foi suspenso por falta de pagamento. Entre em contato com o suporte para regularizar.
-              </p>
-              <button onClick={() => navigate('/planos')} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors text-sm">
-                Regularizar agora
-              </button>
-              <button onClick={handleLogout} className="mt-3 text-xs text-slate-400 hover:underline block mx-auto">Sair da conta</button>
+              <span className="font-bold text-slate-900 text-sm tracking-tight">ZapMenu</span>
             </div>
-          </div>
-        ) : (
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full overflow-x-hidden">
-            <Outlet />
-          </main>
-        )}
+          </header>
+
+          {/* Banner: período de teste */}
+          {planStatus === 'trial_warning' && (
+            <div className={`border-b px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap ${daysRemaining <= 2 ? 'bg-red-50 border-red-200' : daysRemaining <= 5 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+              <p className={`text-sm font-semibold ${daysRemaining <= 2 ? 'text-red-800' : daysRemaining <= 5 ? 'text-amber-800' : 'text-emerald-800'}`}>
+                {daysRemaining <= 2 ? '🚨' : daysRemaining <= 5 ? '⚠️' : '🎉'}{' '}
+                {daysRemaining === 0
+                  ? 'Seu período de teste encerra hoje! Assine para continuar.'
+                  : <>Você está no <strong>período de teste</strong> — restam <strong>{daysRemaining} dia{daysRemaining !== 1 ? 's' : ''}</strong>.</>}
+              </p>
+              <button onClick={() => navigate('/planos')} className={`text-xs font-bold px-3 py-1.5 text-white rounded-lg transition-colors flex-shrink-0 ${daysRemaining <= 2 ? 'bg-red-600 hover:bg-red-700' : daysRemaining <= 5 ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
+                Ver preços
+              </button>
+            </div>
+          )}
+
+          {/* Tela de bloqueio */}
+          {planStatus === 'blocked' ? (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-center max-w-sm">
+                <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-3xl">🚫</span>
+                </div>
+                <h2 className="text-xl font-black text-slate-900 mb-2">Cardápio suspenso</h2>
+                <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                  Seu acesso foi suspenso por falta de pagamento. Entre em contato com o suporte para regularizar.
+                </p>
+                <button onClick={() => navigate('/planos')} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors text-sm">
+                  Regularizar agora
+                </button>
+                <button onClick={handleLogout} className="mt-3 text-xs text-slate-400 hover:underline block mx-auto">Sair da conta</button>
+              </div>
+            </div>
+          ) : (
+            <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full overflow-x-hidden">
+              <Outlet />
+            </main>
+          )}
+        </div>
       </div>
-    </div>
+    </PlanContext.Provider>
   );
 }
