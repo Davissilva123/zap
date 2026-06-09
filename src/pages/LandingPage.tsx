@@ -166,6 +166,10 @@ export default function LandingPage() {
 
   const goRegister = () => navigate('/login?register=1');
 
+  const anyTrialEnabled = Object.values(trialSettings).some(t => t.enabled);
+  const basicTrialDays = trialSettings['basic']?.days ?? trialSettings['pro']?.days ?? 7;
+  const heroTrialText = anyTrialEnabled ? `${basicTrialDays} dias grátis · ` : '';
+
   return (
     <div className="min-h-screen bg-white font-sans antialiased">
 
@@ -224,12 +228,7 @@ export default function LandingPage() {
               Ver demonstração
             </button>
           </div>
-          <p className="text-slate-500 text-sm">
-            {Object.values(trialSettings).some(t => t.enabled)
-              ? `${trialSettings['basic']?.enabled ? trialSettings['basic'].days : Object.values(trialSettings).find(t => t.enabled)?.days} dias grátis · `
-              : ''}
-            Sem cartão de crédito · Cancele quando quiser
-          </p>
+          <p className="text-slate-500 text-sm">{heroTrialText}Sem cartão de crédito · Cancele quando quiser</p>
 
           <div className="mt-16 pt-12 border-t border-white/8 grid grid-cols-3 gap-6 max-w-lg mx-auto">
             {[{ n: '500+', l: 'Restaurantes' }, { n: '98%', l: 'Satisfação' }, { n: '15min', l: 'Para configurar' }].map((s, i) => (
@@ -368,12 +367,7 @@ export default function LandingPage() {
           <button onClick={goRegister} className="inline-flex items-center gap-2.5 px-10 py-4 bg-white text-emerald-700 font-bold rounded-2xl text-base transition-all hover:bg-emerald-50 hover:-translate-y-1 shadow-2xl shadow-emerald-900/30">
             Criar Cardápio <ArrowRight className="w-5 h-5" />
           </button>
-          <p className="text-emerald-200/60 text-sm mt-5">
-            {Object.values(trialSettings).some(t => t.enabled)
-              ? `${trialSettings['basic']?.enabled ? trialSettings['basic'].days : Object.values(trialSettings).find(t => t.enabled)?.days} dias grátis · `
-              : ''}
-            Sem cartão de crédito · Cancele quando quiser
-          </p>
+          <p className="text-emerald-200/60 text-sm mt-5">{heroTrialText}Sem cartão de crédito · Cancele quando quiser</p>
         </div>
       </section>
 
@@ -537,19 +531,22 @@ export default function LandingPage() {
                       problem: 'Cozinha em caos no horário de pico',
                       solution: 'KDS exibe cada pedido em ordem na tela da cozinha',
                     },
-                  ].map((p, i) => (
-                    <div key={i} className={`rounded-2xl border p-4 ${p.card}`}>
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${p.bg}`}>
-                        <p.icon className="w-4 h-4" />
+                  ].map((item, i) => {
+                    const ProblemIcon = item.icon;
+                    return (
+                      <div key={i} className={`rounded-2xl border p-4 ${item.card}`}>
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${item.bg}`}>
+                          <ProblemIcon className="w-4 h-4" />
+                        </div>
+                        <p className="flex items-start gap-1.5 text-rose-500 text-xs font-semibold mb-1.5 leading-snug">
+                          <X className="w-3 h-3 flex-shrink-0 mt-0.5" /> {item.problem}
+                        </p>
+                        <p className="flex items-start gap-1.5 text-emerald-700 text-xs font-bold leading-snug">
+                          <Check className="w-3 h-3 flex-shrink-0 mt-0.5" /> {item.solution}
+                        </p>
                       </div>
-                      <p className="flex items-start gap-1.5 text-rose-500 text-xs font-semibold mb-1.5 leading-snug">
-                        <X className="w-3 h-3 flex-shrink-0 mt-0.5" /> {p.problem}
-                      </p>
-                      <p className="flex items-start gap-1.5 text-emerald-700 text-xs font-bold leading-snug">
-                        <Check className="w-3 h-3 flex-shrink-0 mt-0.5" /> {p.solution}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -633,7 +630,7 @@ export default function LandingPage() {
                 <div className="flex-1 text-center sm:text-left">
                   <p className="font-black text-slate-900 text-base">Pronto para transformar seu restaurante?</p>
                   <p className="text-slate-500 text-xs mt-0.5">
-                    {Object.values(trialSettings).some(t => t.enabled)
+                    {anyTrialEnabled
                       ? 'Comece grátis agora. Sem cartão de crédito necessário.'
                       : 'Assine agora e comece hoje mesmo.'}
                   </p>
@@ -649,7 +646,7 @@ export default function LandingPage() {
                     onClick={() => { setShowDemo(false); goRegister(); }}
                     className="flex items-center gap-2 px-7 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl transition-all text-sm shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:-translate-y-0.5"
                   >
-                    {Object.values(trialSettings).some(t => t.enabled) ? 'Começar grátis' : 'Criar conta'}
+                    {anyTrialEnabled ? 'Começar grátis' : 'Criar conta'}
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
