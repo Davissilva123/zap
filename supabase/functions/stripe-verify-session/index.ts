@@ -42,25 +42,28 @@ Deno.serve(async (req) => {
     const sub = session.subscription as Stripe.Subscription | null;
     const periodEnd = sub?.current_period_end
       ? new Date(sub.current_period_end * 1000).toISOString()
-      : null;
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // fallback: +30 dias
 
-    // Ativa o plano
-    await supabase.from('restaurant_plans').upsert({
-      user_id:            user.id,
-      plan_name:          planSlug,
-      status:             'active',
-      payment_status:     'active',
-      stripe_subscription_id: sub?.id ?? null,
-      stripe_customer_id: session.customer as string ?? null,
-      last_payment_at:    new Date().toISOString(),
-      next_billing_at:    periodEnd,
-      overdue_since:      null,
-    }, { onConflict: 'user_id' });
+    const customerId = typeof session.customer === 'string'
+      ? session.customer
+      : (session.customer as any)?.id ?? null;
 
-    // Desbloqueia cardápio
-    await supabase.from('restaurant_settings')
-      .update({ blocked: false, blocked_reason: null })
-      .eq('user_id', user.id);
+    // Ativa o plano via SECURITY DEFINER (garante que bypassa RLS corretamente)
+    const { error: rpcError } = await supabase.rpc('activate_stripe_plan', {
+      p_user_id:         user.id,
+      p_plan_slug:       planSlug,
+      p_stripe_sub_id:   sub?.id ?? null,
+      p_stripe_customer: customerId,
+      p_next_billing_at: periodEnd,
+    });
+
+    if (rpcError) {
+      console.error('activate_stripe_plan RPC error:', rpcError);
+      return new Response(JSON.stringify({ activated: false, error: rpcError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Registra no histórico (evita duplicata se webhook já inseriu)
     const { data: existing } = await supabase

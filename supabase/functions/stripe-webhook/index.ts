@@ -117,17 +117,14 @@ Deno.serve(async (req) => {
           ? new Date(inv.lines.data[0].period.end * 1000).toISOString()
           : null;
 
-        await supabase.from('restaurant_plans').update({
-          status:         'active',
-          payment_status: 'active',
-          last_payment_at: new Date().toISOString(),
-          next_billing_at: periodEnd,
-          overdue_since:  null,
-        }).eq('user_id', userId);
-
-        await supabase.from('restaurant_settings')
-          .update({ blocked: false, blocked_reason: null })
-          .eq('user_id', userId);
+        const planSlugInv = (inv as any).subscription_details?.metadata?.plan_slug ?? 'pro';
+        await supabase.rpc('activate_stripe_plan', {
+          p_user_id:         userId,
+          p_plan_slug:       planSlugInv,
+          p_stripe_sub_id:   (inv as any).subscription ?? null,
+          p_stripe_customer: inv.customer as string ?? null,
+          p_next_billing_at: periodEnd,
+        });
 
         // Registra no histórico (evita duplicata pela reference do invoice)
         const { data: existingInv } = await supabase
@@ -137,14 +134,13 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (!existingInv) {
-          const planSlug = (inv as any).subscription_details?.metadata?.plan_slug ?? 'pro';
           await supabase.from('payment_history').insert({
             user_id:    userId,
             amount:     (inv.amount_paid ?? 0) / 100,
             method:     'stripe',
             status:     'paid',
             reference:  inv.id,
-            notes:      `Cobrança automática via Stripe — Plano ${planSlug}`,
+            notes:      `Cobrança automática via Stripe — Plano ${planSlugInv}`,
             paid_at:    new Date().toISOString(),
             created_by: null,
           });
