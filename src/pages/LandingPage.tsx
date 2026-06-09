@@ -29,19 +29,19 @@ const steps = [
 
 const plans = [
   {
-    name: 'Básico', price: 'R$ 39', period: 'mês', trial: '7 dias grátis',
+    slug: 'basic', name: 'Básico', price: 'R$ 39', period: 'mês',
     highlight: false, btnClass: 'bg-slate-900 hover:bg-slate-800 text-white',
     borderClass: 'border-slate-200',
     items: ['Cardápio online com QR Code', 'Até 50 itens', 'Portal do cliente', 'Pedidos via WhatsApp (manual)', '2 operadores', 'Suporte por email'],
   },
   {
-    name: 'Pro', price: 'R$ 89', period: 'mês', trial: '7 dias grátis', highlight: true,
+    slug: 'pro', name: 'Pro', price: 'R$ 89', period: 'mês', highlight: true,
     badge: 'Mais popular', btnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
     borderClass: 'border-emerald-500 ring-2 ring-emerald-500/20',
     items: ['Tudo do Básico', 'Itens ilimitados', 'PIX automático', 'WhatsApp automático', 'Relatórios e análises', 'Cupons e promoções', 'Até 5 operadores', 'Suporte prioritário'],
   },
   {
-    name: 'Premium', price: 'R$ 149', period: 'mês', trial: '7 dias grátis',
+    slug: 'premium', name: 'Premium', price: 'R$ 149', period: 'mês',
     highlight: false, badge: 'Completo', btnClass: 'bg-violet-600 hover:bg-violet-700 text-white',
     borderClass: 'border-violet-400 ring-2 ring-violet-400/20',
     items: ['Tudo do Pro', 'Operadores ilimitados', 'KDS para cozinha', 'Entregadores com GPS', 'Comandas digitais', 'Avaliações dos clientes', 'Suporte via WhatsApp'],
@@ -137,6 +137,11 @@ export default function LandingPage() {
   const [heroTitle, setHeroTitle] = useState('Cardápio digital para o seu restaurante');
   const [heroSubtitle, setHeroSubtitle] = useState('Crie seu cardápio, gere QR Codes e receba pedidos com pagamento via PIX — tudo em um só lugar.');
   const [businessHours, setBusinessHours] = useState('Segunda a sexta, das 9h às 18h. Suporte via WhatsApp.');
+  const [trialSettings, setTrialSettings] = useState<Record<string, { enabled: boolean; days: number }>>({
+    basic: { enabled: true, days: 7 },
+    pro:   { enabled: true, days: 7 },
+    premium: { enabled: true, days: 7 },
+  });
 
   useEffect(() => {
     db.getMarketingSettings().then(s => {
@@ -148,6 +153,12 @@ export default function LandingPage() {
       if (s.heroTitle) setHeroTitle(s.heroTitle);
       if (s.heroSubtitle) setHeroSubtitle(s.heroSubtitle);
       if (s.businessHours) setBusinessHours(s.businessHours);
+    }).catch(() => {});
+    db.getPlanTrialSettings().then(list => {
+      if (!list.length) return;
+      const map: Record<string, { enabled: boolean; days: number }> = {};
+      list.forEach(p => { map[p.slug] = { enabled: p.trialEnabled, days: p.trialDays }; });
+      setTrialSettings(map);
     }).catch(() => {});
   }, []);
 
@@ -213,7 +224,12 @@ export default function LandingPage() {
               Ver demonstração
             </button>
           </div>
-          <p className="text-slate-500 text-sm">7 dias grátis · Sem cartão de crédito · Cancele quando quiser</p>
+          <p className="text-slate-500 text-sm">
+            {Object.values(trialSettings).some(t => t.enabled)
+              ? `${trialSettings['basic']?.enabled ? trialSettings['basic'].days : Object.values(trialSettings).find(t => t.enabled)?.days} dias grátis · `
+              : ''}
+            Sem cartão de crédito · Cancele quando quiser
+          </p>
 
           <div className="mt-16 pt-12 border-t border-white/8 grid grid-cols-3 gap-6 max-w-lg mx-auto">
             {[{ n: '500+', l: 'Restaurantes' }, { n: '98%', l: 'Satisfação' }, { n: '15min', l: 'Para configurar' }].map((s, i) => (
@@ -302,7 +318,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
             <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-3 tracking-tight">Planos simples e transparentes</h2>
-            <p className="text-slate-500 text-lg">Todos com <strong>7 dias grátis</strong> — sem cartão de crédito · Cancele a qualquer momento</p>
+            <p className="text-slate-500 text-lg">Sem cartão de crédito · Cancele a qualquer momento</p>
           </div>
           <div className="grid sm:grid-cols-3 gap-5">
             {plans.map((plan, i) => (
@@ -318,7 +334,11 @@ export default function LandingPage() {
                     <span className="text-3xl font-black text-slate-900">{plan.price}</span>
                     <span className="text-slate-400 text-sm">/{plan.period}</span>
                   </div>
-                  <p className="text-xs text-emerald-600 font-semibold mt-1">{plan.trial}</p>
+                  {trialSettings[plan.slug]?.enabled && (
+                    <p className="text-xs text-emerald-600 font-semibold mt-1">
+                      {trialSettings[plan.slug].days} dias grátis
+                    </p>
+                  )}
                 </div>
                 <ul className="space-y-2.5 mb-7 flex-1">
                   {plan.items.map((item, j) => (
@@ -348,7 +368,12 @@ export default function LandingPage() {
           <button onClick={goRegister} className="inline-flex items-center gap-2.5 px-10 py-4 bg-white text-emerald-700 font-bold rounded-2xl text-base transition-all hover:bg-emerald-50 hover:-translate-y-1 shadow-2xl shadow-emerald-900/30">
             Criar Cardápio <ArrowRight className="w-5 h-5" />
           </button>
-          <p className="text-emerald-200/60 text-sm mt-5">7 dias grátis · Sem cartão de crédito · Cancele quando quiser</p>
+          <p className="text-emerald-200/60 text-sm mt-5">
+            {Object.values(trialSettings).some(t => t.enabled)
+              ? `${trialSettings['basic']?.enabled ? trialSettings['basic'].days : Object.values(trialSettings).find(t => t.enabled)?.days} dias grátis · `
+              : ''}
+            Sem cartão de crédito · Cancele quando quiser
+          </p>
         </div>
       </section>
 
@@ -480,7 +505,7 @@ export default function LandingPage() {
             </div>
             <div className="p-6 border-t border-slate-100 flex-shrink-0">
               <button onClick={() => { setShowDemo(false); goRegister(); }} className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all text-sm">
-                Começar 7 dias grátis <ArrowRight className="w-4 h-4" />
+                {Object.values(trialSettings).some(t => t.enabled) ? 'Começar grátis' : 'Criar conta'} <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>

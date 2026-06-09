@@ -74,6 +74,11 @@ export default function PlanosPage({ reason }: Props) {
   const [copied, setCopied] = useState(false);
   const [actualStatus, setActualStatus] = useState<string | null>(null);
   const [waNumber, setWaNumber] = useState('');
+  const [trialSettings, setTrialSettings] = useState<Record<string, { enabled: boolean; days: number }>>({
+    basic: { enabled: true, days: 7 },
+    pro:   { enabled: true, days: 7 },
+    premium: { enabled: true, days: 7 },
+  });
 
   const isNew = new URLSearchParams(window.location.search).has('new');
 
@@ -81,6 +86,12 @@ export default function PlanosPage({ reason }: Props) {
     db.getPlatformPlanPrices().then(setPrices).catch(() => {});
     db.getPixSettings().then(setPixSettings).catch(() => {});
     db.getMarketingSettings().then(s => { if (s?.whatsappNumber) setWaNumber(s.whatsappNumber); }).catch(() => {});
+    db.getPlanTrialSettings().then(list => {
+      if (!list.length) return;
+      const map: Record<string, { enabled: boolean; days: number }> = {};
+      list.forEach(p => { map[p.slug] = { enabled: p.trialEnabled, days: p.trialDays }; });
+      setTrialSettings(map);
+    }).catch(() => {});
 
     // Busca status real do plano para não mostrar mensagem errada
     db.getMyPlan().then(plan => {
@@ -218,6 +229,11 @@ export default function PlanosPage({ reason }: Props) {
                   <span className="text-3xl font-black text-slate-900">R$ {prices[plan.slug] ?? plan.price}</span>
                   <span className="text-slate-400 text-sm">/mês</span>
                   <p className="text-xs text-slate-400 mt-0.5">cobrado mensalmente no cartão</p>
+                  {trialSettings[plan.slug]?.enabled && (
+                    <p className="text-xs text-emerald-600 font-semibold mt-1">
+                      {trialSettings[plan.slug].days} dias grátis para testar
+                    </p>
+                  )}
                 </div>
 
                 <ul className="space-y-2 flex-1 mb-6">
