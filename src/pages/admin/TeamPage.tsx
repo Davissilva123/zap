@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from '../../lib/db';
-import { Users, Plus, Trash2, Power, RefreshCw, Shield, Lock, X } from 'lucide-react';
+import { Users, Plus, Trash2, Power, RefreshCw, Shield, Lock, X, Eye, EyeOff } from 'lucide-react';
 
 type Member = { id: string; email: string; name: string; role: string; active: boolean; createdAt: string };
 
@@ -9,7 +9,8 @@ export default function AdminTeamPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ email: '', name: '', role: 'limited' });
+  const [form, setForm] = useState({ email: '', name: '', password: '', role: 'limited' });
+  const [showPass, setShowPass] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Member | null>(null);
@@ -28,14 +29,17 @@ export default function AdminTeamPage() {
     setFormError('');
     if (!form.email.trim()) { setFormError('E-mail é obrigatório'); return; }
     if (!form.name.trim()) { setFormError('Nome é obrigatório'); return; }
+    if (!form.password.trim()) { setFormError('Senha é obrigatória'); return; }
+    if (form.password.length < 6) { setFormError('Senha deve ter pelo menos 6 caracteres'); return; }
     setFormLoading(true);
     try {
-      await db.upsertAdminTeamMember(form.email.trim(), form.name.trim(), form.role);
-      setForm({ email: '', name: '', role: 'limited' });
+      await db.createTeamMember(form.email.trim(), form.password, form.name.trim(), form.role);
+      setForm({ email: '', name: '', password: '', role: 'limited' });
+      setShowPass(false);
       setShowForm(false);
       await load();
     } catch (e: any) {
-      setFormError(e?.message ?? 'Erro ao salvar');
+      setFormError(e?.message ?? 'Erro ao criar usuário');
     } finally { setFormLoading(false); }
   };
 
@@ -182,21 +186,10 @@ export default function AdminTeamPage() {
             <div className="w-12 h-12 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-4">
               <Users className="w-6 h-6 text-violet-600" />
             </div>
-            <h3 className="text-base font-bold text-slate-900 text-center mb-1">Adicionar operador</h3>
-            <p className="text-xs text-slate-500 text-center mb-5">O operador deve primeiro criar uma conta no sistema com este e-mail.</p>
+            <h3 className="text-base font-bold text-slate-900 text-center mb-1">Criar operador</h3>
+            <p className="text-xs text-slate-500 text-center mb-5">A conta será criada automaticamente. Repasse o e-mail e senha ao operador.</p>
 
             <form onSubmit={handleAdd} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">E-mail</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  placeholder="operador@email.com"
-                  className="input w-full"
-                  autoFocus
-                />
-              </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nome</label>
                 <input
@@ -205,7 +198,37 @@ export default function AdminTeamPage() {
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="Nome do operador"
                   className="input w-full"
+                  autoFocus
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">E-mail</label>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="operador@email.com"
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Senha</label>
+                <div className="relative">
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                    placeholder="Mínimo 6 caracteres"
+                    className="input w-full pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nível de acesso</label>

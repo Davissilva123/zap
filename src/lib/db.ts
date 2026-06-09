@@ -1070,6 +1070,24 @@ export const db = {
 
   // --- Admin Team ---
 
+  async createTeamMember(email: string, password: string, name: string, role: string): Promise<void> {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+    const res = await fetch(`${supabaseUrl}/functions/v1/create-team-member`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'apikey': anonKey,
+      },
+      body: JSON.stringify({ email, password, name, role }),
+    });
+    const json = await res.json();
+    if (!res.ok || json.error) throw new Error(json.error ?? 'Erro ao criar membro');
+  },
+
   async getAdminTeam(): Promise<Array<{ id: string; email: string; name: string; role: string; active: boolean; createdAt: string }>> {
     const { data, error } = await supabase.rpc('get_admin_team');
     if (error || !data) return [];
