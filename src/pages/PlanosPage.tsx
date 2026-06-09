@@ -62,7 +62,7 @@ interface Props {
   reason?: 'expired' | 'blocked';
 }
 
-export default function PlanosPage({ reason = 'expired' }: Props) {
+export default function PlanosPage({ reason }: Props) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
@@ -72,23 +72,27 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
   const [showPixModal, setShowPixModal] = useState(false);
   const [selectedPlanForPix, setSelectedPlanForPix] = useState<{ name: string; price: number } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [actualStatus, setActualStatus] = useState<string | null>(null); // status real do banco
 
-  // Detecta se veio de um cadastro novo (?new=1)
   const isNew = new URLSearchParams(window.location.search).has('new');
 
   useEffect(() => {
     db.getPlatformPlanPrices().then(setPrices).catch(() => {});
     db.getPixSettings().then(setPixSettings).catch(() => {});
 
-    // Se novo usuário chegou aqui, tenta criar trial uma última vez e redireciona
-    if (isNew && user) {
-      supabase.rpc('create_trial_plan', { p_user_id: user.id })
-        .then(() => db.getMyPlan())
-        .then(plan => {
-          if (plan && plan.status === 'trial') navigate('/dashboard', { replace: true });
-        })
-        .catch(() => {});
-    }
+    // Busca status real do plano para não mostrar mensagem errada
+    db.getMyPlan().then(plan => {
+      setActualStatus(plan?.status ?? 'none');
+      // Novo usuário sem plano — tenta criar trial e redireciona
+      if (!plan || plan.status === 'none' || isNew) {
+        if (user) {
+          supabase.rpc('create_trial_plan', { p_user_id: user.id })
+            .then(() => db.getMyPlan())
+            .then(p => { if (p && p.status === 'trial') navigate('/dashboard', { replace: true }); })
+            .catch(() => {});
+        }
+      }
+    }).catch(() => setActualStatus('none'));
   }, []);
 
   const handleCopyPix = () => {
@@ -139,24 +143,35 @@ export default function PlanosPage({ reason = 'expired' }: Props) {
             <span className="font-black text-white text-xl tracking-tight">ZapMenu</span>
           </div>
 
-          {!isNew && (
-            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-5 ${
-              reason === 'blocked' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'
-            }`}>
+          {/* Badge — só aparece quando o teste/acesso REALMENTE encerrou */}
+          {(reason === 'blocked' || actualStatus === 'blocked') && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-5 bg-red-500/20 text-red-300">
               <Lock className="w-4 h-4" />
-              {reason === 'blocked' ? 'Acesso suspenso por inadimplência' : 'Seu período de teste encerrou'}
+              Acesso suspenso por inadimplência
+            </div>
+          )}
+          {actualStatus === 'expired' && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-5 bg-amber-500/20 text-amber-300">
+              <Lock className="w-4 h-4" />
+              Seu período de teste encerrou
             </div>
           )}
 
           <h1 className="text-3xl font-black text-white mb-2">
-            {reason === 'blocked' ? 'Reative seu acesso' : isNew ? 'Bem-vindo ao ZapMenu!' : 'Escolha seu plano'}
+            {(reason === 'blocked' || actualStatus === 'blocked')
+              ? 'Reative seu acesso'
+              : actualStatus === 'trial'
+              ? 'Você está no período de teste'
+              : 'Escolha seu plano'}
           </h1>
           <p className="text-slate-400 text-sm max-w-md mx-auto">
-            {reason === 'blocked'
+            {(reason === 'blocked' || actualStatus === 'blocked')
               ? 'Regularize sua assinatura para reativar o cardápio.'
-              : isNew
-              ? 'Seu teste grátis está ativo. Confira nossos planos quando quiser.'
-              : 'Assine agora e continue usando o ZapMenu sem interrupções.'}
+              : actualStatus === 'trial'
+              ? 'Seu teste está ativo. Assine agora para garantir acesso contínuo após o período de teste.'
+              : actualStatus === 'expired'
+              ? 'Assine agora e continue usando o ZapMenu sem interrupções.'
+              : 'Escolha o plano ideal para o seu restaurante.'}
           </p>
         </div>
 
