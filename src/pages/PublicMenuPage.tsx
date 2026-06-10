@@ -66,6 +66,10 @@ export default function PublicMenuPage() {
   // Taxa de entrega
   const [deliveryFee, setDeliveryFee] = useState(0);
 
+  // CEP auto-fill
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepError, setCepError] = useState('');
+
   // Cupons
   const [couponCode, setCouponCode] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
@@ -212,6 +216,42 @@ export default function PublicMenuPage() {
     setDeliveryFee(match ? match.fee : (settings.deliveryFee || 0));
   };
 
+  const handleCepChange = async (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 8);
+    const formatted = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+    setAddress(a => ({ ...a, zip: formatted }));
+    setCepError('');
+    if (digits.length === 8) {
+      setCepLoading(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+        const data = await res.json();
+        if (data.erro) {
+          setCepError('CEP não encontrado. Preencha o endereço manualmente.');
+        } else {
+          setAddress(a => ({
+            ...a,
+            zip: formatted,
+            street: data.logradouro || a.street,
+            neighborhood: data.bairro || a.neighborhood,
+            city: data.localidade || a.city,
+            state: data.uf || a.state,
+          }));
+          if (settings?.deliveryNeighborhoods?.length) {
+            const match = settings.deliveryNeighborhoods.find(n =>
+              n.name.toLowerCase() === (data.bairro || '').toLowerCase()
+            );
+            if (match) setDeliveryFee(match.fee);
+          }
+        }
+      } catch {
+        setCepError('Erro ao buscar CEP. Preencha o endereço manualmente.');
+      } finally {
+        setCepLoading(false);
+      }
+    }
+  };
+
   const validateDeliveryStep = () => {
     if (!customerName.trim()) return 'Nome é obrigatório';
     if (!customerPhone.trim()) return 'Telefone é obrigatório';
@@ -348,7 +388,8 @@ export default function PublicMenuPage() {
 
   const closeAndReset = () => {
     setCart([]); setShowCart(false); setStep('cart'); setCustomerName(''); setCustomerPhone('');
-    setAddress(emptyAddress); setSelectedPayment(''); setDeliveryType(mesaParam ? 'table' : 'pickup');
+    setAddress(emptyAddress); setCepError(''); setCepLoading(false);
+    setSelectedPayment(''); setDeliveryType(mesaParam ? 'table' : 'pickup');
     setPixCopyPaste(''); setPixQrCode(''); setPixTxId(''); setCashChange('');
     setCouponCode(''); setCouponValid(false); setCouponDiscount(0); setAppliedCouponId(null); setCouponMsg('');
     setPlacedOrderId(null); setOrderRating(0); setRatingComment(''); setRatingSubmitted(false);
@@ -1379,6 +1420,36 @@ export default function PublicMenuPage() {
                         <MapPin className="w-3.5 h-3.5 text-slate-400" />
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Endereço de entrega</span>
                       </div>
+
+                      {/* CEP — primeiro campo com auto-fill */}
+                      <div>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={address.zip}
+                            onChange={e => handleCepChange(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-400 pr-8"
+                            placeholder="CEP *"
+                            maxLength={9}
+                          />
+                          {cepLoading && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 animate-spin" />
+                          )}
+                        </div>
+                        {cepError && (
+                          <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                            <span>⚠️</span> {cepError}
+                          </p>
+                        )}
+                        {address.city && !cepLoading && !cepError && (
+                          <p className="text-xs text-emerald-600 mt-1 font-medium">
+                            ✓ {address.city}{address.state ? ` — ${address.state}` : ''}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Rua + Número */}
                       <div className="grid grid-cols-4 gap-2">
                         <input type="text" value={address.street} onChange={e => setAddress(a => ({ ...a, street: e.target.value }))}
                           className="col-span-3 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
@@ -1387,6 +1458,8 @@ export default function PublicMenuPage() {
                           className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
                           placeholder="Nº *" />
                       </div>
+
+                      {/* Complemento + Bairro */}
                       <div className="grid grid-cols-2 gap-2">
                         <input type="text" value={address.complement} onChange={e => setAddress(a => ({ ...a, complement: e.target.value }))}
                           className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
@@ -1408,21 +1481,21 @@ export default function PublicMenuPage() {
                             placeholder="Bairro *" />
                         )}
                       </div>
+
                       {address.neighborhood && deliveryFee > 0 && (
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
                           <Truck className="w-3.5 h-3.5 text-slate-400" /> Taxa de entrega: <strong className="text-slate-700">R$ {deliveryFee.toFixed(2).replace('.', ',')}</strong>
                         </div>
                       )}
-                      <div className="grid grid-cols-5 gap-2">
+
+                      {/* Cidade + UF (preenchidos pelo CEP, ainda editáveis) */}
+                      <div className="grid grid-cols-4 gap-2">
                         <input type="text" value={address.city} onChange={e => setAddress(a => ({ ...a, city: e.target.value }))}
                           className="col-span-3 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
                           placeholder="Cidade *" />
                         <input type="text" value={address.state} onChange={e => setAddress(a => ({ ...a, state: e.target.value }))}
                           className="col-span-1 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300"
                           placeholder="UF" maxLength={2} />
-                        <input type="text" value={address.zip} onChange={e => setAddress(a => ({ ...a, zip: e.target.value }))}
-                          className="col-span-1 px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-medium bg-white placeholder:text-slate-300 focus:outline-none focus:border-slate-300 hidden sm:block"
-                          placeholder="CEP" />
                       </div>
                     </div>
                   )}
