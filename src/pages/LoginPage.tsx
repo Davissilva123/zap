@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
-import { ArrowRight, AtSign, Lock, User, Zap } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { ArrowRight, AtSign, Lock, User, Zap, CheckCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
@@ -14,6 +15,26 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [isLogin, setIsLogin] = useState(() => !new URLSearchParams(window.location.search).has('register'));
+
+  // Reset password state
+  const [showReset, setShowReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSending, setResetSending] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetError, setResetError] = useState('');
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) return;
+    setResetSending(true);
+    setResetError('');
+    const { error: err } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+      redirectTo: `${window.location.origin}/login`,
+    });
+    setResetSending(false);
+    if (err) { setResetError('Erro ao enviar o email. Verifique o endereço e tente novamente.'); return; }
+    setResetSent(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +53,59 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex bg-slate-100">
+
+      {/* Reset password modal */}
+      {showReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-bold text-slate-900">Recuperar senha</h2>
+              <button onClick={() => { setShowReset(false); setResetSent(false); setResetError(''); setResetEmail(''); }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {resetSent ? (
+              <div className="text-center py-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-7 h-7 text-emerald-500" />
+                </div>
+                <p className="font-semibold text-slate-900 mb-2">Email enviado!</p>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  Verifique a caixa de entrada de <strong>{resetEmail}</strong> e clique no link para redefinir sua senha.
+                </p>
+                <button onClick={() => { setShowReset(false); setResetSent(false); setResetEmail(''); }}
+                  className="mt-5 w-full py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors">
+                  Fechar
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleReset} className="space-y-4">
+                <p className="text-sm text-slate-500">
+                  Digite o email da sua conta e enviaremos um link para redefinir sua senha.
+                </p>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Email</label>
+                  <div className="relative">
+                    <AtSign className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)}
+                      className="input-field pl-10 w-full" placeholder="seu@email.com" autoFocus required
+                    />
+                  </div>
+                </div>
+                {resetError && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-xl">{resetError}</p>}
+                <button type="submit" disabled={resetSending || !resetEmail.trim()}
+                  className="btn-primary w-full py-3 text-sm disabled:opacity-60">
+                  {resetSending ? 'Enviando...' : 'Enviar link de recuperação'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Left panel - branding */}
       <div className="hidden lg:flex flex-col justify-between w-[420px] bg-[#0d1117] p-10 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -114,7 +188,15 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Senha</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">Senha</label>
+                  {isLogin && (
+                    <button type="button" onClick={() => { setShowReset(true); setResetEmail(email); }}
+                      className="text-xs text-emerald-600 hover:text-emerald-700 font-medium hover:underline">
+                      Esqueceu a senha?
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-field pl-10" placeholder="••••••••" />
