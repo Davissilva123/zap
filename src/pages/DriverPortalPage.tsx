@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { db } from '../lib/db';
 import type { Order } from '../lib/types';
-import { Bike, MapPin, Phone, Navigation, CheckCircle, Loader2, RefreshCw, Package, Zap, LocateFixed, WifiOff } from 'lucide-react';
+import { Bike, MapPin, Phone, Navigation, CheckCircle, Loader2, RefreshCw, Package, Zap, LocateFixed, WifiOff, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 function formatAddress(addr: Order['deliveryAddress']): string {
@@ -26,6 +26,14 @@ function openWaze(addr: Order['deliveryAddress']) {
   window.open(`https://waze.com/ul?q=${query}&navigate=yes`, '_blank');
 }
 
+function openFullRoute(orders: Order[]) {
+  const stops = orders
+    .filter(o => o.deliveryAddress)
+    .map(o => encodeURIComponent(formatAddress(o.deliveryAddress)));
+  if (stops.length === 0) return;
+  window.open(`https://www.google.com/maps/dir/${stops.join('/')}`, '_blank');
+}
+
 export default function DriverPortalPage() {
   const { token } = useParams<{ token: string }>();
   const [driver, setDriver] = useState<{ id: string; name: string; phone: string } | null>(null);
@@ -45,7 +53,7 @@ export default function DriverPortalPage() {
       db.getDriverByToken(token),
       db.getDriverOrders(token),
     ]);
-    if (!d) { setError('Link inválido ou expirado.'); setLoading(false); return; }
+    if (!d) { setError('Link invalido ou expirado.'); setLoading(false); return; }
     setDriver(d);
     setOrders(o);
     setLoading(false);
@@ -57,12 +65,20 @@ export default function DriverPortalPage() {
     return () => clearInterval(interval);
   }, [load]);
 
-  const toggleGps = () => {
+  const toggleGps = async () => {
     if (gpsActive) {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
       setGpsActive(false);
       setGpsError('');
+      // Limpa posicao no banco para que o dono saiba que GPS foi desativado
+      if (driver) {
+        await supabase.from('drivers').update({
+          lat: null,
+          lng: null,
+          last_location_at: null,
+        }).eq('id', driver.id);
+      }
       return;
     }
     if (!navigator.geolocation) { setGpsError('GPS nao disponivel neste dispositivo'); return; }
@@ -84,7 +100,9 @@ export default function DriverPortalPage() {
   };
 
   useEffect(() => {
-    return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
+    return () => {
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
   }, []);
 
   const handleComplete = async (order: Order) => {
@@ -110,7 +128,7 @@ export default function DriverPortalPage() {
         <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mb-4">
           <Bike className="w-8 h-8 text-red-400" />
         </div>
-        <p className="text-white font-bold text-lg">Link inválido</p>
+        <p className="text-white font-bold text-lg">Link invalido</p>
         <p className="text-slate-400 text-sm mt-2">{error}</p>
       </div>
     );
@@ -161,15 +179,33 @@ export default function DriverPortalPage() {
           </div>
         ) : (
           <>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-              {active.length} entrega{active.length !== 1 ? 's' : ''} em andamento
-            </p>
-            {active.map(order => (
+            {/* Header + rota completa */}
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                {active.length} entrega{active.length !== 1 ? 's' : ''} em andamento
+              </p>
+              {active.length > 1 && (
+                <button
+                  onClick={() => openFullRoute(active)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Ver rota completa
+                </button>
+              )}
+            </div>
+
+            {active.map((order, idx) => (
               <div key={order.id} className="bg-slate-800 rounded-2xl border border-white/[0.06] overflow-hidden">
-                {/* Order header */}
+                {/* Sequence badge + order header */}
                 <div className="px-4 pt-4 pb-3 border-b border-white/[0.06]">
                   <div className="flex items-center justify-between">
-                    <p className="font-bold text-white">{order.customerName}</p>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-full bg-emerald-500 text-white text-xs font-black flex items-center justify-center flex-shrink-0">
+                        {idx + 1}
+                      </div>
+                      <p className="font-bold text-white">{order.customerName}</p>
+                    </div>
                     <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                       R$ {order.total.toFixed(2).replace('.', ',')}
                     </span>
@@ -177,7 +213,7 @@ export default function DriverPortalPage() {
                   {order.customerPhone && (
                     <a
                       href={`tel:${order.customerPhone}`}
-                      className="flex items-center gap-1.5 mt-1.5 text-sm text-slate-400 hover:text-emerald-400 transition-colors"
+                      className="flex items-center gap-1.5 mt-1.5 text-sm text-slate-400 hover:text-emerald-400 transition-colors ml-9"
                     >
                       <Phone className="w-3.5 h-3.5" />
                       {order.customerPhone}
@@ -194,7 +230,7 @@ export default function DriverPortalPage() {
                     </div>
                     {order.notes && (
                       <p className="text-xs text-amber-400 mt-2 bg-amber-400/10 rounded-lg px-3 py-1.5">
-                        ⚠️ {order.notes}
+                        {order.notes}
                       </p>
                     )}
                   </div>
@@ -238,7 +274,7 @@ export default function DriverPortalPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setNavModal(null)}>
           <div className="bg-slate-800 rounded-2xl w-full max-w-sm border border-white/[0.06] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-white/[0.06]">
-              <p className="font-bold text-white text-sm">Abrir navegação</p>
+              <p className="font-bold text-white text-sm">Abrir navegacao</p>
               <p className="text-xs text-slate-400 mt-0.5 truncate">{formatAddress(navModal.deliveryAddress)}</p>
             </div>
             <div className="p-3 space-y-2">

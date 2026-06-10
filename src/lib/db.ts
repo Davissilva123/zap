@@ -608,6 +608,17 @@ export const db = {
     return toDriver(data as DriverRow);
   },
 
+  async getDriverActiveOrders(driverId: string): Promise<Order[]> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('driver_id', driverId)
+      .eq('status', 'DELIVERING')
+      .order('created_at', { ascending: true });
+    if (error) return [];
+    return (data as OrderRow[]).map(toOrder);
+  },
+
   // ---- Admin: Analytics ----
   async getMrrByPlan(): Promise<Array<{ planSlug: string; planName: string; planPrice: number; activeCount: number; mrr: number }>> {
     const { data, error } = await supabase.rpc('get_mrr_by_plan');
