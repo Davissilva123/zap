@@ -55,6 +55,7 @@ export default function CustomerPortalPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const autoRateTriggered = useRef(false);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [updatedIds, setUpdatedIds] = useState<Set<string>>(new Set());
   const [ratingOrder, setRatingOrder] = useState<string | null>(null);
@@ -110,6 +111,20 @@ export default function CustomerPortalPage() {
       if (channelRef.current) supabaseCustomer.removeChannel(channelRef.current);
     };
   }, [customer, settings]);
+
+  // Auto-open rating when customer arrives via ?avaliar=1 link
+  useEffect(() => {
+    if (autoRateTriggered.current || loading || orders.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('avaliar') !== '1') return;
+    autoRateTriggered.current = true;
+    window.history.replaceState({}, '', window.location.pathname);
+    const target = orders.find(o => o.status === 'COMPLETED' && !o.rating);
+    if (target) {
+      setExpandedId(target.id);
+      setRatingOrder(target.id);
+    }
+  }, [loading, orders]);
 
   const refreshDriverLoc = useCallback(async (orderId: string) => {
     const { data } = await supabaseCustomer.rpc('get_driver_location_for_order', { p_order_id: orderId });

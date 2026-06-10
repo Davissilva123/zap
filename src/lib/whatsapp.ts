@@ -12,7 +12,7 @@ const STATUS_MESSAGES: Record<string, string> = {
   PAID: 'seu pagamento foi confirmado',
   PREPARING: 'seu pedido está sendo preparado',
   DELIVERING: 'seu pedido saiu para entrega',
-  COMPLETED: 'seu pedido foi entregue',
+  COMPLETED: 'seu pedido foi entregue com sucesso',
   CANCELLED: 'seu pedido foi cancelado',
 };
 
@@ -38,9 +38,15 @@ function buildMessage(order: Order, restaurantName: string, newStatus: string, p
   const delivery = order.deliveryType === 'delivery' && order.deliveryAddress
     ? `\nEntrega: ${formatAddress(order.deliveryAddress)}`
     : `\nRetirada no local`;
-  const trackingLine = portalUrl ? `\n\nAcompanhe seu pedido: ${portalUrl}` : '';
 
-  return `${restaurantName} — Atualização do Pedido\n\nOlá ${order.customerName}, ${statusMsg}!\n\nItens:\n${items}\n\nTotal: R$ ${order.total.toFixed(2).replace('.', ',')}\nPagamento: ${PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}${delivery}${trackingLine}\n\nObrigado pela preferência!`;
+  let ctaLine = '';
+  if (newStatus === 'COMPLETED' && portalUrl) {
+    ctaLine = `\n\n⭐ Gostou? Avalie seu pedido e nos ajude a melhorar:\n${portalUrl}`;
+  } else if (portalUrl) {
+    ctaLine = `\n\nAcompanhe seu pedido: ${portalUrl}`;
+  }
+
+  return `${restaurantName} — Atualização do Pedido\n\nOlá ${order.customerName}, ${statusMsg}!\n\nItens:\n${items}\n\nTotal: R$ ${order.total.toFixed(2).replace('.', ',')}\nPagamento: ${PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod}${delivery}${ctaLine}\n\nObrigado pela preferência!`;
 }
 
 export async function sendWhatsAppNotification(

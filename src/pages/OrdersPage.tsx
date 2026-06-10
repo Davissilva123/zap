@@ -141,7 +141,8 @@ export default function OrdersPage() {
       setSendingWhatsapp(orderId);
       setWhatsappError('');
       try {
-        await sendWhatsAppNotification(settings.whatsappApiToken, settings.whatsappPhoneNumberId, { ...order, status: newStatus as Order['status'] }, settings.name, newStatus, settings.slug ? `${window.location.origin}/m/${settings.slug}/conta` : undefined);
+        const reviewSuffix = newStatus === 'COMPLETED' ? '?avaliar=1' : '';
+      await sendWhatsAppNotification(settings.whatsappApiToken, settings.whatsappPhoneNumberId, { ...order, status: newStatus as Order['status'] }, settings.name, newStatus, settings.slug ? `${window.location.origin}/m/${settings.slug}/conta${reviewSuffix}` : undefined);
         setWhatsappSent(prev => ({ ...prev, [orderId]: true }));
       } catch (err) {
         setWhatsappError(String(err));
