@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike, Lock, Store } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike, Lock, Store, UserCheck, Package, Wallet, Package2, Clock, Megaphone } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState, useEffect } from 'react';
@@ -25,6 +25,12 @@ const BASE_NAV: NavItem[] = [
   { to: '/reviews',    icon: Star,            label: 'Avaliações',      feature: 'reviews'    },
   { to: '/comandas',   icon: ClipboardList,   label: 'Comandas',        feature: 'comandas'   },
   { to: '/drivers',    icon: Bike,            label: 'Entregadores',    feature: 'drivers'    },
+  { to: '/crm',         icon: UserCheck,       label: 'CRM',             feature: 'crm'        },
+  { to: '/estoque',    icon: Package,         label: 'Estoque',         feature: 'stock'      },
+  { to: '/caixa',      icon: Wallet,          label: 'Caixa',           feature: 'cashregister'},
+  { to: '/combos',     icon: Package2,        label: 'Combos',          feature: 'combos'     },
+  { to: '/promocoes',  icon: Clock,           label: 'Promoções',       feature: 'promotions' },
+  { to: '/campanhas',  icon: Megaphone,       label: 'Campanhas',       feature: 'campaigns'  },
   { to: '/operators',  icon: Users,           label: 'Operadores',      feature: 'operators'  },
   { to: '/branches',   icon: Store,           label: 'Filiais',         feature: 'settings'   },
   { to: '/qrcode',     icon: QrCode,          label: 'QR Code',         feature: 'qrcode'     },

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, ItemOption, OpeningHours, DeliveryNeighborhood, Coupon, RestaurantTable, Operator, Driver, Branch } from './types';
+import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, ItemOption, OpeningHours, DeliveryNeighborhood, Coupon, RestaurantTable, Operator, Driver, Branch, Combo, ComboItem, Promotion, CashSession, CashEntry, CustomerRecord } from './types';
 
 // ---- Supabase row shapes (snake_case) ----
 interface SettingsRow {
@@ -1184,5 +1184,226 @@ export const db = {
     const r = (data as any[])?.[0];
     if (!r) return null;
     return { ownerId: r.owner_id, branchName: r.branch_name, branchAddress: r.branch_address, branchPhone: r.branch_phone };
+  },
+
+  // ---- CRM (derived from orders) ----
+  async getCRMCustomers(userId: string): Promise<CustomerRecord[]> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('customer_phone, customer_name, total, created_at, status')
+      .eq('user_id', userId)
+      .neq('status', 'CANCELLED')
+      .order('created_at', { ascending: false });
+    if (error || !data) return [];
+    const map = new Map<string, CustomerRecord>();
+    const now = new Date();
+    for (const row of data as Array<{ customer_phone: string; customer_name: string; total: number; created_at: string }>) {
+      const phone = row.customer_phone;
+      if (!phone) continue;
+      if (!map.has(phone)) {
+        map.set(phone, { phone, name: row.customer_name, totalOrders: 0, totalSpent: 0, lastOrderAt: row.created_at, segment: 'inactive' });
+      }
+      const c = map.get(phone)!;
+      c.totalOrders++;
+      c.totalSpent += Number(row.total ?? 0);
+      if (new Date(row.created_at) > new Date(c.lastOrderAt)) c.lastOrderAt = row.created_at;
+    }
+    for (const c of map.values()) {
+      const daysSince = (now.getTime() - new Date(c.lastOrderAt).getTime()) / 86400000;
+      if (c.totalOrders >= 5 && daysSince <= 30) c.segment = 'loyal';
+      else if (c.totalOrders >= 2 && daysSince <= 60) c.segment = 'active';
+      else if (daysSince <= 120) c.segment = 'at_risk';
+      else c.segment = 'inactive';
+    }
+    return Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+  },
+
+  // ---- Combos ----
+  async getCombos(userId: string): Promise<Combo[]> {
+    const { data, error } = await supabase
+      .from('combos')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error || !data) return [];
+    return (data as any[]).map(r => ({
+      id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji ?? '🍱',
+      description: r.description ?? '', price: Number(r.price ?? 0),
+      active: r.active, items: (r.items as ComboItem[]) ?? [], createdAt: r.created_at,
+    }));
+  },
+
+  async addCombo(userId: string, combo: Omit<Combo, 'id' | 'userId' | 'createdAt'>): Promise<void> {
+    const { error } = await supabase.from('combos').insert({
+      user_id: userId, name: combo.name, emoji: combo.emoji,
+      description: combo.description, price: combo.price,
+      active: combo.active, items: combo.items,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  async updateCombo(id: string, updates: Partial<Omit<Combo, 'id' | 'userId' | 'createdAt'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.name !== undefined) row.name = updates.name;
+    if (updates.emoji !== undefined) row.emoji = updates.emoji;
+    if (updates.description !== undefined) row.description = updates.description;
+    if (updates.price !== undefined) row.price = updates.price;
+    if (updates.active !== undefined) row.active = updates.active;
+    if (updates.items !== undefined) row.items = updates.items;
+    await supabase.from('combos').update(row).eq('id', id);
+  },
+
+  async deleteCombo(id: string): Promise<void> {
+    await supabase.from('combos').delete().eq('id', id);
+  },
+
+  // ---- Promotions ----
+  async getPromotions(userId: string): Promise<Promotion[]> {
+    const { data, error } = await supabase
+      .from('promotions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error || !data) return [];
+    return (data as any[]).map(r => ({
+      id: r.id, userId: r.user_id, name: r.name,
+      daysOfWeek: r.days_of_week ?? [], startTime: r.start_time, endTime: r.end_time,
+      discountPercent: Number(r.discount_percent ?? 0),
+      targetType: r.target_type as Promotion['targetType'],
+      targetId: r.target_id ?? null, active: r.active, createdAt: r.created_at,
+    }));
+  },
+
+  async addPromotion(userId: string, p: Omit<Promotion, 'id' | 'userId' | 'createdAt'>): Promise<void> {
+    const { error } = await supabase.from('promotions').insert({
+      user_id: userId, name: p.name, days_of_week: p.daysOfWeek,
+      start_time: p.startTime, end_time: p.endTime,
+      discount_percent: p.discountPercent, target_type: p.targetType,
+      target_id: p.targetId, active: p.active,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  async updatePromotion(id: string, updates: Partial<Omit<Promotion, 'id' | 'userId' | 'createdAt'>>): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.name !== undefined) row.name = updates.name;
+    if (updates.daysOfWeek !== undefined) row.days_of_week = updates.daysOfWeek;
+    if (updates.startTime !== undefined) row.start_time = updates.startTime;
+    if (updates.endTime !== undefined) row.end_time = updates.endTime;
+    if (updates.discountPercent !== undefined) row.discount_percent = updates.discountPercent;
+    if (updates.targetType !== undefined) row.target_type = updates.targetType;
+    if (updates.targetId !== undefined) row.target_id = updates.targetId;
+    if (updates.active !== undefined) row.active = updates.active;
+    await supabase.from('promotions').update(row).eq('id', id);
+  },
+
+  async deletePromotion(id: string): Promise<void> {
+    await supabase.from('promotions').delete().eq('id', id);
+  },
+
+  // ---- Cash Register ----
+  async getCurrentCashSession(userId: string): Promise<CashSession | null> {
+    const { data, error } = await supabase
+      .from('cash_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'open')
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      id: data.id, userId: data.user_id, openedAt: data.opened_at,
+      closedAt: data.closed_at ?? null, openingAmount: Number(data.opening_amount ?? 0),
+      closingAmount: data.closing_amount ? Number(data.closing_amount) : null,
+      totalSales: Number(data.total_sales ?? 0), totalWithdrawals: Number(data.total_withdrawals ?? 0),
+      totalDeposits: Number(data.total_deposits ?? 0), status: data.status,
+      notes: data.notes ?? '', createdAt: data.created_at,
+    };
+  },
+
+  async getCashSessions(userId: string): Promise<CashSession[]> {
+    const { data, error } = await supabase
+      .from('cash_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('opened_at', { ascending: false })
+      .limit(30);
+    if (error || !data) return [];
+    return (data as any[]).map(r => ({
+      id: r.id, userId: r.user_id, openedAt: r.opened_at, closedAt: r.closed_at ?? null,
+      openingAmount: Number(r.opening_amount ?? 0), closingAmount: r.closing_amount ? Number(r.closing_amount) : null,
+      totalSales: Number(r.total_sales ?? 0), totalWithdrawals: Number(r.total_withdrawals ?? 0),
+      totalDeposits: Number(r.total_deposits ?? 0), status: r.status,
+      notes: r.notes ?? '', createdAt: r.created_at,
+    }));
+  },
+
+  async openCashSession(userId: string, openingAmount: number, notes = ''): Promise<CashSession> {
+    const { data, error } = await supabase
+      .from('cash_sessions')
+      .insert({ user_id: userId, opening_amount: openingAmount, status: 'open', notes })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    const r = data as any;
+    return {
+      id: r.id, userId: r.user_id, openedAt: r.opened_at, closedAt: null,
+      openingAmount: Number(r.opening_amount), closingAmount: null,
+      totalSales: 0, totalWithdrawals: 0, totalDeposits: 0,
+      status: 'open', notes: r.notes ?? '', createdAt: r.created_at,
+    };
+  },
+
+  async closeCashSession(id: string, closingAmount: number, notes = ''): Promise<void> {
+    await supabase.from('cash_sessions').update({
+      status: 'closed', closed_at: new Date().toISOString(),
+      closing_amount: closingAmount, notes,
+    }).eq('id', id);
+  },
+
+  async getCashEntries(sessionId: string): Promise<CashEntry[]> {
+    const { data, error } = await supabase
+      .from('cash_entries')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false });
+    if (error || !data) return [];
+    return (data as any[]).map(r => ({
+      id: r.id, sessionId: r.session_id, userId: r.user_id,
+      type: r.type as CashEntry['type'], amount: Number(r.amount),
+      description: r.description ?? '', createdAt: r.created_at,
+    }));
+  },
+
+  async addCashEntry(userId: string, sessionId: string, type: CashEntry['type'], amount: number, description = ''): Promise<void> {
+    await supabase.from('cash_entries').insert({ user_id: userId, session_id: sessionId, type, amount, description });
+    const col = type === 'withdrawal' ? 'total_withdrawals' : type === 'deposit' ? 'total_deposits' : 'total_sales';
+    const { data: sess } = await supabase.from('cash_sessions').select(col).eq('id', sessionId).single();
+    if (sess) {
+      await supabase.from('cash_sessions').update({ [col]: Number((sess as any)[col] ?? 0) + amount }).eq('id', sessionId);
+    }
+  },
+
+  // ---- Stock Movements ----
+  async addStockMovement(userId: string, menuItemId: string, delta: number, reason = ''): Promise<void> {
+    await supabase.from('stock_movements').insert({ user_id: userId, menu_item_id: menuItemId, delta, reason });
+    const { data: item } = await supabase.from('menu_items').select('stock').eq('id', menuItemId).single();
+    if (item) {
+      const newStock = Math.max(0, Number((item as any).stock ?? 0) + delta);
+      await supabase.from('menu_items').update({ stock: newStock }).eq('id', menuItemId);
+    }
+  },
+
+  async getStockMovements(userId: string, menuItemId: string): Promise<Array<{ id: string; delta: number; reason: string; createdAt: string }>> {
+    const { data, error } = await supabase
+      .from('stock_movements')
+      .select('id, delta, reason, created_at')
+      .eq('user_id', userId)
+      .eq('menu_item_id', menuItemId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (error || !data) return [];
+    return (data as any[]).map(r => ({ id: r.id, delta: Number(r.delta), reason: r.reason ?? '', createdAt: r.created_at }));
   },
 };

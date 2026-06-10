@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import CookieBanner from '../components/CookieBanner';
 import { db } from '../lib/db';
 import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS, type PixChargeResult } from '../lib/xgate';
 import { createMpPixCharge, checkMpPayment, cancelMpPayment } from '../lib/mercadopago';
@@ -468,6 +469,7 @@ export default function PublicMenuPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f5f5]">
+      <CookieBanner />
 
       {/* ── HERO ── */}
       {settings.coverUrl ? (

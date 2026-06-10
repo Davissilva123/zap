@@ -3,7 +3,9 @@ export type PlanSlug = 'basic' | 'pro' | 'premium' | '';
 export type FeatureKey =
   | 'dashboard' | 'menu' | 'categories' | 'orders' | 'qrcode' | 'settings' | 'operators'
   | 'reports' | 'coupons' | 'tables'
-  | 'reviews' | 'comandas' | 'drivers';
+  | 'reviews' | 'comandas' | 'drivers'
+  | 'crm' | 'stock' | 'cashregister' | 'combos' | 'promotions'
+  | 'campaigns';
 
 const LEVEL: Record<PlanSlug, number> = { '': 0, basic: 1, pro: 2, premium: 3 };
 
@@ -17,13 +19,19 @@ export const FEATURE_MIN_PLAN: Record<FeatureKey, PlanSlug> = {
   settings:   'basic',
   operators:  'basic',
   // Pro
-  reports:    'pro',
-  coupons:    'pro',
-  tables:     'pro',
+  reports:      'pro',
+  coupons:      'pro',
+  tables:       'pro',
+  crm:          'pro',
+  stock:        'pro',
+  cashregister: 'pro',
+  combos:       'pro',
+  promotions:   'pro',
   // Premium
-  reviews:    'premium',
-  comandas:   'premium',
-  drivers:    'premium',
+  reviews:      'premium',
+  comandas:     'premium',
+  drivers:      'premium',
+  campaigns:    'premium',
 };
 
 export const PLAN_DISPLAY: Record<PlanSlug, string> = {

@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { RestaurantSettings, PaymentMethod } from '../lib/types';
-import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift, Crown, XCircle, ExternalLink } from 'lucide-react';
+import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift, Crown, XCircle, ExternalLink, Globe, Shield, Copy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DeliveryNeighborhood, DayHours } from '../lib/types';
 
@@ -532,6 +532,184 @@ export default function SettingsPage() {
           </p>
         </SectionCard>
       )}
+
+      {/* Custom Domain */}
+      <CustomDomainSection slug={form?.slug ?? ''} />
+
+      {/* 2FA */}
+      <TwoFactorSection />
     </div>
+  );
+}
+
+function CustomDomainSection({ slug }: { slug: string }) {
+  const [domain, setDomain] = useState(() => localStorage.getItem('zm_custom_domain') ?? '');
+  const [copied, setCopied] = useState(false);
+  const target = `${window.location.hostname}`;
+
+  const save = () => {
+    localStorage.setItem('zm_custom_domain', domain.trim());
+    alert('Dominio salvo! Configure o registro CNAME no seu provedor de DNS conforme as instrucoes abaixo.');
+  };
+
+  const copy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <SectionCard icon={Globe} title="Dominio proprio" description="Aponte um dominio personalizado para o seu cardapio">
+      <div>
+        <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Dominio (ex: cardapio.seurestaurante.com.br)</label>
+        <div className="flex gap-2">
+          <input
+            value={domain}
+            onChange={e => setDomain(e.target.value)}
+            className="input flex-1"
+            placeholder="cardapio.seurestaurante.com.br"
+          />
+          <button onClick={save} className="btn-primary flex items-center gap-1.5">
+            <Check className="w-4 h-4" /> Salvar
+          </button>
+        </div>
+      </div>
+      <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-200">
+        <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Configuracao de DNS (CNAME)</p>
+        <p className="text-xs text-slate-500 leading-relaxed">No painel do seu provedor de DNS (Registro.br, GoDaddy, Cloudflare, etc.), adicione o registro:</p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2 bg-white rounded-lg border border-slate-200 px-3 py-2">
+            <div className="font-mono text-xs text-slate-700">
+              <span className="text-slate-400">Tipo: </span>CNAME &nbsp;
+              <span className="text-slate-400">Nome: </span>{domain || 'cardapio'} &nbsp;
+              <span className="text-slate-400">Destino: </span>{target}
+            </div>
+            <button onClick={() => copy(`CNAME ${domain || 'cardapio'} ${target}`)} className="p-1 rounded-lg hover:bg-slate-100 flex-shrink-0">
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-slate-400">A propagacao do DNS pode levar ate 48 horas. Apos configurado, acesse <code className="bg-slate-100 px-1 rounded">{domain || 'seu-dominio'}</code> para ver o cardapio.</p>
+      </div>
+    </SectionCard>
+  );
+}
+
+function TwoFactorSection() {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'enrolling' | 'done'>('idle');
+  const [qrCode, setQrCode] = useState('');
+  const [secret, setSecret] = useState('');
+  const [code, setCode] = useState('');
+  const [factorId, setFactorId] = useState('');
+  const [error, setError] = useState('');
+  const [factors, setFactors] = useState<Array<{ id: string; status: string }>>([]);
+
+  useEffect(() => {
+    import('../lib/supabase').then(({ supabase }) => {
+      supabase.auth.mfa.listFactors().then(({ data }) => {
+        setFactors(data?.totp ?? []);
+      });
+    });
+  }, []);
+
+  const startEnroll = async () => {
+    setStatus('loading');
+    setError('');
+    const { supabase } = await import('../lib/supabase');
+    const { data, error: err } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+    if (err || !data) { setError(err?.message ?? 'Erro ao iniciar 2FA'); setStatus('idle'); return; }
+    setQrCode(data.totp.qr_code);
+    setSecret(data.totp.secret);
+    setFactorId(data.id);
+    setStatus('enrolling');
+  };
+
+  const verify = async () => {
+    if (!code || code.length !== 6) return;
+    setError('');
+    const { supabase } = await import('../lib/supabase');
+    const { data: challenge } = await supabase.auth.mfa.challenge({ factorId });
+    if (!challenge) { setError('Erro ao iniciar desafio'); return; }
+    const { error: err } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code });
+    if (err) { setError('Codigo invalido. Tente novamente.'); return; }
+    setStatus('done');
+    setFactors(f => [...f, { id: factorId, status: 'verified' }]);
+  };
+
+  const removeFactor = async (id: string) => {
+    if (!confirm('Desativar 2FA? Voce precisara reconfigurar se quiser reativar.')) return;
+    const { supabase } = await import('../lib/supabase');
+    await supabase.auth.mfa.unenroll({ factorId: id });
+    setFactors(f => f.filter(x => x.id !== id));
+    setStatus('idle');
+  };
+
+  const verified = factors.filter(f => f.status === 'verified');
+
+  return (
+    <SectionCard icon={Shield} title="Autenticacao em dois fatores (2FA)" description="Adicione uma camada extra de seguranca a sua conta">
+      {status === 'done' ? (
+        <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+          <Check className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-emerald-800 text-sm">2FA ativado com sucesso!</p>
+            <p className="text-xs text-emerald-600 mt-0.5">Sua conta agora requer o aplicativo autenticador ao fazer login.</p>
+          </div>
+        </div>
+      ) : verified.length > 0 ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+            <Shield className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold text-emerald-800 text-sm">2FA ativo</p>
+              <p className="text-xs text-emerald-600 mt-0.5">Sua conta esta protegida com autenticacao em dois fatores.</p>
+            </div>
+            <button onClick={() => removeFactor(verified[0].id)} className="text-xs text-red-500 font-semibold hover:underline flex-shrink-0">Desativar</button>
+          </div>
+        </div>
+      ) : status === 'enrolling' ? (
+        <div className="space-y-4">
+          <div className="text-sm text-slate-600 space-y-2">
+            <p>1. Instale o <strong>Google Authenticator</strong> ou <strong>Authy</strong> no celular</p>
+            <p>2. Escaneie o QR Code abaixo</p>
+          </div>
+          {qrCode && (
+            <div className="flex flex-col items-center gap-3">
+              <div className="bg-white border-2 border-slate-200 rounded-xl p-3">
+                <img src={qrCode} alt="QR Code 2FA" className="w-40 h-40" />
+              </div>
+              <details className="text-center">
+                <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600">Nao consegue escanear? Ver codigo manual</summary>
+                <p className="text-xs font-mono bg-slate-100 rounded-lg px-3 py-2 mt-2 break-all select-all">{secret}</p>
+              </details>
+            </div>
+          )}
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">3. Digite o codigo de 6 digitos</label>
+            <div className="flex gap-2">
+              <input
+                value={code}
+                onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="input flex-1 font-mono text-center text-xl tracking-widest"
+                placeholder="000000"
+                maxLength={6}
+              />
+              <button onClick={verify} disabled={code.length !== 6} className="btn-primary">Verificar</button>
+            </div>
+          </div>
+          {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-xl">{error}</p>}
+          <button onClick={() => setStatus('idle')} className="text-xs text-slate-400 hover:underline">Cancelar</button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500">O 2FA usa um aplicativo autenticador (Google Authenticator, Authy) para gerar codigos temporarios ao fazer login.</p>
+          {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-xl">{error}</p>}
+          <button onClick={startEnroll} disabled={status === 'loading'} className="btn-primary flex items-center gap-2">
+            {status === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+            {status === 'loading' ? 'Aguarde...' : 'Ativar 2FA'}
+          </button>
+        </div>
+      )}
+    </SectionCard>
   );
 }

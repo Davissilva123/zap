@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { db } from '../lib/db';
 import type { Order } from '../lib/types';
-import { Bike, MapPin, Phone, Navigation, CheckCircle, Loader2, RefreshCw, Package, Zap } from 'lucide-react';
+import { Bike, MapPin, Phone, Navigation, CheckCircle, Loader2, RefreshCw, Package, Zap, LocateFixed, WifiOff } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 function formatAddress(addr: Order['deliveryAddress']): string {
   if (!addr) return '';
@@ -34,6 +35,9 @@ export default function DriverPortalPage() {
   const [completing, setCompleting] = useState<string | null>(null);
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [navModal, setNavModal] = useState<Order | null>(null);
+  const [gpsActive, setGpsActive] = useState(false);
+  const [gpsError, setGpsError] = useState('');
+  const watchIdRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -52,6 +56,36 @@ export default function DriverPortalPage() {
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
   }, [load]);
+
+  const toggleGps = () => {
+    if (gpsActive) {
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+      setGpsActive(false);
+      setGpsError('');
+      return;
+    }
+    if (!navigator.geolocation) { setGpsError('GPS nao disponivel neste dispositivo'); return; }
+    setGpsError('');
+    const id = navigator.geolocation.watchPosition(
+      async pos => {
+        if (!driver) return;
+        await supabase.from('drivers').update({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          last_location_at: new Date().toISOString(),
+        }).eq('id', driver.id);
+      },
+      () => setGpsError('Erro ao obter localizacao. Verifique as permissoes.'),
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+    watchIdRef.current = id;
+    setGpsActive(true);
+  };
+
+  useEffect(() => {
+    return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
+  }, []);
 
   const handleComplete = async (order: Order) => {
     if (!token) return;
@@ -96,11 +130,21 @@ export default function DriverPortalPage() {
             <p className="font-bold text-white text-sm leading-none">ZapMenu</p>
             <p className="text-emerald-400 text-xs mt-0.5 font-medium">Portal do Entregador</p>
           </div>
-          <div className="ml-auto text-right">
+          <div className="ml-auto text-right space-y-1">
             <p className="text-white font-bold text-sm">{driver?.name}</p>
-            <button onClick={load} className="flex items-center gap-1 text-slate-400 text-xs mt-0.5 hover:text-slate-200 transition-colors">
-              <RefreshCw className="w-3 h-3" /> Atualizar
-            </button>
+            <div className="flex items-center gap-2 justify-end">
+              <button onClick={load} className="flex items-center gap-1 text-slate-400 text-xs hover:text-slate-200 transition-colors">
+                <RefreshCw className="w-3 h-3" /> Atualizar
+              </button>
+              <button
+                onClick={toggleGps}
+                className={`flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full transition-colors ${gpsActive ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-400 hover:text-slate-200'}`}
+              >
+                {gpsActive ? <LocateFixed className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                {gpsActive ? 'GPS ativo' : 'GPS off'}
+              </button>
+            </div>
+            {gpsError && <p className="text-xs text-red-400">{gpsError}</p>}
           </div>
         </div>
       </div>

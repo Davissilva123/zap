@@ -57,6 +57,12 @@ import AdminTeamPage from './pages/admin/TeamPage';
 import PlanosPage from './pages/PlanosPage';
 import UpgradePage from './pages/UpgradePage';
 import BranchesPage from './pages/BranchesPage';
+import CRMPage from './pages/CRMPage';
+import StockPage from './pages/StockPage';
+import CashRegisterPage from './pages/CashRegisterPage';
+import CombosPage from './pages/CombosPage';
+import PromotionsPage from './pages/PromotionsPage';
+import CampaignsPage from './pages/CampaignsPage';
 
 const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
@@ -157,6 +163,12 @@ export default function App() {
             <Route path="/drivers"    element={<DriversPage />} />
             <Route path="/operators"  element={<OperatorsPage />} />
             <Route path="/branches"   element={<BranchesPage />} />
+            <Route path="/crm"        element={<CRMPage />} />
+            <Route path="/estoque"    element={<StockPage />} />
+            <Route path="/caixa"      element={<CashRegisterPage />} />
+            <Route path="/combos"     element={<CombosPage />} />
+            <Route path="/promocoes"  element={<PromotionsPage />} />
+            <Route path="/campanhas"  element={<CampaignsPage />} />
             <Route path="/qrcode"     element={<QRCodePage />} />
             <Route path="/settings"   element={<SettingsPage />} />
             <Route path="/upgrade"    element={<UpgradePage />} />

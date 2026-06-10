@@ -220,3 +220,70 @@ export interface Operator {
   createdAt: string;
   userId?: string | null;
 }
+
+export interface ComboItem {
+  menuItemId: string;
+  name: string;
+  emoji: string;
+  quantity: number;
+}
+
+export interface Combo {
+  id: string;
+  userId: string;
+  name: string;
+  emoji: string;
+  description: string;
+  price: number;
+  active: boolean;
+  items: ComboItem[];
+  createdAt: string;
+}
+
+export interface Promotion {
+  id: string;
+  userId: string;
+  name: string;
+  daysOfWeek: number[];
+  startTime: string;
+  endTime: string;
+  discountPercent: number;
+  targetType: 'all' | 'category' | 'item';
+  targetId: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface CashSession {
+  id: string;
+  userId: string;
+  openedAt: string;
+  closedAt: string | null;
+  openingAmount: number;
+  closingAmount: number | null;
+  totalSales: number;
+  totalWithdrawals: number;
+  totalDeposits: number;
+  status: 'open' | 'closed';
+  notes: string;
+  createdAt: string;
+}
+
+export interface CashEntry {
+  id: string;
+  sessionId: string;
+  userId: string;
+  type: 'sale' | 'withdrawal' | 'deposit';
+  amount: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface CustomerRecord {
+  phone: string;
+  name: string;
+  totalOrders: number;
+  totalSpent: number;
+  lastOrderAt: string;
+  segment: 'loyal' | 'active' | 'at_risk' | 'inactive';
+}
