@@ -56,6 +56,7 @@ import AdminMarketingPage from './pages/admin/MarketingPage';
 import AdminTeamPage from './pages/admin/TeamPage';
 import PlanosPage from './pages/PlanosPage';
 import UpgradePage from './pages/UpgradePage';
+import BranchesPage from './pages/BranchesPage';
 
 const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
@@ -155,6 +156,7 @@ export default function App() {
             <Route path="/comandas"   element={<ComandasPage />} />
             <Route path="/drivers"    element={<DriversPage />} />
             <Route path="/operators"  element={<OperatorsPage />} />
+            <Route path="/branches"   element={<BranchesPage />} />
             <Route path="/qrcode"     element={<QRCodePage />} />
             <Route path="/settings"   element={<SettingsPage />} />
             <Route path="/upgrade"    element={<UpgradePage />} />

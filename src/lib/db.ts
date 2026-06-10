@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, ItemOption, OpeningHours, DeliveryNeighborhood, Coupon, RestaurantTable, Operator, Driver } from './types';
+import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, ItemOption, OpeningHours, DeliveryNeighborhood, Coupon, RestaurantTable, Operator, Driver, Branch } from './types';
 
 // ---- Supabase row shapes (snake_case) ----
 interface SettingsRow {
@@ -1145,5 +1145,44 @@ export const db = {
   async getSuperAdminUserId(): Promise<string | null> {
     const { data } = await supabase.rpc('get_super_admin_user_id');
     return (data as string | null) ?? null;
+  },
+
+  // ---- Branches (multi-location) ----
+  async getBranches(ownerId: string): Promise<Branch[]> {
+    const { data, error } = await supabase.rpc('get_branches', { p_owner_id: ownerId });
+    if (error) throw error;
+    return ((data as any[]) ?? []).map(r => ({
+      id: r.id, ownerId: r.owner_id, name: r.name, slug: r.slug,
+      address: r.address, phone: r.phone, active: r.active, createdAt: r.created_at,
+    }));
+  },
+
+  async addBranch(ownerId: string, name: string, slug: string, address: string, phone: string): Promise<string> {
+    const { data, error } = await supabase.rpc('add_branch', {
+      p_owner_id: ownerId, p_name: name, p_slug: slug, p_address: address, p_phone: phone,
+    });
+    if (error) throw error;
+    return data as string;
+  },
+
+  async updateBranch(id: string, updates: { name: string; slug: string; address: string; phone: string; active: boolean }): Promise<void> {
+    const { error } = await supabase.rpc('update_branch', {
+      p_id: id, p_name: updates.name, p_slug: updates.slug,
+      p_address: updates.address, p_phone: updates.phone, p_active: updates.active,
+    });
+    if (error) throw error;
+  },
+
+  async deleteBranch(id: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_branch', { p_id: id });
+    if (error) throw error;
+  },
+
+  async getMenuByBranchSlug(slug: string): Promise<{ ownerId: string; branchName: string; branchAddress: string; branchPhone: string } | null> {
+    const { data, error } = await supabase.rpc('get_menu_by_branch_slug', { p_slug: slug });
+    if (error) return null;
+    const r = (data as any[])?.[0];
+    if (!r) return null;
+    return { ownerId: r.owner_id, branchName: r.branch_name, branchAddress: r.branch_address, branchPhone: r.branch_phone };
   },
 };

@@ -8,7 +8,7 @@ import { playNewOrderSound, unlockAudio } from '../lib/sound';
 import { printOrder } from '../lib/print';
 import { supabase } from '../lib/supabase';
 import type { Order, RestaurantSettings, Driver } from '../lib/types';
-import { Clock, CheckCircle, XCircle, Eye, X, Truck, ShoppingBag, MapPin, Inbox, MessageCircle, Loader2, Printer, Volume2, VolumeX, Ban, Star, LayoutGrid, Tag, Search, CalendarDays, Bike, Check } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Eye, X, Truck, ShoppingBag, MapPin, Inbox, MessageCircle, Loader2, Printer, Volume2, VolumeX, Ban, Star, LayoutGrid, Tag, Search, CalendarDays, Bike, Check, AlarmClock } from 'lucide-react';
 import { showNewOrderNotification, requestNotificationPermission } from '../lib/notifications';
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string }> = {
@@ -111,8 +111,14 @@ export default function OrdersPage() {
 
   if (!user) return null;
 
+  const scheduledCount = orders.filter(o => o.scheduledFor && o.status !== 'CANCELLED').length;
+
   const filtered = orders.filter(o => {
-    if (filter && o.status !== filter) return false;
+    if (filter === 'SCHEDULED') {
+      if (!o.scheduledFor || o.status === 'CANCELLED') return false;
+    } else if (filter && o.status !== filter) {
+      return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       if (!o.customerName.toLowerCase().includes(q) && !o.customerPhone?.toLowerCase().includes(q)) return false;
@@ -282,6 +288,14 @@ export default function OrdersPage() {
             </button>
           );
         })}
+        <button
+          onClick={() => setFilter(filter === 'SCHEDULED' ? '' : 'SCHEDULED')}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 ${filter === 'SCHEDULED' ? 'bg-blue-50 text-blue-700 shadow-sm' : 'text-slate-500 hover:bg-slate-100/60'}`}
+        >
+          <AlarmClock className="w-3.5 h-3.5" />
+          Agendados
+          {scheduledCount > 0 && <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold leading-none">{scheduledCount}</span>}
+        </button>
       </div>
 
       {filtered.length === 0 ? (
@@ -300,7 +314,15 @@ export default function OrdersPage() {
             const wasSent = whatsappSent[order.id];
             const canCancel = order.status !== 'CANCELLED' && order.status !== 'COMPLETED';
             return (
-              <div key={order.id} className="card-hover">
+              <div key={order.id} className={`card-hover ${order.scheduledFor ? 'ring-1 ring-blue-200 ring-inset' : ''}`}>
+                {order.scheduledFor && (
+                  <div className="flex items-center gap-1.5 px-3 sm:px-4 pt-2.5 pb-0">
+                    <AlarmClock className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                    <span className="text-[11px] font-bold text-blue-600">
+                      Agendado para {new Date(order.scheduledFor).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-start gap-3 p-3 sm:p-4">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${cfg.bg}`}>
                     <cfg.icon className={`w-5 h-5 ${cfg.color}`} />
@@ -498,6 +520,15 @@ export default function OrdersPage() {
                 </div>
               )}
 
+              {selectedOrder.scheduledFor && (
+                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                  <AlarmClock className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">Pedido agendado</p>
+                    <p className="text-sm font-semibold text-blue-800">{new Date(selectedOrder.scheduledFor).toLocaleString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                </div>
+              )}
               <p className="text-[12px] text-slate-400">{formatDate(selectedOrder.createdAt)}</p>
             </div>
           </div>

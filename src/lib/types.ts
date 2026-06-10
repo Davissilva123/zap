@@ -198,6 +198,17 @@ export interface RestaurantTable {
   createdAt: string;
 }
 
+export interface Branch {
+  id: string;
+  ownerId: string;
+  name: string;
+  slug: string;
+  address: string;
+  phone: string;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface Operator {
   id: string;
   ownerId: string;

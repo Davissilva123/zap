@@ -5,7 +5,7 @@ import { useCustomerAuth } from '../lib/customerAuth';
 import { db } from '../lib/db';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { Order, RestaurantSettings } from '../lib/types';
-import { ArrowLeft, Clock, CheckCircle, XCircle, Truck, ShoppingBag, Package, LogOut, User, Loader2, Ban, ChefHat, MapPin, Zap, RotateCcw, Gift, Star, DollarSign } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, XCircle, Truck, ShoppingBag, Package, LogOut, User, Loader2, Ban, ChefHat, MapPin, Zap, RotateCcw, Gift, Star, DollarSign, MessageSquare } from 'lucide-react';
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string; pulse?: boolean }> = {
   PENDING: { label: 'Aguardando', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', pulse: true },
@@ -54,6 +54,10 @@ export default function CustomerPortalPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [updatedIds, setUpdatedIds] = useState<Set<string>>(new Set());
+  const [ratingOrder, setRatingOrder] = useState<string | null>(null);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabaseCustomer.channel> | null>(null);
 
   useEffect(() => {
@@ -116,6 +120,23 @@ export default function CustomerPortalPage() {
   const handleRepeatOrder = (order: Order) => {
     sessionStorage.setItem(`repeat_cart_${slug}`, JSON.stringify(order.items));
     navigate(`/m/${slug}`);
+  };
+
+  const handleSubmitRating = async () => {
+    if (!ratingOrder || !ratingValue) return;
+    setRatingSubmitting(true);
+    await supabaseCustomer
+      .from('orders')
+      .update({ rating: ratingValue, rating_comment: ratingComment.trim() || null })
+      .eq('id', ratingOrder);
+    setOrders(prev => prev.map(o => o.id === ratingOrder
+      ? { ...o, rating: ratingValue, ratingComment: ratingComment.trim() || undefined }
+      : o
+    ));
+    setRatingOrder(null);
+    setRatingValue(0);
+    setRatingComment('');
+    setRatingSubmitting(false);
   };
 
   const formatDate = (d: string) => new Date(d).toLocaleString('pt-BR', {
@@ -405,6 +426,58 @@ export default function CustomerPortalPage() {
                           <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-slate-400" />
                           {formatAddress(order.deliveryAddress)}
                         </div>
+                      )}
+
+                      {/* Rating section */}
+                      {order.status === 'COMPLETED' && (
+                        order.rating ? (
+                          <div className="p-3 rounded-xl bg-amber-50 border border-amber-100">
+                            <div className="flex items-center gap-1 mb-1">
+                              {[1,2,3,4,5].map(s => (
+                                <Star key={s} className={`w-4 h-4 ${s <= order.rating! ? 'fill-amber-400 text-amber-400' : 'text-amber-200'}`} />
+                              ))}
+                              <span className="text-xs text-amber-700 font-bold ml-1">Sua avaliacao</span>
+                            </div>
+                            {order.ratingComment && <p className="text-xs text-amber-700 italic">"{order.ratingComment}"</p>}
+                          </div>
+                        ) : ratingOrder === order.id ? (
+                          <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 space-y-3">
+                            <p className="text-xs font-bold text-amber-700">Como foi sua experiencia?</p>
+                            <div className="flex gap-1">
+                              {[1,2,3,4,5].map(s => (
+                                <button key={s} onClick={() => setRatingValue(s)} className="transition-transform active:scale-110">
+                                  <Star className={`w-8 h-8 ${s <= ratingValue ? 'fill-amber-400 text-amber-400' : 'text-amber-200'}`} />
+                                </button>
+                              ))}
+                            </div>
+                            <textarea
+                              value={ratingComment}
+                              onChange={e => setRatingComment(e.target.value)}
+                              rows={2}
+                              placeholder="Comentario opcional..."
+                              className="w-full text-sm px-3 py-2 rounded-xl border border-amber-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 resize-none"
+                            />
+                            <div className="flex gap-2">
+                              <button onClick={() => { setRatingOrder(null); setRatingValue(0); setRatingComment(''); }} className="flex-1 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-500">Cancelar</button>
+                              <button
+                                onClick={handleSubmitRating}
+                                disabled={!ratingValue || ratingSubmitting}
+                                className="flex-1 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                style={{ backgroundColor: accent }}
+                              >
+                                {ratingSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
+                                Avaliar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setRatingOrder(order.id); setRatingValue(0); setRatingComment(''); }}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-sm font-semibold hover:bg-amber-100 transition-colors"
+                          >
+                            <Star className="w-4 h-4" /> Avaliar este pedido
+                          </button>
+                        )
                       )}
 
                       {/* Actions */}

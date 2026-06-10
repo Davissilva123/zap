@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike, Lock } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike, Lock, Store } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState, useEffect } from 'react';
@@ -26,6 +26,7 @@ const BASE_NAV: NavItem[] = [
   { to: '/comandas',   icon: ClipboardList,   label: 'Comandas',        feature: 'comandas'   },
   { to: '/drivers',    icon: Bike,            label: 'Entregadores',    feature: 'drivers'    },
   { to: '/operators',  icon: Users,           label: 'Operadores',      feature: 'operators'  },
+  { to: '/branches',   icon: Store,           label: 'Filiais',         feature: 'settings'   },
   { to: '/qrcode',     icon: QrCode,          label: 'QR Code',         feature: 'qrcode'     },
   { to: '/settings',   icon: Settings,        label: 'Configurações',   feature: 'settings'   },
 ];
