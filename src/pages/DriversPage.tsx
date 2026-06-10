@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
 import type { Driver } from '../lib/types';
-import { Bike, Plus, Edit2, Trash2, Phone, X, Check, ToggleLeft, ToggleRight, Link, Copy } from 'lucide-react';
+import { Bike, Plus, Edit2, Trash2, Phone, X, Check, ToggleLeft, ToggleRight, Copy, LocateFixed, WifiOff, MapPin, RefreshCw } from 'lucide-react';
 
 export default function DriversPage() {
   const { user } = useAuth();
@@ -13,6 +13,10 @@ export default function DriversPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [trackingDriver, setTrackingDriver] = useState<Driver | null>(null);
+  const [trackingLoc, setTrackingLoc] = useState<{ lat: number; lng: number; lastAt: string | null } | null>(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
+  const trackingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const portalUrl = (token: string) => `${window.location.origin}/entregador/${token}`;
 
@@ -29,6 +33,27 @@ export default function DriversPage() {
   };
 
   useEffect(() => { load(); }, [user]);
+
+  const refreshTracking = useCallback(async (driverId: string) => {
+    const d = await db.getDriver(driverId);
+    if (d?.lat != null && d?.lng != null) {
+      setTrackingLoc({ lat: d.lat, lng: d.lng, lastAt: d.lastLocationAt ?? null });
+    } else {
+      setTrackingLoc(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!trackingDriver) {
+      if (trackingInterval.current) clearInterval(trackingInterval.current);
+      setTrackingLoc(null);
+      return;
+    }
+    setTrackingLoading(true);
+    refreshTracking(trackingDriver.id).finally(() => setTrackingLoading(false));
+    trackingInterval.current = setInterval(() => refreshTracking(trackingDriver.id), 10000);
+    return () => { if (trackingInterval.current) clearInterval(trackingInterval.current); };
+  }, [trackingDriver, refreshTracking]);
 
   const openCreate = () => {
     setForm({ name: '', phone: '', active: true });
@@ -110,7 +135,7 @@ export default function DriversPage() {
             <section>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Ativos ({active.length})</p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {active.map(d => <DriverCard key={d.id} driver={d} onEdit={openEdit} onDelete={remove} onToggle={toggleActive} onCopyLink={copyLink} copied={copiedId === d.id} />)}
+                {active.map(d => <DriverCard key={d.id} driver={d} onEdit={openEdit} onDelete={remove} onToggle={toggleActive} onCopyLink={copyLink} copied={copiedId === d.id} onTrack={setTrackingDriver} />)}
               </div>
             </section>
           )}
@@ -118,14 +143,84 @@ export default function DriversPage() {
             <section>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Inativos ({inactive.length})</p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {inactive.map(d => <DriverCard key={d.id} driver={d} onEdit={openEdit} onDelete={remove} onToggle={toggleActive} onCopyLink={copyLink} copied={copiedId === d.id} />)}
+                {inactive.map(d => <DriverCard key={d.id} driver={d} onEdit={openEdit} onDelete={remove} onToggle={toggleActive} onCopyLink={copyLink} copied={copiedId === d.id} onTrack={setTrackingDriver} />)}
               </div>
             </section>
           )}
         </div>
       )}
 
-      {/* Modal */}
+      {/* Tracking modal */}
+      {trackingDriver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 text-sm">Rastrear entregador</p>
+                  <p className="text-xs text-slate-400">{trackingDriver.name}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => refreshTracking(trackingDriver.id)}
+                  className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                  title="Atualizar"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+                <button onClick={() => setTrackingDriver(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="relative bg-slate-50" style={{ minHeight: 300 }}>
+              {trackingLoading ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <div className="w-7 h-7 border-4 border-emerald-200 border-t-emerald-500 rounded-full animate-spin mb-3" />
+                  <p className="text-sm text-slate-400">Buscando localização...</p>
+                </div>
+              ) : trackingLoc ? (
+                <>
+                  <iframe
+                    key={`${trackingLoc.lat},${trackingLoc.lng}`}
+                    title="mapa-entregador"
+                    width="100%"
+                    height="320"
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${trackingLoc.lng - 0.005},${trackingLoc.lat - 0.005},${trackingLoc.lng + 0.005},${trackingLoc.lat + 0.005}&layer=mapnik&marker=${trackingLoc.lat},${trackingLoc.lng}`}
+                    style={{ border: 0, display: 'block' }}
+                  />
+                  {trackingLoc.lastAt && (
+                    <div className="px-4 py-2.5 bg-white border-t border-slate-100 flex items-center gap-2">
+                      <LocateFixed className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                      <p className="text-xs text-slate-500">
+                        Última atualização: <span className="font-semibold text-slate-700">{new Date(trackingLoc.lastAt).toLocaleTimeString('pt-BR')}</span>
+                        <span className="text-slate-400 ml-1">· atualiza a cada 10s</span>
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                    <WifiOff className="w-7 h-7 text-slate-300" />
+                  </div>
+                  <p className="font-semibold text-slate-500">GPS não disponível</p>
+                  <p className="text-sm text-slate-400 mt-1">
+                    O entregador precisa ativar o GPS no portal dele para aparecer aqui.
+                  </p>
+                  <p className="text-xs text-slate-300 mt-3">Verificando a cada 10 segundos...</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create/edit modal */}
       {modal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
@@ -185,13 +280,14 @@ export default function DriversPage() {
   );
 }
 
-function DriverCard({ driver, onEdit, onDelete, onToggle, onCopyLink, copied }: {
+function DriverCard({ driver, onEdit, onDelete, onToggle, onCopyLink, copied, onTrack }: {
   driver: Driver;
   onEdit: (d: Driver) => void;
   onDelete: (id: string) => void;
   onToggle: (d: Driver) => void;
   onCopyLink: (token: string, id: string) => void;
   copied: boolean;
+  onTrack: (d: Driver) => void;
 }) {
   return (
     <div className={`bg-white rounded-2xl border p-4 transition-all ${driver.active ? 'border-slate-200 shadow-sm' : 'border-slate-100 opacity-60'}`}>
@@ -230,6 +326,18 @@ function DriverCard({ driver, onEdit, onDelete, onToggle, onCopyLink, copied }: 
       >
         {copied ? <Check className="w-3.5 h-3.5 flex-shrink-0" /> : <Copy className="w-3.5 h-3.5 flex-shrink-0" />}
         <span className="truncate">{copied ? 'Link copiado!' : 'Copiar link do portal'}</span>
+      </button>
+      <button
+        onClick={() => onTrack(driver)}
+        className="mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+      >
+        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+        <span>Rastrear no mapa</span>
+        {driver.lat != null && driver.lng != null && (
+          <span className="ml-auto flex items-center gap-1 text-emerald-600">
+            <LocateFixed className="w-3 h-3" /> GPS ativo
+          </span>
+        )}
       </button>
     </div>
   );

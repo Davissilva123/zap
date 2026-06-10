@@ -172,6 +172,9 @@ export interface Driver {
   phone: string;
   active: boolean;
   accessToken: string;
+  lat?: number | null;
+  lng?: number | null;
+  lastLocationAt?: string | null;
   createdAt: string;
 }
 

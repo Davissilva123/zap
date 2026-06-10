@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabaseCustomer } from '../lib/supabaseCustomer';
 import { useCustomerAuth } from '../lib/customerAuth';
 import { db } from '../lib/db';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { Order, RestaurantSettings } from '../lib/types';
-import { ArrowLeft, Clock, CheckCircle, XCircle, Truck, ShoppingBag, Package, LogOut, User, Loader2, Ban, ChefHat, MapPin, Zap, RotateCcw, Gift, Star, DollarSign, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, XCircle, Truck, ShoppingBag, Package, LogOut, User, Loader2, Ban, ChefHat, MapPin, Zap, RotateCcw, Gift, Star, DollarSign, MessageSquare, WifiOff, LocateFixed } from 'lucide-react';
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string; pulse?: boolean }> = {
   PENDING: { label: 'Aguardando', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', pulse: true },
@@ -30,6 +30,7 @@ interface OrderRowDb {
   payment_method: string; delivery_address: Order['deliveryAddress']; delivery_type: string;
   pix_tx_id: string; pix_qr_code: string; pix_copy_paste: string;
   created_at: string; paid_at: string | null;
+  driver_id?: string | null; driver_name?: string | null;
 }
 
 function rowToOrder(r: OrderRowDb): Order {
@@ -41,6 +42,8 @@ function rowToOrder(r: OrderRowDb): Order {
     deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as Order['deliveryType'],
     pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste,
     createdAt: r.created_at, paidAt: r.paid_at,
+    driverId: r.driver_id ?? undefined,
+    driverName: r.driver_name ?? undefined,
   };
 }
 
@@ -58,7 +61,11 @@ export default function CustomerPortalPage() {
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const [driverLoc, setDriverLoc] = useState<{ lat: number; lng: number; lastAt: string | null } | null>(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabaseCustomer.channel> | null>(null);
+  const trackingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -103,6 +110,28 @@ export default function CustomerPortalPage() {
       if (channelRef.current) supabaseCustomer.removeChannel(channelRef.current);
     };
   }, [customer, settings]);
+
+  const refreshDriverLoc = useCallback(async (orderId: string) => {
+    const { data } = await supabaseCustomer.rpc('get_driver_location_for_order', { p_order_id: orderId });
+    const rows = data as Array<{ lat: number; lng: number; driver_name: string; last_location_at: string | null }> | null;
+    if (rows && rows.length > 0 && rows[0].lat && rows[0].lng) {
+      setDriverLoc({ lat: rows[0].lat, lng: rows[0].lng, lastAt: rows[0].last_location_at });
+    } else {
+      setDriverLoc(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!trackingOrderId) {
+      if (trackingInterval.current) clearInterval(trackingInterval.current);
+      setDriverLoc(null);
+      return;
+    }
+    setTrackingLoading(true);
+    refreshDriverLoc(trackingOrderId).finally(() => setTrackingLoading(false));
+    trackingInterval.current = setInterval(() => refreshDriverLoc(trackingOrderId), 10000);
+    return () => { if (trackingInterval.current) clearInterval(trackingInterval.current); };
+  }, [trackingOrderId, refreshDriverLoc]);
 
   const handleCancel = async (orderId: string) => {
     if (!confirm('Cancelar este pedido?')) return;
@@ -425,6 +454,62 @@ export default function CustomerPortalPage() {
                         <div className="flex items-start gap-1.5 text-xs text-slate-500">
                           <MapPin className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-slate-400" />
                           {formatAddress(order.deliveryAddress)}
+                        </div>
+                      )}
+
+                      {/* Driver tracking */}
+                      {order.status === 'DELIVERING' && order.deliveryType === 'delivery' && (
+                        <div className="rounded-xl overflow-hidden border border-teal-100">
+                          <button
+                            className="w-full flex items-center justify-between px-3 py-2.5 bg-teal-50 hover:bg-teal-100 transition-colors"
+                            onClick={() => setTrackingOrderId(trackingOrderId === order.id ? null : order.id)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Truck className="w-4 h-4 text-teal-600" />
+                              <span className="text-sm font-bold text-teal-700">Rastrear minha entrega</span>
+                              {order.driverName && (
+                                <span className="text-xs text-teal-500">· {order.driverName}</span>
+                              )}
+                            </div>
+                            <span className="text-xs font-semibold text-teal-600">
+                              {trackingOrderId === order.id ? 'Fechar' : 'Ver mapa'}
+                            </span>
+                          </button>
+                          {trackingOrderId === order.id && (
+                            <div className="bg-white">
+                              {trackingLoading ? (
+                                <div className="flex items-center justify-center py-10">
+                                  <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
+                                </div>
+                              ) : driverLoc ? (
+                                <>
+                                  <iframe
+                                    key={`${driverLoc.lat},${driverLoc.lng}`}
+                                    title="mapa-entrega"
+                                    width="100%"
+                                    height="240"
+                                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${driverLoc.lng - 0.005},${driverLoc.lat - 0.005},${driverLoc.lng + 0.005},${driverLoc.lat + 0.005}&layer=mapnik&marker=${driverLoc.lat},${driverLoc.lng}`}
+                                    style={{ border: 0, display: 'block' }}
+                                  />
+                                  {driverLoc.lastAt && (
+                                    <div className="flex items-center gap-1.5 px-3 py-2 border-t border-slate-100">
+                                      <LocateFixed className="w-3 h-3 text-teal-500 flex-shrink-0" />
+                                      <p className="text-[10px] text-slate-500">
+                                        Atualizado: <span className="font-semibold">{new Date(driverLoc.lastAt).toLocaleTimeString('pt-BR')}</span>
+                                        <span className="text-slate-300 ml-1">· atualiza a cada 10s</span>
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center py-10 text-center px-4">
+                                  <WifiOff className="w-6 h-6 text-slate-300 mb-2" />
+                                  <p className="text-sm font-medium text-slate-400">Sinal GPS indisponivel</p>
+                                  <p className="text-xs text-slate-300 mt-1">Verificando automaticamente...</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
 

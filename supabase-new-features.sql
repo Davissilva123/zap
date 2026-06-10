@@ -117,3 +117,27 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.promotions TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.cash_sessions TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.cash_entries TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.stock_movements TO authenticated;
+
+-- =========================================================
+-- BLOCO 3: RPC para rastreamento de entregador pelo cliente
+-- =========================================================
+
+CREATE OR REPLACE FUNCTION public.get_driver_location_for_order(p_order_id UUID)
+RETURNS TABLE(lat DOUBLE PRECISION, lng DOUBLE PRECISION, driver_name TEXT, last_location_at TIMESTAMPTZ)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+    SELECT d.lat, d.lng, d.name AS driver_name, d.last_location_at
+    FROM orders o
+    JOIN drivers d ON d.id = o.driver_id
+    WHERE o.id = p_order_id
+      AND o.status = 'DELIVERING'
+      AND d.lat IS NOT NULL
+      AND d.lng IS NOT NULL;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_driver_location_for_order(UUID) TO anon, authenticated;
