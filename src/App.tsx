@@ -54,6 +54,7 @@ import AdminRestaurantDetailPage from './pages/admin/RestaurantDetailPage';
 import AdminCobrancasPage from './pages/admin/CobrancasPage';
 import AdminMarketingPage from './pages/admin/MarketingPage';
 import AdminTeamPage from './pages/admin/TeamPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import PlanosPage from './pages/PlanosPage';
 import UpgradePage from './pages/UpgradePage';
 import BranchesPage from './pages/BranchesPage';
@@ -130,6 +131,7 @@ export default function App() {
 
           {/* Auth */}
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* Onboarding (owner auth required, no sidebar) */}
           <Route path="/onboarding" element={<OwnerRoute><OnboardingPage /></OwnerRoute>} />

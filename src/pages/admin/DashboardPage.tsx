@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-type MrrStats = { mrrCurrent: number; arr: number; activePaid: number; inTrial: number; trialsExpiring7d: number; churnedMonth: number; totalRestaurants: number };
+type MrrStats = { mrrCurrent: number; arr: number; activePaid: number; inTrial: number; trialsExpiring7d: number; churnedMonth: number; totalRestaurants: number; trialDays: number };
 type RestaurantStat = { userId: string; orderCount: number; totalRevenue: number; lastOrderAt: string | null };
 
 const R = (n: number) => 'R$ ' + n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -77,7 +77,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-bold text-amber-800">
-              {mrr.trialsExpiring7d} trial{mrr.trialsExpiring7d > 1 ? 's expiram' : ' expira'} nos próximos 7 dias
+              {mrr.trialsExpiring7d} trial{mrr.trialsExpiring7d > 1 ? 's expiram' : ' expira'} nos próximos {mrr.trialDays ?? 7} dias
             </p>
             <p className="text-xs text-amber-600 mt-0.5">Faça follow-up para converter em clientes pagantes →</p>
           </div>

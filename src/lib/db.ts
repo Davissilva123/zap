@@ -143,7 +143,7 @@ export const db = {
     return ((data as any[]) ?? []).map(r => ({ userId: r.user_id, email: r.email }));
   },
 
-  async getMrrStats(): Promise<{ mrrCurrent: number; arr: number; activePaid: number; inTrial: number; trialsExpiring7d: number; churnedMonth: number; totalRestaurants: number }> {
+  async getMrrStats(): Promise<{ mrrCurrent: number; arr: number; activePaid: number; inTrial: number; trialsExpiring7d: number; churnedMonth: number; totalRestaurants: number; trialDays: number }> {
     const { data, error } = await supabase.rpc('get_mrr_stats');
     if (error) throw error;
     const r = (data as any[])?.[0] ?? {};
@@ -155,6 +155,7 @@ export const db = {
       trialsExpiring7d: Number(r.trials_expiring_7d ?? 0),
       churnedMonth: Number(r.churned_month ?? 0),
       totalRestaurants: Number(r.total_restaurants ?? 0),
+      trialDays: Number(r.trial_days ?? 7),
     };
   },
 

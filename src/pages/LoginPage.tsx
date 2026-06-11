@@ -29,7 +29,7 @@ export default function LoginPage() {
     setResetSending(true);
     setResetError('');
     const { error: err } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
-      redirectTo: `${window.location.origin}/login`,
+      redirectTo: `${window.location.origin}/reset-password`,
     });
     setResetSending(false);
     if (err) { setResetError('Erro ao enviar o email. Verifique o endereço e tente novamente.'); return; }
