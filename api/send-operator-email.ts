@@ -1,13 +1,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import nodemailer from 'nodemailer';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    return res.status(200).end();
-  }
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
 
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { name, email, password, loginUrl, restaurantName } = req.body ?? {};
@@ -16,10 +19,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Campos obrigatórios: email, password, loginUrl' });
   }
 
-  const RESEND_API_KEY = process.env.RESEND_API_KEY;
-  if (!RESEND_API_KEY) {
-    return res.status(500).json({ error: 'RESEND_API_KEY não configurada nas variáveis de ambiente do Vercel' });
+  const EMAIL_USER = process.env.EMAIL_USER;
+  const EMAIL_APP_PASSWORD = process.env.EMAIL_APP_PASSWORD;
+
+  if (!EMAIL_USER || !EMAIL_APP_PASSWORD) {
+    return res.status(500).json({
+      error: 'Variáveis EMAIL_USER e EMAIL_APP_PASSWORD não configuradas no Vercel.',
+    });
   }
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_APP_PASSWORD,
+    },
+  });
 
   const html = `
 <!DOCTYPE html>
@@ -56,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   <tr>
                     <td style="padding:10px 0;border-bottom:1px solid #e2e8f0;">
                       <span style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.8px;">Senha</span><br>
-                      <span style="font-size:20px;font-weight:700;color:#10b981;font-family:monospace;letter-spacing:3px;">${password}</span>
+                      <span style="font-size:22px;font-weight:700;color:#10b981;font-family:monospace;letter-spacing:4px;">${password}</span>
                     </td>
                   </tr>
                   <tr>
@@ -98,30 +113,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 </body>
 </html>`;
 
-  const EMAIL_FROM = process.env.EMAIL_FROM ?? 'ZapMenu <onboarding@resend.dev>';
-
-  const resendRes = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: EMAIL_FROM,
+  try {
+    await transporter.sendMail({
+      from: `"ZapMenu${restaurantName ? ` — ${restaurantName}` : ''}" <${EMAIL_USER}>`,
       to: email,
       subject: `Seu acesso ao ZapMenu${restaurantName ? ` — ${restaurantName}` : ''}`,
       html,
-    }),
-  });
+    });
 
-  const result = await resendRes.json();
-
-  res.setHeader('Access-Control-Allow-Origin', '*');
-
-  if (!resendRes.ok) {
-    const msg = result?.message ?? result?.name ?? JSON.stringify(result);
+    return res.status(200).json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
     return res.status(500).json({ error: msg });
   }
-
-  return res.status(200).json({ ok: true });
 }
