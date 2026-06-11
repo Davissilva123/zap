@@ -54,7 +54,7 @@ export default function PDVPage() {
     Promise.all([
       db.getMenuItems(user.id),
       db.getCategories(user.id),
-      db.getRestaurantSettings(user.id),
+      db.getSettings(user.id),
     ]).then(([its, cats, s]) => {
       setItems(its.filter(i => i.available));
       setCategories(cats);
@@ -142,7 +142,7 @@ export default function PDVPage() {
         selectedOptions: [],
       }));
 
-      const order = await db.createOrder({
+      const order = await db.addOrder({
         userId: user.id,
         items: orderItems,
         total: cartTotal,
@@ -158,6 +158,7 @@ export default function PDVPage() {
         pixTxId: '',
         pixQrCode: '',
         pixCopyPaste: '',
+        paidAt: new Date().toISOString(),
       });
 
       setLastOrder(order);
