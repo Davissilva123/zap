@@ -98,9 +98,29 @@ export default function OperatorsPage() {
   };
 
   const sendResetLink = async (op: Operator) => {
-    await supabase.auth.resetPasswordForEmail(op.email, {
-      redirectTo: window.location.origin + '/login',
+    // Se ainda não tem conta Auth (userId vazio), cria uma com senha temporária
+    // para que o resetPasswordForEmail possa enviar o e-mail
+    if (!op.userId) {
+      const tempPwd = Math.random().toString(36).slice(-8) + 'A1!';
+      const { error: signupErr } = await supabaseNoSession.auth.signUp({
+        email: op.email.trim().toLowerCase(),
+        password: tempPwd,
+      });
+      if (signupErr && !signupErr.message.toLowerCase().includes('already registered')) {
+        alert('Erro ao preparar conta: ' + signupErr.message);
+        return;
+      }
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(op.email.trim().toLowerCase(), {
+      redirectTo: window.location.origin + '/reset-password',
     });
+
+    if (error) {
+      alert('Erro ao enviar e-mail: ' + error.message);
+      return;
+    }
+
     setResetSent(prev => ({ ...prev, [op.id]: true }));
   };
 
