@@ -1,8 +1,8 @@
-import { Receipt, BarChart2, UtensilsCrossed, Tag, LogOut, Menu, Zap, X, LayoutGrid, ChefHat } from 'lucide-react';
+import { Receipt, BarChart2, UtensilsCrossed, Tag, LogOut, Menu, Zap, X, LayoutGrid, ChefHat, MonitorPlay, Shield, CreditCard, ChevronDown } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState } from 'react';
-import KitchenPage from '../pages/op/KitchenPage';
+import KDSPage from '../pages/KDSPage';
 
 const ROLE_LABELS = {
   waiter:  { label: 'Garçom',  color: 'bg-blue-500/15 text-blue-300' },
@@ -11,35 +11,47 @@ const ROLE_LABELS = {
   kitchen: { label: 'Cozinha', color: 'bg-orange-500/15 text-orange-300' },
 };
 
+type RoleKey = 'waiter' | 'cashier' | 'admin' | 'kitchen';
 type NavItem = { to: string; icon: typeof Receipt; label: string };
 
-function getNavItems(role: 'waiter' | 'cashier' | 'admin' | 'kitchen'): NavItem[] {
+const VIEW_OPTIONS: { value: RoleKey; label: string; icon: typeof Shield }[] = [
+  { value: 'admin',   label: 'Admin',   icon: Shield },
+  { value: 'cashier', label: 'Caixa',   icon: CreditCard },
+  { value: 'waiter',  label: 'Garçom',  icon: UtensilsCrossed },
+  { value: 'kitchen', label: 'Cozinha', icon: ChefHat },
+];
+
+function getNavItems(role: RoleKey): NavItem[] {
   const orders: NavItem = { to: '/op/pedidos', icon: Receipt, label: 'Pedidos' };
   const tables: NavItem = { to: '/op/mesas', icon: LayoutGrid, label: 'Mesas' };
   const kitchen: NavItem = { to: '/op/cozinha', icon: ChefHat, label: 'Cozinha' };
   const reports: NavItem = { to: '/op/relatorios', icon: BarChart2, label: 'Relatórios' };
   const menu: NavItem = { to: '/op/cardapio', icon: UtensilsCrossed, label: 'Cardápio' };
   const coupons: NavItem = { to: '/op/cupons', icon: Tag, label: 'Cupons' };
+  const pdv: NavItem = { to: '/op/pdv', icon: MonitorPlay, label: 'PDV' };
 
-  if (role === 'waiter') return [orders, tables, kitchen];
-  if (role === 'cashier') return [orders, tables, kitchen, reports];
+  if (role === 'waiter') return [orders, tables];
+  if (role === 'cashier') return [orders, tables, pdv, reports];
   if (role === 'kitchen') return [kitchen];
-  return [orders, tables, kitchen, menu, reports, coupons]; // admin
+  return [orders, tables, kitchen, pdv, menu, reports, coupons]; // admin
 }
 
 export default function OperatorLayout() {
   const { user, operatorInfo, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [viewAs, setViewAs] = useState<RoleKey>('admin');
+  const [viewDropdown, setViewDropdown] = useState(false);
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
 
   if (!operatorInfo) return null;
   const role = operatorInfo.role;
   const roleCfg = ROLE_LABELS[role];
+  const effectiveRole: RoleKey = role === 'admin' ? viewAs : role;
 
-  // Kitchen operators: full-screen KDS, sem sidebar
-  if (role === 'kitchen') {
+  // Kitchen operators (or admin viewing as kitchen): full-screen KDS, sem sidebar
+  if (effectiveRole === 'kitchen') {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col">
         <header className="sticky top-0 z-30 bg-[#0d1117] border-b border-white/[0.06] px-5 py-3 flex items-center justify-between">
@@ -59,13 +71,13 @@ export default function OperatorLayout() {
             <LogOut className="w-3.5 h-3.5" /> Sair
           </button>
         </header>
-        <main className="flex-1 p-4 sm:p-6 max-w-5xl mx-auto w-full">
-          <KitchenPage />
+        <main className="flex-1 overflow-hidden">
+          <KDSPage />
         </main>
       </div>
     );
   }
-  const navItems = getNavItems(role);
+  const navItems = getNavItems(effectiveRole);
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150 ${
@@ -88,6 +100,36 @@ export default function OperatorLayout() {
           </div>
         </div>
       </div>
+
+      {/* Role switcher (admin only) */}
+      {role === 'admin' && (
+        <div className="px-3 py-2 border-b border-white/[0.06] relative">
+          <p className="px-2 text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-1.5">Visualizar como</p>
+          <button
+            onClick={() => setViewDropdown(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-[13px] font-medium transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              {(() => { const opt = VIEW_OPTIONS.find(o => o.value === viewAs)!; return <><opt.icon className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} /><span>{opt.label}</span></>; })()}
+            </div>
+            <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${viewDropdown ? 'rotate-180' : ''}`} />
+          </button>
+          {viewDropdown && (
+            <div className="absolute left-3 right-3 top-full mt-1 z-50 bg-[#1a2030] border border-white/10 rounded-xl overflow-hidden shadow-xl">
+              {VIEW_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => { setViewAs(opt.value); setViewDropdown(false); navigate('/op/pedidos'); setMobileOpen(false); }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-medium transition-colors ${viewAs === opt.value ? 'bg-emerald-500/15 text-emerald-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
+                >
+                  <opt.icon className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} />
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">

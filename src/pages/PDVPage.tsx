@@ -1,15 +1,12 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { useAuth } from '../lib/auth';
+import { useEffect, useState, useRef } from 'react';
+import { useAuth, useRestaurantId } from '../lib/auth';
 import { db } from '../lib/db';
-import { supabase } from '../lib/supabase';
-import type { MenuItem, Category, Order, PaymentMethod } from '../lib/types';
-import { isSerialSupported, printReceiptSerial } from '../lib/print';
-import { printOrder } from '../lib/print';
+import type { MenuItem, Category, Order, PaymentMethod, CashSession } from '../lib/types';
+import { isSerialSupported, printReceiptSerial, printOrder } from '../lib/print';
 import { isScaleSupported, readScaleWeight, formatWeight } from '../lib/scale';
 import {
-  Search, Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote,
-  Printer, Scale, X, CheckCircle, Keyboard, LayoutGrid, ChefHat,
-  AlertCircle, Tag,
+  Search, Plus, Minus, Trash2, ShoppingCart, CreditCard,
+  Scale, X, CheckCircle, Keyboard, LayoutGrid, AlertCircle, Lock,
 } from 'lucide-react';
 
 const PAYMENT_OPTS: { value: PaymentMethod; label: string; icon: string }[] = [
@@ -30,6 +27,7 @@ function fmt(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}` }
 
 export default function PDVPage() {
   const { user } = useAuth();
+  const restaurantId = useRestaurantId();
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -47,20 +45,23 @@ export default function PDVPage() {
   const [settings, setSettings] = useState<import('../lib/types').RestaurantSettings | null>(null);
   const [scaleLoading, setScaleLoading] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
+  const [cashSession, setCashSession] = useState<CashSession | null | undefined>(undefined); // undefined = loading
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!user) return;
+    if (!restaurantId) return;
     Promise.all([
-      db.getMenuItems(user.id),
-      db.getCategories(user.id),
-      db.getSettings(user.id),
-    ]).then(([its, cats, s]) => {
+      db.getMenuItems(restaurantId),
+      db.getCategories(restaurantId),
+      db.getSettings(restaurantId),
+      db.getCurrentCashSession(restaurantId),
+    ]).then(([its, cats, s, sess]) => {
       setItems(its.filter(i => i.available));
       setCategories(cats);
       setSettings(s);
+      setCashSession(sess);
     });
-  }, [user]);
+  }, [restaurantId]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -77,7 +78,7 @@ export default function PDVPage() {
         setSearch('');
         searchRef.current?.blur();
       }
-      if (e.key === 'F10') { e.preventDefault(); if (cart.length > 0) setPayModal(true); }
+      if (e.key === 'F10') { e.preventDefault(); if (cart.length > 0 && cashSession) setPayModal(true); }
       if (e.key === 'Delete' && !inInput) {
         setCart(prev => prev.slice(0, -1));
       }
@@ -130,7 +131,7 @@ export default function PDVPage() {
   };
 
   const completeOrder = async () => {
-    if (!user || cart.length === 0) return;
+    if (!restaurantId || cart.length === 0) return;
     setCompleting(true);
     try {
       const orderItems = cart.map(c => ({
@@ -143,7 +144,7 @@ export default function PDVPage() {
       }));
 
       const order = await db.addOrder({
-        userId: user.id,
+        userId: restaurantId,
         items: orderItems,
         total: cartTotal,
         discount: 0,
@@ -160,6 +161,16 @@ export default function PDVPage() {
         pixCopyPaste: '',
         paidAt: new Date().toISOString(),
       });
+
+      if (payMethod === 'cash' && cashSession) {
+        await db.addCashEntry(
+          restaurantId,
+          cashSession.id,
+          'sale',
+          cartTotal,
+          `Venda PDV #${order.id.slice(-6).toUpperCase()}`,
+        );
+      }
 
       setLastOrder(order);
       if (settings) {
@@ -234,6 +245,14 @@ export default function PDVPage() {
             {[['F2 ou /', 'Buscar'], ['F10', 'Finalizar'], ['Delete', 'Remover último'], ['Esc', 'Fechar']].map(([k, d]) => (
               <span key={k}><kbd className="bg-slate-600 px-1.5 py-0.5 rounded text-[10px]">{k}</kbd> {d}</span>
             ))}
+          </div>
+        )}
+
+        {/* Cash session banner */}
+        {cashSession === null && (
+          <div className="bg-red-50 border-b border-red-200 px-4 py-2 flex items-center gap-2 text-red-700 text-sm">
+            <Lock size={14} className="flex-shrink-0" />
+            <span>Caixa fechado — acesse <strong>Caixa</strong> para abrir uma sessão antes de vender.</span>
           </div>
         )}
 
@@ -363,12 +382,13 @@ export default function PDVPage() {
             <span className="text-xl font-bold text-emerald-600">{fmt(cartTotal)}</span>
           </div>
           <button
-            disabled={cart.length === 0}
+            disabled={cart.length === 0 || !cashSession}
             onClick={() => setPayModal(true)}
             className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+            title={!cashSession ? 'Abra o caixa para finalizar vendas' : undefined}
           >
-            <CreditCard size={18} />
-            Finalizar (F10)
+            {cashSession === null ? <Lock size={18} /> : <CreditCard size={18} />}
+            {cashSession === null ? 'Caixa fechado' : 'Finalizar (F10)'}
           </button>
           {cart.length > 0 && (
             <button

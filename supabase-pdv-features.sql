@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS menu_item_branches (
   id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id      uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   menu_item_id uuid REFERENCES menu_items(id) ON DELETE CASCADE,
-  branch_id    uuid REFERENCES branches(id) ON DELETE CASCADE,
+  branch_id    uuid NOT NULL,
   available    boolean DEFAULT true,
   created_at   timestamptz DEFAULT now(),
   UNIQUE(menu_item_id, branch_id)

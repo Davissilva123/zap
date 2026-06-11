@@ -1,5 +1,10 @@
-import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike, Lock, Store, UserCheck, Package, Wallet, Package2, Clock, Megaphone, TrendingDown, DollarSign, ScrollText, MonitorPlay, ShoppingBag, BookOpen, Truck, FileBarChart } from 'lucide-react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import {
+  LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap,
+  BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike, Lock, Store, UserCheck,
+  Package, Wallet, Package2, Clock, Megaphone, TrendingDown, DollarSign, ScrollText,
+  MonitorPlay, ShoppingBag, BookOpen, Truck, FileBarChart, ChevronRight,
+} from 'lucide-react';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState, useEffect } from 'react';
 import { db } from '../lib/db';
@@ -14,47 +19,105 @@ type NavItem = {
   feature: FeatureKey;
 };
 
-const BASE_NAV: NavItem[] = [
-  { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',      feature: 'dashboard'  },
-  { to: '/menu',       icon: UtensilsCrossed, label: 'Cardápio',        feature: 'menu'       },
-  { to: '/categories', icon: Grid3X3,         label: 'Categorias',      feature: 'categories' },
-  { to: '/orders',     icon: Receipt,         label: 'Pedidos',         feature: 'orders'     },
-  { to: '/reports',    icon: BarChart2,       label: 'Relatórios',      feature: 'reports'    },
-  { to: '/coupons',    icon: Tag,             label: 'Cupons',          feature: 'coupons'    },
-  { to: '/tables',     icon: LayoutGrid,      label: 'Mesas',           feature: 'tables'     },
-  { to: '/reviews',    icon: Star,            label: 'Avaliações',      feature: 'reviews'    },
-  { to: '/comandas',   icon: ClipboardList,   label: 'Comandas',        feature: 'comandas'   },
-  { to: '/drivers',    icon: Bike,            label: 'Entregadores',    feature: 'drivers'    },
-  { to: '/crm',         icon: UserCheck,       label: 'CRM',             feature: 'crm'        },
-  { to: '/estoque',    icon: Package,         label: 'Estoque',         feature: 'stock'      },
-  { to: '/caixa',      icon: Wallet,          label: 'Caixa',           feature: 'cashregister'},
-  { to: '/combos',     icon: Package2,        label: 'Combos',          feature: 'combos'     },
-  { to: '/promocoes',  icon: Clock,           label: 'Promoções',       feature: 'promotions' },
-  { to: '/campanhas',  icon: Megaphone,       label: 'Campanhas',       feature: 'campaigns'  },
-  { to: '/pdv',            icon: ShoppingBag,   label: 'PDV',             feature: 'pdv'            },
-  { to: '/kds',            icon: MonitorPlay,   label: 'KDS Cozinha',     feature: 'kds'            },
-  { to: '/fichas',         icon: BookOpen,      label: 'Fichas Técnicas', feature: 'recipes'        },
-  { to: '/fornecedores',   icon: Truck,         label: 'Fornecedores',    feature: 'suppliers'      },
-  { to: '/compras',        icon: ClipboardList, label: 'Pedidos de Compra', feature: 'purchase_orders' },
-  { to: '/contas',         icon: Wallet,        label: 'Contas',          feature: 'contas'         },
-  { to: '/dre',            icon: FileBarChart,  label: 'DRE',             feature: 'dre'            },
-  { to: '/cmv',        icon: TrendingDown,    label: 'CMV',             feature: 'cmv'        },
-  { to: '/financas',   icon: DollarSign,      label: 'Finanças',        feature: 'financas'   },
-  { to: '/fiscal',     icon: ScrollText,      label: 'Fiscal',          feature: 'fiscal'     },
-  { to: '/operators',  icon: Users,           label: 'Operadores',      feature: 'operators'  },
-  { to: '/branches',   icon: Store,           label: 'Filiais',         feature: 'settings'   },
-  { to: '/qrcode',     icon: QrCode,          label: 'QR Code',         feature: 'qrcode'     },
-  { to: '/settings',   icon: Settings,        label: 'Configurações',   feature: 'settings'   },
+type NavGroup = {
+  key: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  items: NavItem[];
+};
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    key: 'cardapio',
+    label: 'Cardápio',
+    icon: UtensilsCrossed,
+    items: [
+      { to: '/menu',       icon: UtensilsCrossed, label: 'Itens do Cardápio', feature: 'menu'       },
+      { to: '/categories', icon: Grid3X3,         label: 'Categorias',        feature: 'categories' },
+      { to: '/combos',     icon: Package2,        label: 'Combos',            feature: 'combos'     },
+      { to: '/fichas',     icon: BookOpen,        label: 'Fichas Técnicas',   feature: 'recipes'    },
+      { to: '/promocoes',  icon: Clock,           label: 'Promoções',         feature: 'promotions' },
+    ],
+  },
+  {
+    key: 'operacoes',
+    label: 'Operações',
+    icon: Receipt,
+    items: [
+      { to: '/orders',   icon: Receipt,      label: 'Pedidos',     feature: 'orders'     },
+      { to: '/pdv',      icon: ShoppingBag,  label: 'PDV',         feature: 'pdv'        },
+      { to: '/kds',      icon: MonitorPlay,  label: 'KDS Cozinha', feature: 'kds'        },
+      { to: '/tables',   icon: LayoutGrid,   label: 'Mesas',       feature: 'tables'     },
+      { to: '/comandas', icon: ClipboardList,label: 'Comandas',    feature: 'comandas'   },
+      { to: '/drivers',  icon: Bike,         label: 'Entregadores',feature: 'drivers'    },
+    ],
+  },
+  {
+    key: 'clientes',
+    label: 'Clientes',
+    icon: UserCheck,
+    items: [
+      { to: '/crm',       icon: UserCheck, label: 'CRM',       feature: 'crm'       },
+      { to: '/reviews',   icon: Star,      label: 'Avaliações',feature: 'reviews'   },
+      { to: '/coupons',   icon: Tag,       label: 'Cupons',    feature: 'coupons'   },
+      { to: '/campanhas', icon: Megaphone, label: 'Campanhas', feature: 'campaigns' },
+    ],
+  },
+  {
+    key: 'estoque',
+    label: 'Estoque & Compras',
+    icon: Package,
+    items: [
+      { to: '/estoque',      icon: Package,      label: 'Estoque',          feature: 'stock'           },
+      { to: '/fornecedores', icon: Truck,        label: 'Fornecedores',     feature: 'suppliers'       },
+      { to: '/compras',      icon: ClipboardList,label: 'Pedidos de Compra',feature: 'purchase_orders' },
+    ],
+  },
+  {
+    key: 'financeiro',
+    label: 'Financeiro',
+    icon: DollarSign,
+    items: [
+      { to: '/caixa',   icon: Wallet,      label: 'Caixa',     feature: 'cashregister' },
+      { to: '/contas',  icon: Wallet,      label: 'Contas',    feature: 'contas'       },
+      { to: '/financas',icon: DollarSign,  label: 'Finanças',  feature: 'financas'     },
+      { to: '/cmv',     icon: TrendingDown,label: 'CMV',       feature: 'cmv'          },
+      { to: '/dre',     icon: FileBarChart,label: 'DRE',       feature: 'dre'          },
+      { to: '/fiscal',  icon: ScrollText,  label: 'Fiscal',    feature: 'fiscal'       },
+      { to: '/reports', icon: BarChart2,   label: 'Relatórios',feature: 'reports'      },
+    ],
+  },
+  {
+    key: 'config',
+    label: 'Configurações',
+    icon: Settings,
+    items: [
+      { to: '/operators', icon: Users,    label: 'Operadores',   feature: 'operators' },
+      { to: '/branches',  icon: Store,    label: 'Filiais',      feature: 'settings'  },
+      { to: '/qrcode',    icon: QrCode,   label: 'QR Code',      feature: 'qrcode'    },
+      { to: '/settings',  icon: Settings, label: 'Configurações',feature: 'settings'  },
+    ],
+  },
 ];
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [planStatus, setPlanStatus] = useState<'loading' | 'ok' | 'trial_warning' | 'expired' | 'blocked' | 'disabled'>('loading');
   const [daysRemaining, setDaysRemaining] = useState(0);
   const [planSlug, setPlanSlug] = useState<PlanSlug>('');
   const [planDisplayName, setPlanDisplayName] = useState('');
+
+  // Which group is currently open
+  const activeGroup = NAV_GROUPS.find(g => g.items.some(i => location.pathname.startsWith(i.to)))?.key ?? '';
+  const [openGroup, setOpenGroup] = useState<string>(activeGroup);
+
+  // Keep open group in sync when navigating
+  useEffect(() => {
+    if (activeGroup) setOpenGroup(activeGroup);
+  }, [activeGroup]);
 
   const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
@@ -63,7 +126,7 @@ export default function Layout() {
 
     if (user.email === SUPER_ADMIN_EMAIL) {
       setPlanStatus('ok');
-      setPlanSlug('premium'); // superadmin acessa tudo
+      setPlanSlug('premium');
       return;
     }
 
@@ -100,7 +163,6 @@ export default function Layout() {
           db.getSettings(user.id).catch(() => null),
         ]);
 
-        // Restaurante desativado pelo admin
         if (settings?.disabled) { setPlanStatus('disabled'); return; }
 
         let resolvedPlan = plan;
@@ -113,7 +175,6 @@ export default function Layout() {
         if (resolvedPlan.isBlocked) { setPlanStatus('blocked'); return; }
         if (resolvedPlan.status === 'cancelled' || resolvedPlan.status === 'expired') { navigate('/planos'); return; }
 
-        // Armazena o plano para feature gating
         const slug = (resolvedPlan.planSlug ?? 'basic') as PlanSlug;
         setPlanSlug(slug);
         setPlanDisplayName(resolvedPlan.planName ?? PLAN_DISPLAY[slug] ?? 'Básico');
@@ -134,23 +195,51 @@ export default function Layout() {
     })();
   }, [user?.id]);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
+  const handleLogout = async () => { await logout(); navigate('/login'); };
 
   const initials = user?.name
-    ?.split(' ')
-    .map(n => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() || '?';
+    ?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() || '?';
 
-  const handleNavClick = (item: NavItem) => {
-    setMobileOpen(false);
-    if (!canAccess(planSlug, item.feature)) {
-      navigate(`/upgrade?feature=${item.feature}`);
+  const toggleGroup = (key: string) => setOpenGroup(prev => prev === key ? '' : key);
+
+  const renderItem = (item: NavItem) => {
+    const locked = planSlug !== '' && !canAccess(planSlug, item.feature);
+    const minPlan = FEATURE_MIN_PLAN[item.feature];
+    if (locked) {
+      return (
+        <button
+          key={item.to}
+          onClick={() => { navigate(`/upgrade?feature=${item.feature}`); setMobileOpen(false); }}
+          title={`Requer plano ${PLAN_DISPLAY[minPlan]}`}
+          className="w-full flex items-center gap-2.5 pl-8 pr-3 py-2 rounded-lg text-[12.5px] font-medium text-slate-600/50 hover:bg-white/5 hover:text-slate-400 transition-all group"
+        >
+          <item.icon className="w-3.5 h-3.5 flex-shrink-0 opacity-50" strokeWidth={1.75} />
+          <span className="flex-1 text-left opacity-60">{item.label}</span>
+          <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Lock className="w-2.5 h-2.5" />
+            <span className="text-[9px] font-bold">{PLAN_DISPLAY[minPlan]}</span>
+          </span>
+          <Lock className="w-2.5 h-2.5 opacity-40 group-hover:opacity-0 transition-opacity" />
+        </button>
+      );
     }
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        onClick={() => setMobileOpen(false)}
+        className={({ isActive }) =>
+          `flex items-center gap-2.5 pl-8 pr-3 py-2 rounded-lg text-[12.5px] font-medium transition-all duration-150 ${
+            isActive
+              ? 'bg-emerald-500/10 text-emerald-400'
+              : 'text-slate-500 hover:bg-white/5 hover:text-slate-200'
+          }`
+        }
+      >
+        <item.icon className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={1.75} />
+        <span>{item.label}</span>
+      </NavLink>
+    );
   };
 
   const sidebar = (
@@ -172,45 +261,49 @@ export default function Layout() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        <p className="px-3 text-[10px] font-semibold text-slate-600 uppercase tracking-widest mb-2">Menu</p>
-        {BASE_NAV.map(item => {
-          const locked = planSlug !== '' && !canAccess(planSlug, item.feature);
-          const minPlan = FEATURE_MIN_PLAN[item.feature];
-          if (locked) {
-            return (
-              <button
-                key={item.to}
-                onClick={() => handleNavClick(item)}
-                title={`Requer plano ${PLAN_DISPLAY[minPlan]}`}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium text-slate-600/50 hover:bg-white/5 hover:text-slate-400 transition-all duration-150 group"
-              >
-                <item.icon className="w-[17px] h-[17px] flex-shrink-0 opacity-50" strokeWidth={1.75} />
-                <span className="flex-1 text-left opacity-60">{item.label}</span>
-                <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Lock className="w-3 h-3" />
-                  <span className="text-[10px] font-bold">{PLAN_DISPLAY[minPlan]}</span>
-                </span>
-                <Lock className="w-3 h-3 opacity-40 group-hover:opacity-0 transition-opacity" />
-              </button>
-            );
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+        {/* Dashboard — standalone */}
+        <NavLink
+          to="/dashboard"
+          onClick={() => setMobileOpen(false)}
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150 mb-1 ${
+              isActive ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+            }`
           }
+        >
+          <LayoutDashboard className="w-[17px] h-[17px] flex-shrink-0" strokeWidth={1.75} />
+          <span>Dashboard</span>
+        </NavLink>
+
+        {/* Groups */}
+        {NAV_GROUPS.map(group => {
+          const isOpen = openGroup === group.key;
+          const hasActive = group.items.some(i => location.pathname.startsWith(i.to));
           return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150 ${
-                  isActive
-                    ? 'bg-emerald-500/10 text-emerald-400'
+            <div key={group.key}>
+              <button
+                onClick={() => toggleGroup(group.key)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150 ${
+                  hasActive
+                    ? 'text-emerald-400 bg-emerald-500/5'
                     : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
-                }`
-              }
-              onClick={() => setMobileOpen(false)}
-            >
-              <item.icon className="w-[17px] h-[17px] flex-shrink-0" strokeWidth={1.75} />
-              <span>{item.label}</span>
-            </NavLink>
+                }`}
+              >
+                <group.icon className="w-[17px] h-[17px] flex-shrink-0" strokeWidth={1.75} />
+                <span className="flex-1 text-left">{group.label}</span>
+                <ChevronRight
+                  className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${hasActive ? 'text-emerald-500' : 'text-slate-600'}`}
+                  strokeWidth={2}
+                />
+              </button>
+
+              {isOpen && (
+                <div className="mt-0.5 mb-1 space-y-0.5">
+                  {group.items.map(renderItem)}
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
@@ -304,7 +397,6 @@ export default function Layout() {
             </div>
           )}
 
-          {/* Tela de desativação pelo admin */}
           {planStatus === 'disabled' ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="text-center max-w-sm">

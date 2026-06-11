@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { db } from '../lib/db';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../lib/auth';
+import { useRestaurantId } from '../lib/auth';
 import type { Order } from '../lib/types';
 import { ChefHat, Truck, CheckCircle, Clock, RefreshCw, Volume2, VolumeX } from 'lucide-react';
 import { playNewOrderSound } from '../lib/sound';
@@ -30,7 +30,7 @@ function urgencyColor(iso: string): string {
 const TYPE_ICON: Record<string, string> = { delivery: '🛵', pickup: '🏠', table: '🪑' };
 
 export default function KDSPage() {
-  const { user } = useAuth();
+  const restaurantId = useRestaurantId();
   const [orders, setOrders] = useState<Order[]>([]);
   const [now, setNow] = useState(Date.now());
   const [loading, setLoading] = useState(true);
@@ -40,13 +40,13 @@ export default function KDSPage() {
   const ACTIVE = ['PENDING', 'PAID', 'PREPARING', 'DELIVERING'];
 
   const load = async () => {
-    if (!user) return;
-    const all = await db.getOrders(user.id);
+    if (!restaurantId) return;
+    const all = await db.getOrders(restaurantId);
     setOrders(all.filter(o => ACTIVE.includes(o.status)));
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [restaurantId]);
 
   // Tick every 30s for elapsed time
   useEffect(() => {
@@ -56,9 +56,9 @@ export default function KDSPage() {
 
   // Realtime subscription
   useEffect(() => {
-    if (!user) return;
-    const ch = supabase.channel('kds-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+    if (!restaurantId) return;
+    const ch = supabase.channel(`kds-orders:${restaurantId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `user_id=eq.${restaurantId}` }, (payload) => {
         const o = payload.new as Order | null;
         if (o && !prevIdsRef.current.has(o.id) && ACTIVE.includes(o.status)) {
           if (soundOn) playNewOrderSound();
@@ -68,7 +68,7 @@ export default function KDSPage() {
       })
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
-  }, [user, soundOn]);
+  }, [restaurantId, soundOn]);
 
   const advance = async (order: Order) => {
     const cfg = STATUS_FLOW[order.status];

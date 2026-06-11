@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { FinancialEntry, FinancialEntryType, Supplier } from '../lib/types';
-import { Wallet, Plus, X, Save, Trash2, CheckCircle, AlertCircle, Calendar, TrendingUp, TrendingDown, Edit2 } from 'lucide-react';
+import { Wallet, Plus, X, Save, Trash2, CheckCircle, AlertCircle, Calendar, TrendingUp, TrendingDown, Edit2, Banknote, CreditCard } from 'lucide-react';
 
 const STATUS_CFG = {
   pending:   { label: 'Pendente',  cls: 'bg-amber-100 text-amber-700'  },
@@ -34,7 +34,9 @@ export default function ContasPage() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<Partial<FinancialEntry>>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [payingEntry, setPayingEntry] = useState<FinancialEntry | null>(null);
 
   const load = async () => {
     if (!user) return;
@@ -72,15 +74,32 @@ export default function ContasPage() {
   const save = async () => {
     if (!user || !form.description?.trim() || !form.amount || !form.dueDate) return;
     setSaving(true);
-    await db.upsertFinancialEntry(user.id, form as FinancialEntry & { type: string; description: string; amount: number; dueDate: string });
-    await load();
-    setSaving(false);
-    close();
+    setSaveError('');
+    try {
+      await db.upsertFinancialEntry(user.id, form as FinancialEntry & { type: string; description: string; amount: number; dueDate: string });
+      await load();
+      close();
+    } catch (err) {
+      setSaveError('Erro ao salvar. Verifique se o SQL de migração foi executado no Supabase.');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const markPaid = async (e: FinancialEntry) => {
-    await db.markFinancialEntryPaid(e.id, new Date().toISOString().slice(0, 10));
-    setEntries(prev => prev.map(x => x.id === e.id ? { ...x, status: 'paid', paidDate: new Date().toISOString().slice(0, 10) } : x));
+  const confirmMarkPaid = async (e: FinancialEntry, isCash: boolean) => {
+    const today = new Date().toISOString().slice(0, 10);
+    await db.markFinancialEntryPaid(e.id, today);
+    setEntries(prev => prev.map(x => x.id === e.id ? { ...x, status: 'paid', paidDate: today } : x));
+    if (isCash && user) {
+      const session = await db.getCurrentCashSession(user.id);
+      if (session) {
+        const entryType = e.type === 'payable' ? 'withdrawal' : 'deposit';
+        const label = e.type === 'payable' ? `Pgto: ${e.description}` : `Receb.: ${e.description}`;
+        await db.addCashEntry(user.id, session.id, entryType, e.amount, label);
+      }
+    }
+    setPayingEntry(null);
   };
 
   const del = async (id: string) => {
@@ -191,7 +210,7 @@ export default function ContasPage() {
                     </td>
                     <td className="px-4 py-3 flex items-center gap-1">
                       {(e.status === 'pending' || e.status === 'overdue') && (
-                        <button onClick={() => markPaid(e)} title="Marcar como pago" className="p-1.5 text-slate-400 hover:text-emerald-600">
+                        <button onClick={() => setPayingEntry(e)} title="Marcar como pago" className="p-1.5 text-slate-400 hover:text-emerald-600">
                           <CheckCircle size={14} />
                         </button>
                       )}
@@ -203,6 +222,41 @@ export default function ContasPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {payingEntry && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-slate-800">Como foi pago?</h2>
+              <button onClick={() => setPayingEntry(null)} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={16} /></button>
+            </div>
+            <p className="text-sm text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
+              <span className={payingEntry.type === 'payable' ? 'text-red-600 font-medium' : 'text-emerald-600 font-medium'}>
+                {payingEntry.type === 'payable' ? '📤' : '📥'} {payingEntry.description}
+              </span>
+              <span className="ml-2 font-bold">R$ {payingEntry.amount.toFixed(2).replace('.', ',')}</span>
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => confirmMarkPaid(payingEntry, true)}
+                className="flex flex-col items-center gap-2 py-4 rounded-xl border-2 border-emerald-400 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold transition-colors"
+              >
+                <Banknote size={22} />
+                <span className="text-sm">Dinheiro</span>
+                <span className="text-[10px] text-emerald-600 font-normal">Registra no caixa</span>
+              </button>
+              <button
+                onClick={() => confirmMarkPaid(payingEntry, false)}
+                className="flex flex-col items-center gap-2 py-4 rounded-xl border-2 border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold transition-colors"
+              >
+                <CreditCard size={22} />
+                <span className="text-sm">Outro</span>
+                <span className="text-[10px] text-slate-500 font-normal">PIX, cartão, etc.</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -273,6 +327,12 @@ export default function ContasPage() {
                   className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none" />
               </div>
             </div>
+            {saveError && (
+              <div className="mx-6 mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-start gap-2">
+                <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
+                {saveError}
+              </div>
+            )}
             <div className="flex-shrink-0 px-6 py-4 border-t border-slate-200 flex gap-3 justify-end">
               <button onClick={close} className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">Cancelar</button>
               <button onClick={save} disabled={saving || !form.description?.trim()}

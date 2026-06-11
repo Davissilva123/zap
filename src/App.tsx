@@ -205,6 +205,7 @@ export default function App() {
             <Route path="relatorios" element={<ReportsPage />} />
             <Route path="cardapio" element={<MenuPage />} />
             <Route path="cupons" element={<CouponsPage />} />
+            <Route path="pdv" element={<PDVPage />} />
           </Route>
 
           {/* Driver portal (public, token-based) */}

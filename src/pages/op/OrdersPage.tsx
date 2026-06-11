@@ -121,7 +121,14 @@ export default function OpOrdersPage() {
   const formatDate = (d: string) => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
   const updateStatus = async (orderId: string, newStatus: string) => {
+    const order = orders.find(o => o.id === orderId);
     await db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined });
+    if (newStatus === 'PAID' && order?.paymentMethod === 'cash') {
+      const session = await db.getCurrentCashSession(restaurantId);
+      if (session) {
+        await db.addCashEntry(restaurantId, session.id, 'sale', order.total, `Pedido #${order.id.slice(-6).toUpperCase()}`);
+      }
+    }
     load();
     if (selectedOrder?.id === orderId) {
       setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null);

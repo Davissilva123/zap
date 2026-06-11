@@ -154,6 +154,12 @@ export default function OrdersPage() {
       ));
     }
     await db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined, driverName, driverId });
+    if (newStatus === 'PAID' && order?.paymentMethod === 'cash') {
+      const session = await db.getCurrentCashSession(user.id);
+      if (session) {
+        await db.addCashEntry(user.id, session.id, 'sale', order.total, `Pedido #${order.id.slice(-6).toUpperCase()}`);
+      }
+    }
     load();
     if (selectedOrder?.id === orderId) {
       setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'], driverName } : null);

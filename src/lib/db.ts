@@ -1497,7 +1497,8 @@ export const db = {
   async upsertFinancialEntry(userId: string, entry: Partial<import('./types').FinancialEntry> & { type: string; description: string; amount: number; dueDate: string }): Promise<void> {
     const row: Record<string, unknown> = { user_id: userId, type: entry.type, description: entry.description, amount: entry.amount, due_date: entry.dueDate, paid_date: entry.paidDate ?? null, status: entry.status ?? 'pending', category: entry.category ?? '', supplier_id: entry.supplierId ?? null, notes: entry.notes ?? '', recurrence: entry.recurrence ?? 'none' };
     if (entry.id) row.id = entry.id;
-    await supabase.from('financial_entries').upsert(row, { onConflict: 'id' });
+    const { error } = await supabase.from('financial_entries').upsert(row, { onConflict: 'id' });
+    if (error) throw new Error(error.message);
   },
   async markFinancialEntryPaid(id: string, paidDate: string): Promise<void> {
     await supabase.from('financial_entries').update({ status: 'paid', paid_date: paidDate }).eq('id', id);
