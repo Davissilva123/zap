@@ -67,6 +67,13 @@ import CampaignsPage from './pages/CampaignsPage';
 import CMVPage from './pages/CMVPage';
 import FinancasPage from './pages/FinancasPage';
 import FiscalPage from './pages/FiscalPage';
+import KDSPage from './pages/KDSPage';
+import PDVPage from './pages/PDVPage';
+import RecipesPage from './pages/RecipesPage';
+import SuppliersPage from './pages/SuppliersPage';
+import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
+import ContasPage from './pages/ContasPage';
+import DREPage from './pages/DREPage';
 
 const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
@@ -174,10 +181,17 @@ export default function App() {
             <Route path="/combos"     element={<CombosPage />} />
             <Route path="/promocoes"  element={<PromotionsPage />} />
             <Route path="/campanhas"  element={<CampaignsPage />} />
-            <Route path="/cmv"        element={<CMVPage />} />
-            <Route path="/financas"   element={<FinancasPage />} />
-            <Route path="/fiscal"     element={<FiscalPage />} />
-            <Route path="/qrcode"     element={<QRCodePage />} />
+            <Route path="/cmv"          element={<CMVPage />} />
+            <Route path="/financas"     element={<FinancasPage />} />
+            <Route path="/fiscal"       element={<FiscalPage />} />
+            <Route path="/kds"          element={<KDSPage />} />
+            <Route path="/pdv"          element={<PDVPage />} />
+            <Route path="/fichas"       element={<RecipesPage />} />
+            <Route path="/fornecedores" element={<SuppliersPage />} />
+            <Route path="/compras"      element={<PurchaseOrdersPage />} />
+            <Route path="/contas"       element={<ContasPage />} />
+            <Route path="/dre"          element={<DREPage />} />
+            <Route path="/qrcode"       element={<QRCodePage />} />
             <Route path="/settings"   element={<SettingsPage />} />
             <Route path="/upgrade"    element={<UpgradePage />} />
           </Route>

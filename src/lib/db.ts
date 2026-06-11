@@ -1424,4 +1424,102 @@ export const db = {
     if (error || !data) return [];
     return (data as any[]).map(r => ({ id: r.id, delta: Number(r.delta), reason: r.reason ?? '', createdAt: r.created_at }));
   },
+
+  // ---- Fornecedores ----
+  async getSuppliers(userId: string): Promise<import('./types').Supplier[]> {
+    const { data } = await supabase.from('suppliers').select('*').eq('user_id', userId).order('name');
+    if (!data) return [];
+    return (data as any[]).map(r => ({ id: r.id, userId: r.user_id, name: r.name, email: r.email ?? '', phone: r.phone ?? '', cnpj: r.cnpj ?? '', address: r.address ?? '', contactName: r.contact_name ?? '', notes: r.notes ?? '', active: r.active ?? true, createdAt: r.created_at }));
+  },
+  async upsertSupplier(userId: string, s: Partial<import('./types').Supplier> & { name: string }): Promise<import('./types').Supplier> {
+    const row: Record<string, unknown> = { user_id: userId, name: s.name, email: s.email ?? '', phone: s.phone ?? '', cnpj: s.cnpj ?? '', address: s.address ?? '', contact_name: s.contactName ?? '', notes: s.notes ?? '', active: s.active ?? true };
+    if (s.id) row.id = s.id;
+    const { data } = await supabase.from('suppliers').upsert(row, { onConflict: 'id' }).select().single();
+    const r = data as any;
+    return { id: r.id, userId: r.user_id, name: r.name, email: r.email ?? '', phone: r.phone ?? '', cnpj: r.cnpj ?? '', address: r.address ?? '', contactName: r.contact_name ?? '', notes: r.notes ?? '', active: r.active ?? true, createdAt: r.created_at };
+  },
+  async deleteSupplier(id: string): Promise<void> {
+    await supabase.from('suppliers').delete().eq('id', id);
+  },
+
+  // ---- Fichas Técnicas ----
+  async getRecipeIngredients(menuItemId: string): Promise<import('./types').RecipeIngredient[]> {
+    const { data } = await supabase.from('recipe_ingredients').select('*').eq('menu_item_id', menuItemId).order('created_at');
+    if (!data) return [];
+    return (data as any[]).map(r => ({ id: r.id, userId: r.user_id, menuItemId: r.menu_item_id, name: r.name, quantity: Number(r.quantity), unit: r.unit ?? 'g', unitCost: Number(r.unit_cost), supplierId: r.supplier_id ?? null, createdAt: r.created_at }));
+  },
+  async upsertRecipeIngredient(userId: string, ing: Partial<import('./types').RecipeIngredient> & { menuItemId: string; name: string; quantity: number; unit: string; unitCost: number }): Promise<void> {
+    const row: Record<string, unknown> = { user_id: userId, menu_item_id: ing.menuItemId, name: ing.name, quantity: ing.quantity, unit: ing.unit, unit_cost: ing.unitCost, supplier_id: ing.supplierId ?? null };
+    if (ing.id) row.id = ing.id;
+    await supabase.from('recipe_ingredients').upsert(row, { onConflict: 'id' });
+  },
+  async deleteRecipeIngredient(id: string): Promise<void> {
+    await supabase.from('recipe_ingredients').delete().eq('id', id);
+  },
+
+  // ---- Pedidos de Compra ----
+  async getPurchaseOrders(userId: string): Promise<import('./types').PurchaseOrder[]> {
+    const { data } = await supabase.from('purchase_orders').select('*, suppliers(name)').eq('user_id', userId).order('created_at', { ascending: false });
+    if (!data) return [];
+    return (data as any[]).map(r => ({ id: r.id, userId: r.user_id, supplierId: r.supplier_id ?? null, supplierName: r.suppliers?.name ?? '', status: r.status, expectedDate: r.expected_date ?? null, receivedDate: r.received_date ?? null, total: Number(r.total), notes: r.notes ?? '', createdAt: r.created_at }));
+  },
+  async getPurchaseOrderItems(orderId: string): Promise<import('./types').PurchaseOrderItem[]> {
+    const { data } = await supabase.from('purchase_order_items').select('*').eq('order_id', orderId).order('created_at');
+    if (!data) return [];
+    return (data as any[]).map(r => ({ id: r.id, orderId: r.order_id, userId: r.user_id, name: r.name, quantity: Number(r.quantity), unit: r.unit ?? 'un', unitCost: Number(r.unit_cost), createdAt: r.created_at }));
+  },
+  async upsertPurchaseOrder(userId: string, po: Partial<import('./types').PurchaseOrder>): Promise<string> {
+    const row: Record<string, unknown> = { user_id: userId, supplier_id: po.supplierId ?? null, status: po.status ?? 'draft', expected_date: po.expectedDate ?? null, received_date: po.receivedDate ?? null, total: po.total ?? 0, notes: po.notes ?? '' };
+    if (po.id) row.id = po.id;
+    const { data } = await supabase.from('purchase_orders').upsert(row, { onConflict: 'id' }).select('id').single();
+    return (data as any).id as string;
+  },
+  async upsertPurchaseOrderItem(userId: string, item: Partial<import('./types').PurchaseOrderItem> & { orderId: string; name: string }): Promise<void> {
+    const row: Record<string, unknown> = { order_id: item.orderId, user_id: userId, name: item.name, quantity: item.quantity ?? 0, unit: item.unit ?? 'un', unit_cost: item.unitCost ?? 0 };
+    if (item.id) row.id = item.id;
+    await supabase.from('purchase_order_items').upsert(row, { onConflict: 'id' });
+  },
+  async deletePurchaseOrderItem(id: string): Promise<void> {
+    await supabase.from('purchase_order_items').delete().eq('id', id);
+  },
+  async deletePurchaseOrder(id: string): Promise<void> {
+    await supabase.from('purchase_orders').delete().eq('id', id);
+  },
+
+  // ---- Contas a Pagar / Receber ----
+  async getFinancialEntries(userId: string, type?: 'payable' | 'receivable'): Promise<import('./types').FinancialEntry[]> {
+    let q = supabase.from('financial_entries').select('*').eq('user_id', userId).order('due_date');
+    if (type) q = q.eq('type', type);
+    const { data } = await q;
+    if (!data) return [];
+    return (data as any[]).map(r => ({ id: r.id, userId: r.user_id, type: r.type, description: r.description, amount: Number(r.amount), dueDate: r.due_date, paidDate: r.paid_date ?? null, status: r.status, category: r.category ?? '', supplierId: r.supplier_id ?? null, notes: r.notes ?? '', recurrence: r.recurrence ?? 'none', createdAt: r.created_at }));
+  },
+  async upsertFinancialEntry(userId: string, entry: Partial<import('./types').FinancialEntry> & { type: string; description: string; amount: number; dueDate: string }): Promise<void> {
+    const row: Record<string, unknown> = { user_id: userId, type: entry.type, description: entry.description, amount: entry.amount, due_date: entry.dueDate, paid_date: entry.paidDate ?? null, status: entry.status ?? 'pending', category: entry.category ?? '', supplier_id: entry.supplierId ?? null, notes: entry.notes ?? '', recurrence: entry.recurrence ?? 'none' };
+    if (entry.id) row.id = entry.id;
+    await supabase.from('financial_entries').upsert(row, { onConflict: 'id' });
+  },
+  async markFinancialEntryPaid(id: string, paidDate: string): Promise<void> {
+    await supabase.from('financial_entries').update({ status: 'paid', paid_date: paidDate }).eq('id', id);
+  },
+  async deleteFinancialEntry(id: string): Promise<void> {
+    await supabase.from('financial_entries').delete().eq('id', id);
+  },
+
+  // ---- Cardápio por Filial ----
+  async getMenuItemBranches(menuItemId: string): Promise<string[]> {
+    const { data } = await supabase.from('menu_item_branches').select('branch_id').eq('menu_item_id', menuItemId).eq('available', true);
+    if (!data) return [];
+    return (data as any[]).map(r => r.branch_id as string);
+  },
+  async setMenuItemBranches(userId: string, menuItemId: string, branchIds: string[]): Promise<void> {
+    await supabase.from('menu_item_branches').delete().eq('menu_item_id', menuItemId);
+    if (branchIds.length === 0) return;
+    await supabase.from('menu_item_branches').insert(branchIds.map(bid => ({ user_id: userId, menu_item_id: menuItemId, branch_id: bid, available: true })));
+  },
+  async getBranchMenuItemIds(branchId: string): Promise<string[] | null> {
+    const { data } = await supabase.from('menu_item_branches').select('menu_item_id').eq('branch_id', branchId).eq('available', true);
+    if (!data || data.length === 0) return null; // null = no restrictions set
+    return (data as any[]).map(r => r.menu_item_id as string);
+  },
 };

@@ -89,3 +89,99 @@ export function printOrder(order: Order, settings: RestaurantSettings) {
   win.document.close();
   win.onload = () => { win.focus(); win.print(); win.onafterprint = () => win.close(); };
 }
+
+// ── ESC/POS via Web Serial API (Chrome/Edge com impressora USB/serial) ──────
+const ESC = 0x1b;
+const GS  = 0x1d;
+const LF  = 0x0a;
+
+function bytes(...b: number[]): Uint8Array { return new Uint8Array(b); }
+function text(s: string): Uint8Array { return new TextEncoder().encode(s); }
+
+const CMD = {
+  init:       bytes(ESC, 0x40),
+  cut:        bytes(GS, 0x56, 0x41, 0x00),
+  boldOn:     bytes(ESC, 0x45, 0x01),
+  boldOff:    bytes(ESC, 0x45, 0x00),
+  center:     bytes(ESC, 0x61, 0x01),
+  left:       bytes(ESC, 0x61, 0x00),
+  right:      bytes(ESC, 0x61, 0x02),
+  dblHeight:  bytes(GS, 0x21, 0x01),
+  dblSize:    bytes(GS, 0x21, 0x11),
+  normalSize: bytes(GS, 0x21, 0x00),
+  lf:         bytes(LF),
+};
+
+function line80(left: string, right: string, width = 42): string {
+  const gap = Math.max(1, width - left.length - right.length);
+  return left + ' '.repeat(gap) + right;
+}
+
+export function isSerialSupported(): boolean {
+  return 'serial' in navigator;
+}
+
+export async function printReceiptSerial(order: Order, settings: RestaurantSettings): Promise<void> {
+  if (!isSerialSupported()) throw new Error('Web Serial não suportado. Use Chrome/Edge.');
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const serial = (navigator as any).serial;
+  const port = await serial.requestPort();
+  await port.open({ baudRate: 9600 });
+  const writer = port.writable.getWriter();
+
+  const write = async (...chunks: Uint8Array[]) => {
+    for (const c of chunks) await writer.write(c);
+  };
+
+  const sep = () => write(text('─'.repeat(42) + '\n'));
+  const pay = PAYMENT_METHOD_LABELS[order.paymentMethod];
+  const orderId = order.id.slice(-8).toUpperCase();
+
+  try {
+    await write(CMD.init);
+    await write(CMD.center, CMD.boldOn, CMD.dblSize, text(settings.name + '\n'), CMD.normalSize, CMD.boldOff);
+    if (settings.address) await write(CMD.center, text(settings.address + '\n'));
+    if (settings.phone)   await write(CMD.center, text(settings.phone + '\n'));
+    await write(CMD.lf);
+    await sep();
+    await write(CMD.center, CMD.boldOn, CMD.dblHeight, text(`PEDIDO #${orderId}\n`), CMD.normalSize, CMD.boldOff);
+    await write(CMD.center, text(new Date(order.createdAt).toLocaleString('pt-BR') + '\n'));
+    await sep();
+
+    await write(CMD.left);
+    await write(text(`Cliente: ${order.customerName}\n`));
+    await write(text(`Fone: ${order.customerPhone}\n`));
+    await write(text(`Entrega: ${order.deliveryType === 'delivery' ? 'DELIVERY' : order.deliveryType === 'table' ? `Mesa ${order.tableName ?? ''}` : 'RETIRADA'}\n`));
+    if (order.deliveryType === 'delivery' && order.deliveryAddress) {
+      const a = order.deliveryAddress;
+      await write(text(`End: ${[a.street, a.number, a.neighborhood].filter(Boolean).join(', ')}\n`));
+    }
+    await sep();
+
+    await write(CMD.boldOn, text('ITENS\n'), CMD.boldOff);
+    for (const item of order.items) {
+      const left  = `${item.quantity}x ${item.name}`;
+      const right = `R$${(item.price * item.quantity).toFixed(2)}`;
+      await write(text(line80(left, right) + '\n'));
+      if (item.selectedOptions?.length) {
+        for (const opt of item.selectedOptions) {
+          await write(text(`  + ${opt.optionName}\n`));
+        }
+      }
+    }
+    await sep();
+
+    if (order.discount > 0) await write(text(line80('Desconto:', `-R$${order.discount.toFixed(2)}`) + '\n'));
+    await write(CMD.boldOn, CMD.dblHeight, text(line80('TOTAL:', `R$${order.total.toFixed(2)}`)), CMD.normalSize, CMD.boldOff, CMD.lf);
+    await sep();
+    await write(text(`Pagamento: ${pay?.label ?? order.paymentMethod}\n`));
+    if (order.notes) await write(text(`Obs: ${order.notes}\n`));
+    await sep();
+    await write(CMD.center, text('\nObrigado pela preferencia!\nVolte sempre!\n\n'));
+    await write(CMD.cut);
+  } finally {
+    writer.releaseLock();
+    await port.close();
+  }
+}

@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike, Lock, Store, UserCheck, Package, Wallet, Package2, Clock, Megaphone, TrendingDown, DollarSign, ScrollText } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, Grid3X3, QrCode, Settings, LogOut, Receipt, Menu, Zap, BarChart2, Tag, LayoutGrid, Users, Star, ClipboardList, Bike, Lock, Store, UserCheck, Package, Wallet, Package2, Clock, Megaphone, TrendingDown, DollarSign, ScrollText, MonitorPlay, ShoppingBag, BookOpen, Truck, FileBarChart } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState, useEffect } from 'react';
@@ -31,6 +31,13 @@ const BASE_NAV: NavItem[] = [
   { to: '/combos',     icon: Package2,        label: 'Combos',          feature: 'combos'     },
   { to: '/promocoes',  icon: Clock,           label: 'Promoções',       feature: 'promotions' },
   { to: '/campanhas',  icon: Megaphone,       label: 'Campanhas',       feature: 'campaigns'  },
+  { to: '/pdv',            icon: ShoppingBag,   label: 'PDV',             feature: 'pdv'            },
+  { to: '/kds',            icon: MonitorPlay,   label: 'KDS Cozinha',     feature: 'kds'            },
+  { to: '/fichas',         icon: BookOpen,      label: 'Fichas Técnicas', feature: 'recipes'        },
+  { to: '/fornecedores',   icon: Truck,         label: 'Fornecedores',    feature: 'suppliers'      },
+  { to: '/compras',        icon: ClipboardList, label: 'Pedidos de Compra', feature: 'purchase_orders' },
+  { to: '/contas',         icon: Wallet,        label: 'Contas',          feature: 'contas'         },
+  { to: '/dre',            icon: FileBarChart,  label: 'DRE',             feature: 'dre'            },
   { to: '/cmv',        icon: TrendingDown,    label: 'CMV',             feature: 'cmv'        },
   { to: '/financas',   icon: DollarSign,      label: 'Finanças',        feature: 'financas'   },
   { to: '/fiscal',     icon: ScrollText,      label: 'Fiscal',          feature: 'fiscal'     },

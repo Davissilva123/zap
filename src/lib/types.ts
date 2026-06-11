@@ -290,3 +290,76 @@ export interface CustomerRecord {
   lastOrderAt: string;
   segment: 'loyal' | 'active' | 'at_risk' | 'inactive';
 }
+
+export interface Supplier {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  phone: string;
+  cnpj: string;
+  address: string;
+  contactName: string;
+  notes: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface RecipeIngredient {
+  id: string;
+  userId: string;
+  menuItemId: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  supplierId: string | null;
+  createdAt: string;
+}
+
+export type PurchaseOrderStatus = 'draft' | 'sent' | 'received' | 'cancelled';
+
+export interface PurchaseOrderItem {
+  id: string;
+  orderId: string;
+  userId: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  createdAt: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  userId: string;
+  supplierId: string | null;
+  supplierName?: string;
+  status: PurchaseOrderStatus;
+  expectedDate: string | null;
+  receivedDate: string | null;
+  total: number;
+  notes: string;
+  items?: PurchaseOrderItem[];
+  createdAt: string;
+}
+
+export type FinancialEntryType = 'payable' | 'receivable';
+export type FinancialEntryStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
+export type FinancialEntryRecurrence = 'none' | 'monthly' | 'weekly' | 'yearly';
+
+export interface FinancialEntry {
+  id: string;
+  userId: string;
+  type: FinancialEntryType;
+  description: string;
+  amount: number;
+  dueDate: string;
+  paidDate: string | null;
+  status: FinancialEntryStatus;
+  category: string;
+  supplierId: string | null;
+  notes: string;
+  recurrence: FinancialEntryRecurrence;
+  createdAt: string;
+}
