@@ -1,4 +1,4 @@
-import type { Order } from './types';
+import type { Order, Coupon } from './types';
 
 const fmt = (v: number) =>
   'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -18,6 +18,7 @@ const PAY: Record<string, string> = {
 const DELIVERY: Record<string, string> = {
   delivery: 'Delivery',
   pickup: 'Retirada',
+  table: 'Mesa',
   dine_in: 'Mesa',
 };
 
@@ -27,6 +28,7 @@ export interface ReportCtx {
   rangeOrders: Order[];       // pedidos do período (sem cancelados)
   allPeriodOrders: Order[];   // todos do período (com cancelados)
   allOrders: Order[];         // todos os pedidos (histórico completo)
+  coupons?: Coupon[];         // cupons cadastrados no restaurante
 }
 
 export function openReport(html: string) {
@@ -503,4 +505,247 @@ export function csvMensal(ctx: ReportCtx) {
     (count ? rev / count : 0).toFixed(2).replace('.', ','),
   ]);
   downloadCsv('faturamento-mensal', headers, rows);
+}
+
+// ─── 10. Livro Caixa ─────────────────────────────────────────────────────────
+export function reportLivroCaixa(ctx: ReportCtx): string {
+  const { restaurantName, period, rangeOrders } = ctx;
+  const sorted = [...rangeOrders].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  let balance = 0;
+  const rows = sorted.map(o => {
+    balance += o.total;
+    return `<tr>
+      <td style="white-space:nowrap">${fmtDate(o.createdAt)}</td>
+      <td>${o.customerName} — ${PAY[o.paymentMethod] ?? o.paymentMethod}</td>
+      <td style="text-align:right;color:#10b981;font-weight:600">${fmt(o.total)}</td>
+      <td style="text-align:right;color:#64748b">—</td>
+      <td style="text-align:right;font-weight:700">${fmt(balance)}</td>
+    </tr>`;
+  }).join('');
+  const totalIn = sorted.reduce((s, o) => s + o.total, 0);
+
+  const body = `
+    <div class="note">⚠ Documento gerado automaticamente. As saídas de caixa (custos, fornecedores, salários) devem ser lançadas manualmente pelo contador. Adequado para MEI e Simples Nacional como base para o Livro Caixa oficial.</div>
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-label">Total de entradas</div><div class="kpi-value" style="color:#10b981">${fmt(totalIn)}</div></div>
+      <div class="kpi"><div class="kpi-label">Saídas</div><div class="kpi-value">—</div><div class="kpi-sub">Lançar manualmente</div></div>
+      <div class="kpi"><div class="kpi-label">Saldo do período</div><div class="kpi-value" style="color:#10b981">${fmt(totalIn)}</div></div>
+      <div class="kpi"><div class="kpi-label">Lançamentos</div><div class="kpi-value">${sorted.length}</div></div>
+    </div>
+    <div class="section">
+      <div class="sec-title">Livro Caixa — Registro de Entradas (Receitas)</div>
+      <table>
+        <thead><tr><th>Data</th><th>Histórico</th><th style="text-align:right">Entradas (R$)</th><th style="text-align:right">Saídas (R$)</th><th style="text-align:right">Saldo (R$)</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Nenhuma entrada no período</td></tr>'}</tbody>
+        <tfoot><tr class="tfoot-total"><td colspan="2">TOTAL DO PERÍODO</td><td style="text-align:right;color:#10b981">${fmt(totalIn)}</td><td style="text-align:right">—</td><td style="text-align:right">${fmt(totalIn)}</td></tr></tfoot>
+      </table>
+    </div>`;
+  return base('Livro Caixa', restaurantName, period, body);
+}
+
+// ─── 11. Descontos e Cupons ───────────────────────────────────────────────────
+export function reportCupons(ctx: ReportCtx): string {
+  const { restaurantName, period, rangeOrders, coupons } = ctx;
+  const discountedOrders = rangeOrders.filter(o => (o.discount ?? 0) > 0);
+  const totalDiscount = discountedOrders.reduce((s, o) => s + (o.discount ?? 0), 0);
+  const totalRev = rangeOrders.reduce((s, o) => s + o.total, 0);
+  const grossRev = totalRev + totalDiscount;
+
+  const byCoupon: Record<string, { count: number; discount: number; revenue: number }> = {};
+  rangeOrders.forEach(o => {
+    if ((o.discount ?? 0) > 0) {
+      const code = o.couponCode ?? 'Manual';
+      if (!byCoupon[code]) byCoupon[code] = { count: 0, discount: 0, revenue: 0 };
+      byCoupon[code].count++;
+      byCoupon[code].discount += o.discount ?? 0;
+      byCoupon[code].revenue += o.total;
+    }
+  });
+
+  const couponMap: Record<string, Coupon> = {};
+  coupons?.forEach(c => { couponMap[c.code] = c; });
+
+  const usedRows = Object.entries(byCoupon).sort(([, a], [, b]) => b.discount - a.discount).map(([code, { count, discount, revenue }]) => {
+    const def = couponMap[code];
+    const tipo = def ? (def.discountType === 'percent' ? `${def.discountValue}%` : fmt(def.discountValue)) : '—';
+    return `<tr>
+      <td style="font-family:monospace;font-weight:700;color:#6366f1">${code}</td>
+      <td>${tipo}</td>
+      <td style="text-align:center">${count}</td>
+      <td style="text-align:right;color:#ef4444;font-weight:600">${fmt(discount)}</td>
+      <td style="text-align:right">${fmt(revenue)}</td>
+    </tr>`;
+  }).join('');
+
+  const inventoryRows = (coupons ?? []).map(c => `<tr>
+    <td style="font-family:monospace;font-weight:700">${c.code}</td>
+    <td>${c.discountType === 'percent' ? `${c.discountValue}%` : fmt(c.discountValue)}</td>
+    <td style="text-align:center">${c.usesCount}</td>
+    <td style="text-align:center">${c.maxUses ?? '∞'}</td>
+    <td style="text-align:center;color:${c.active ? '#10b981' : '#ef4444'}">${c.active ? '✅ Ativo' : '❌ Inativo'}</td>
+    <td style="text-align:right">${c.expiresAt ? fmtDate(c.expiresAt) : 'Sem venc.'}</td>
+  </tr>`).join('');
+
+  const body = `
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-label">Total de descontos</div><div class="kpi-value" style="color:#ef4444">${fmt(totalDiscount)}</div></div>
+      <div class="kpi"><div class="kpi-label">Pedidos com desconto</div><div class="kpi-value">${discountedOrders.length}</div><div class="kpi-sub">${rangeOrders.length > 0 ? Math.round(discountedOrders.length / rangeOrders.length * 100) : 0}% do total</div></div>
+      <div class="kpi"><div class="kpi-label">Receita bruta (s/ desc.)</div><div class="kpi-value" style="font-size:14px">${fmt(grossRev)}</div></div>
+      <div class="kpi"><div class="kpi-label">Receita líquida</div><div class="kpi-value" style="font-size:14px;color:#10b981">${fmt(totalRev)}</div></div>
+    </div>
+    <div class="section">
+      <div class="sec-title">Cupons utilizados no período</div>
+      ${Object.keys(byCoupon).length > 0 ? `<table><thead><tr><th>Código</th><th>Tipo de desconto</th><th style="text-align:center">Usos</th><th style="text-align:right">Total desconto</th><th style="text-align:right">Receita líquida</th></tr></thead><tbody>${usedRows}</tbody></table>`
+        : '<p style="color:#94a3b8;padding:12px 0;font-size:12px">Nenhum cupom utilizado no período selecionado.</p>'}
+    </div>
+    <div class="section">
+      <div class="sec-title">Inventário de cupons cadastrados</div>
+      ${inventoryRows ? `<table><thead><tr><th>Código</th><th>Valor</th><th style="text-align:center">Usos</th><th style="text-align:center">Limite</th><th style="text-align:center">Status</th><th style="text-align:right">Vencimento</th></tr></thead><tbody>${inventoryRows}</tbody></table>`
+        : '<p style="color:#94a3b8;padding:12px 0;font-size:12px">Nenhum cupom cadastrado.</p>'}
+    </div>`;
+  return base('Relatório de Descontos e Cupons', restaurantName, period, body);
+}
+
+// ─── 12. Comprovante por Pedido ───────────────────────────────────────────────
+export function reportComprovantes(ctx: ReportCtx): string {
+  const { restaurantName, period, allPeriodOrders } = ctx;
+  const STATUS: Record<string, string> = {
+    PENDING: 'Pendente', PAID: 'Pago', PREPARING: 'Em preparo',
+    DELIVERING: 'Em entrega', COMPLETED: 'Concluído', CANCELLED: 'Cancelado',
+  };
+  const orders = [...allPeriodOrders]
+    .filter(o => o.status !== 'CANCELLED')
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 60);
+
+  const receipts = orders.map((o, idx) => {
+    const itemRows = o.items.map(i => `<tr><td>${i.quantity}x ${i.name}</td><td style="text-align:right">${fmt(i.price * i.quantity)}</td></tr>`).join('');
+    const addrLine = o.deliveryAddress
+      ? `<div style="font-size:11px;color:#64748b;margin-top:2px">📍 ${o.deliveryAddress.street}, ${o.deliveryAddress.number}${o.deliveryAddress.complement ? `, ${o.deliveryAddress.complement}` : ''} — ${o.deliveryAddress.neighborhood}</div>` : '';
+    const notesLine = o.notes ? `<div style="font-size:11px;color:#94a3b8;margin-top:2px;font-style:italic">Obs: ${o.notes}</div>` : '';
+    const discountLine = (o.discount ?? 0) > 0
+      ? `<div style="display:flex;justify-content:space-between;font-size:12px;color:#64748b;margin-bottom:3px"><span>Subtotal</span><span>${fmt(o.total + (o.discount ?? 0))}</span></div>
+         <div style="display:flex;justify-content:space-between;font-size:12px;color:#ef4444;margin-bottom:3px"><span>Desconto${o.couponCode ? ` (${o.couponCode})` : ''}</span><span>− ${fmt(o.discount ?? 0)}</span></div>` : '';
+
+    return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;margin-bottom:20px;break-inside:avoid">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:10px;border-bottom:1px dashed #e2e8f0">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:#0f172a">${restaurantName}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px">${fmtDT(o.createdAt)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:#94a3b8">Comprovante ${String(idx + 1).padStart(4, '0')}</div>
+          <div style="font-size:11px;font-weight:700;color:${o.status === 'COMPLETED' ? '#10b981' : '#64748b'};margin-top:2px">${STATUS[o.status] ?? o.status}</div>
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:12px;color:#1e293b"><strong>${o.customerName}</strong> · ${o.customerPhone}</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px">${PAY[o.paymentMethod] ?? o.paymentMethod} · ${DELIVERY[o.deliveryType ?? ''] ?? o.deliveryType ?? '—'}</div>
+        ${addrLine}${notesLine}
+      </div>
+      <table style="width:100%;border-collapse:collapse;margin-bottom:10px">
+        <thead><tr style="background:#f8fafc"><th style="padding:5px 8px;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;text-align:left">Item</th><th style="padding:5px 8px;font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;text-align:right">Valor</th></tr></thead>
+        <tbody>${itemRows}</tbody>
+      </table>
+      <div style="border-top:1px solid #f1f5f9;padding-top:8px">
+        ${discountLine}
+        <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;color:#0f172a"><span>TOTAL</span><span style="color:#10b981">${fmt(o.total)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const body = `
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-label">Comprovantes</div><div class="kpi-value">${orders.length}</div><div class="kpi-sub">${orders.length >= 60 ? 'Últimos 60' : 'Todos'} do período</div></div>
+      <div class="kpi"><div class="kpi-label">Faturamento</div><div class="kpi-value" style="font-size:15px">${fmt(orders.reduce((s, o) => s + o.total, 0))}</div></div>
+    </div>
+    ${receipts || '<p style="text-align:center;color:#94a3b8;padding:40px 0">Nenhum pedido no período</p>'}`;
+  return base('Comprovantes de Pedido', restaurantName, period, body);
+}
+
+// ─── 13. Tipo de Atendimento ──────────────────────────────────────────────────
+export function reportAtendimento(ctx: ReportCtx): string {
+  const { restaurantName, period, rangeOrders } = ctx;
+  const byType: Record<string, { count: number; revenue: number; tickets: number[] }> = {};
+  rangeOrders.forEach(o => {
+    const t = o.deliveryType ?? 'delivery';
+    if (!byType[t]) byType[t] = { count: 0, revenue: 0, tickets: [] };
+    byType[t].count++;
+    byType[t].revenue += o.total;
+    byType[t].tickets.push(o.total);
+  });
+  const total = rangeOrders.length;
+  const totalRev = rangeOrders.reduce((s, o) => s + o.total, 0);
+  const maxRev = Math.max(...Object.values(byType).map(t => t.revenue), 1);
+  const COLORS: Record<string, string> = { delivery: '#6366f1', pickup: '#10b981', table: '#f59e0b', dine_in: '#f59e0b' };
+  const LABELS: Record<string, string> = { delivery: '🛵 Delivery', pickup: '🏃 Retirada', table: '🪑 Mesa', dine_in: '🪑 Mesa' };
+  const entries = Object.entries(byType).sort(([, a], [, b]) => b.revenue - a.revenue);
+
+  const tableRows = entries.map(([type, { count, revenue, tickets }]) => {
+    const avg = count ? revenue / count : 0;
+    const max = Math.max(...tickets); const min = Math.min(...tickets);
+    return `<tr>
+      <td style="font-weight:700">${LABELS[type] ?? type}</td>
+      <td style="text-align:center">${count}</td>
+      <td style="text-align:center;color:#64748b">${total ? Math.round(count / total * 100) : 0}%</td>
+      <td style="text-align:right;font-weight:600">${fmt(revenue)}</td>
+      <td style="text-align:center;color:#64748b">${totalRev > 0 ? Math.round(revenue / totalRev * 100) : 0}%</td>
+      <td style="text-align:right;color:#64748b">${fmt(avg)}</td>
+      <td style="text-align:right;font-size:10px;color:#94a3b8">${fmt(min)} ~ ${fmt(max)}</td>
+    </tr>`;
+  }).join('');
+
+  const body = `
+    <div class="kpis">
+      ${entries.map(([type, { count, revenue }]) => `<div class="kpi"><div class="kpi-label">${LABELS[type] ?? type}</div><div class="kpi-value">${count}</div><div class="kpi-sub">${fmt(revenue)}</div></div>`).join('')}
+    </div>
+    <div class="section">
+      <div class="sec-title">Receita por canal</div>
+      ${bars(entries.map(([type, { revenue }]) => ({ label: LABELS[type] ?? type, value: revenue, max: maxRev, sub: fmt(revenue), color: COLORS[type] ?? '#6366f1' })))}
+    </div>
+    <div class="section">
+      <div class="sec-title">Comparativo detalhado</div>
+      <table><thead><tr><th>Canal</th><th style="text-align:center">Pedidos</th><th style="text-align:center">% Ped.</th><th style="text-align:right">Receita</th><th style="text-align:center">% Rec.</th><th style="text-align:right">Ticket Médio</th><th style="text-align:right">Faixa</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+      <tfoot><tr class="tfoot-total"><td>TOTAL</td><td style="text-align:center">${total}</td><td style="text-align:center">100%</td><td style="text-align:right;color:#10b981">${fmt(totalRev)}</td><td style="text-align:center">100%</td><td style="text-align:right">${fmt(total ? totalRev / total : 0)}</td><td></td></tr></tfoot>
+      </table>
+    </div>`;
+  return base('Relatório por Tipo de Atendimento', restaurantName, period, body);
+}
+
+// ─── 14. Avaliações ───────────────────────────────────────────────────────────
+export function reportAvaliacoes(ctx: ReportCtx): string {
+  const { restaurantName, period, rangeOrders } = ctx;
+  const rated = rangeOrders.filter(o => o.rating != null && o.rating > 0);
+  const avgRating = rated.length ? rated.reduce((s, o) => s + (o.rating ?? 0), 0) / rated.length : 0;
+  const dist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  rated.forEach(o => { if (o.rating) dist[o.rating] = (dist[o.rating] || 0) + 1; });
+  const maxDist = Math.max(...Object.values(dist), 1);
+  const withComments = rated.filter(o => o.ratingComment).sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const npsLike = rated.length ? Math.round(rated.filter(o => (o.rating ?? 0) >= 4).length / rated.length * 100) : 0;
+  const stars = (n: number) => '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
+
+  const commentRows = withComments.slice(0, 30).map(o => `<tr>
+    <td style="white-space:nowrap">${fmtDate(o.createdAt)}</td>
+    <td>${o.customerName}</td>
+    <td style="color:#f59e0b;font-weight:700;white-space:nowrap">${stars(o.rating ?? 0)} ${o.rating}/5</td>
+    <td style="color:#64748b;font-style:italic">${o.ratingComment ?? ''}</td>
+  </tr>`).join('');
+
+  const body = `
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-label">Nota média</div><div class="kpi-value" style="color:#f59e0b">${avgRating.toFixed(1)}/5.0</div></div>
+      <div class="kpi"><div class="kpi-label">Total de avaliações</div><div class="kpi-value">${rated.length}</div><div class="kpi-sub">${rangeOrders.length > 0 ? Math.round(rated.length / rangeOrders.length * 100) : 0}% dos pedidos</div></div>
+      <div class="kpi"><div class="kpi-label">Satisfação (4-5 ⭐)</div><div class="kpi-value">${npsLike}%</div></div>
+      <div class="kpi"><div class="kpi-label">Com comentário</div><div class="kpi-value">${withComments.length}</div></div>
+    </div>
+    <div class="section">
+      <div class="sec-title">Distribuição das notas</div>
+      ${bars([5,4,3,2,1].map(n => ({ label: `${'★'.repeat(n)} ${n} estrela${n !== 1 ? 's' : ''}`, value: dist[n], max: maxDist, sub: `${dist[n]} avaliação${dist[n] !== 1 ? 'ões' : ''}`, color: n >= 4 ? '#10b981' : n === 3 ? '#f59e0b' : '#ef4444' })))}
+    </div>
+    ${withComments.length > 0 ? `<div class="section"><div class="sec-title">Comentários dos clientes (últimos 30)</div>
+      <table><thead><tr><th>Data</th><th>Cliente</th><th>Nota</th><th>Comentário</th></tr></thead>
+      <tbody>${commentRows}</tbody></table></div>` : ''}
+    ${rated.length === 0 ? '<div class="section"><p style="color:#94a3b8;padding:12px 0;font-size:12px">Nenhuma avaliação recebida no período selecionado.</p></div>' : ''}`;
+  return base('Relatório de Avaliações', restaurantName, period, body);
 }

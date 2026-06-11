@@ -5,12 +5,15 @@ import type { Order, RestaurantSettings } from '../lib/types';
 import {
   TrendingUp, ShoppingBag, DollarSign, Clock, Star, Download,
   Check, Loader2, Copy, FileText, BarChart2, Users, AlertTriangle,
-  CreditCard, Calendar, Receipt, BookOpen, ExternalLink,
+  CreditCard, Calendar, Receipt, BookOpen, ExternalLink, Tag,
+  Truck, MessageSquare, BookMarked,
 } from 'lucide-react';
+import type { Coupon } from '../lib/types';
 import {
   openReport, downloadCsv,
   reportFaturamento, reportProdutos, reportHorarioPico, reportRetencao,
   reportCancelamentos, reportDRE, reportPagamentos, reportExtrato, reportMensal,
+  reportLivroCaixa, reportCupons, reportComprovantes, reportAtendimento, reportAvaliacoes,
   csvExtrato, csvPagamentos, csvMensal,
   type ReportCtx,
 } from '../lib/reports';
@@ -101,6 +104,36 @@ const REPORT_DEFS: ReportDef[] = [
     onPdf: ctx => openReport(reportMensal(ctx)),
     onCsv: ctx => csvMensal(ctx),
   },
+  {
+    id: 'livrocaixa', title: 'Livro Caixa', category: 'accounting',
+    desc: 'Registro de entradas por data — exigido por contadores MEI/Simples Nacional.',
+    icon: BookMarked, color: 'bg-emerald-100 text-emerald-700',
+    onPdf: ctx => openReport(reportLivroCaixa(ctx)),
+  },
+  {
+    id: 'cupons', title: 'Descontos e Cupons', category: 'accounting',
+    desc: 'Descontos concedidos, impacto na receita e inventário de cupons.',
+    icon: Tag, color: 'bg-pink-100 text-pink-600',
+    onPdf: ctx => openReport(reportCupons(ctx)),
+  },
+  {
+    id: 'comprovantes', title: 'Comprovantes de Pedido', category: 'accounting',
+    desc: 'Recibo individual por pedido — para arquivo fiscal ou envio ao cliente.',
+    icon: Receipt, color: 'bg-amber-100 text-amber-700',
+    onPdf: ctx => openReport(reportComprovantes(ctx)),
+  },
+  {
+    id: 'atendimento', title: 'Tipo de Atendimento', category: 'analytics',
+    desc: 'Comparativo entre delivery, retirada e mesa — pedidos e receita por canal.',
+    icon: Truck, color: 'bg-indigo-100 text-indigo-600',
+    onPdf: ctx => openReport(reportAtendimento(ctx)),
+  },
+  {
+    id: 'avaliacoes', title: 'Avaliações dos Clientes', category: 'analytics',
+    desc: 'NPS, distribuição de notas, tendência de satisfação e comentários.',
+    icon: MessageSquare, color: 'bg-yellow-100 text-yellow-700',
+    onPdf: ctx => openReport(reportAvaliacoes(ctx)),
+  },
 ];
 
 export default function ReportsPage() {
@@ -108,6 +141,7 @@ export default function ReportsPage() {
   const restaurantId = useRestaurantId();
   const [orders, setOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<RestaurantSettings | null>(null);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [range, setRange] = useState<'7' | '30' | '90' | 'custom'>('30');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -119,6 +153,7 @@ export default function ReportsPage() {
     if (!restaurantId) return;
     db.getOrders(restaurantId).then(setOrders);
     db.getSettings(restaurantId).then(setSettings);
+    db.getCoupons(restaurantId).then(setCoupons);
   }, [restaurantId]);
 
   const generateCashbackCoupon = async (customerName: string, customerPhone: string, amount: number) => {
@@ -162,6 +197,7 @@ export default function ReportsPage() {
     rangeOrders,
     allPeriodOrders,
     allOrders: orders,
+    coupons,
   };
 
   const totalRevenue = rangeOrders.reduce((s, o) => s + o.total, 0);
