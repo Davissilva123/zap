@@ -119,7 +119,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   if (!resendRes.ok) {
-    return res.status(500).json({ error: result });
+    const msg = result?.message ?? result?.name ?? JSON.stringify(result);
+    return res.status(500).json({ error: msg });
   }
 
   return res.status(200).json({ ok: true });

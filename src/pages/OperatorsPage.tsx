@@ -131,7 +131,8 @@ export default function OperatorsPage() {
 
     if (!apiRes.ok) {
       const err = await apiRes.json().catch(() => ({}));
-      alert('Erro ao enviar e-mail: ' + (err.error ?? apiRes.statusText) + '\n\nVerifique se RESEND_API_KEY está configurada nas variáveis de ambiente do Vercel.');
+      const msg = typeof err.error === 'string' ? err.error : JSON.stringify(err.error ?? err);
+      alert('Erro ao enviar e-mail:\n' + msg);
       return;
     }
 
