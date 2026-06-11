@@ -97,27 +97,38 @@ export default function OperatorsPage() {
     }
   };
 
-  const sendResetLink = async (op: Operator) => {
-    // Se ainda não tem conta Auth (userId vazio), cria uma com senha temporária
-    // para que o resetPasswordForEmail possa enviar o e-mail
-    if (!op.userId) {
-      const tempPwd = Math.random().toString(36).slice(-8) + 'A1!';
-      const { error: signupErr } = await supabaseNoSession.auth.signUp({
-        email: op.email.trim().toLowerCase(),
-        password: tempPwd,
-      });
-      if (signupErr && !signupErr.message.toLowerCase().includes('already registered')) {
-        alert('Erro ao preparar conta: ' + signupErr.message);
-        return;
-      }
+  const sendAccessEmail = async (op: Operator) => {
+    // Gera senha temporária
+    const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+    const tempPwd = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+      + 'A1';
+
+    // Cria ou recria conta Auth com a senha temporária
+    const { error: signupErr } = await supabaseNoSession.auth.signUp({
+      email: op.email.trim().toLowerCase(),
+      password: tempPwd,
+    });
+    if (signupErr && !signupErr.message.toLowerCase().includes('already registered')) {
+      alert('Erro ao preparar conta: ' + signupErr.message);
+      return;
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(op.email.trim().toLowerCase(), {
-      redirectTo: window.location.origin + '/reset-password',
+    // Recupera nome do restaurante para o e-mail
+    const settings = user ? await import('../lib/db').then(m => m.db.getSettings(user.id)).catch(() => null) : null;
+
+    // Chama Edge Function para enviar o e-mail com credenciais
+    const { error: fnErr } = await supabase.functions.invoke('send-operator-email', {
+      body: {
+        name: op.name,
+        email: op.email.trim().toLowerCase(),
+        password: tempPwd,
+        loginUrl: window.location.origin + '/login',
+        restaurantName: settings?.name ?? '',
+      },
     });
 
-    if (error) {
-      alert('Erro ao enviar e-mail: ' + error.message);
+    if (fnErr) {
+      alert('Erro ao enviar e-mail: ' + fnErr.message + '\n\nVerifique se a Edge Function foi publicada e o segredo RESEND_API_KEY está configurado.');
       return;
     }
 
@@ -344,7 +355,7 @@ export default function OperatorsPage() {
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {/* Send reset/access link */}
                   <button
-                    onClick={() => sendResetLink(op)}
+                    onClick={() => sendAccessEmail(op)}
                     disabled={sentReset}
                     title={sentReset ? 'Link enviado!' : 'Enviar link de acesso por e-mail'}
                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium transition-colors ${sentReset ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
