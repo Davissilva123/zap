@@ -354,20 +354,21 @@ export default function AdminRestaurantsPage() {
                         </div>
 
                         {/* Email + slug */}
-                        <div className="flex items-center gap-2 flex-wrap mb-2">
+                        <div className="flex items-center gap-x-2 gap-y-1 flex-wrap mb-2">
                           {email !== '—' ? (
                             <a
                               href={`mailto:${email}?subject=ZapMenu - ${r.name}&body=Olá ${r.name},%0D%0A%0D%0AEntrando em contato sobre sua conta ZapMenu.`}
-                              className="flex items-center gap-1 text-xs text-slate-500 hover:text-violet-600 transition-colors"
+                              className="flex items-center gap-1 text-xs text-slate-500 hover:text-violet-600 transition-colors min-w-0"
                               title="Enviar email"
                             >
-                              <Mail className="w-3 h-3 text-slate-400" /> {email}
+                              <Mail className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                              <span className="truncate">{email}</span>
                             </a>
                           ) : (
                             <span className="flex items-center gap-1 text-xs text-slate-400"><Mail className="w-3 h-3" /> —</span>
                           )}
-                          <span className="text-xs text-slate-300">·</span>
-                          <span className="text-xs text-slate-400 font-mono">/m/{r.slug}</span>
+                          <span className="text-xs text-slate-300 hidden sm:inline">·</span>
+                          <span className="text-xs text-slate-400 font-mono hidden sm:inline">/m/{r.slug}</span>
                           {plan?.paymentStatus === 'past_due' && (
                             <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700">
                               <CreditCard className="w-2.5 h-2.5" /> Pagamento atrasado
@@ -376,7 +377,7 @@ export default function AdminRestaurantsPage() {
                         </div>
 
                         {/* Stats */}
-                        <div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
+                        <div className="flex items-center gap-x-4 gap-y-1 text-xs text-slate-400 flex-wrap mb-3">
                           <span className="flex items-center gap-1"><ShoppingBag className="w-3 h-3" /> {stat?.orderCount ?? 0} pedidos</span>
                           <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" /> {stat ? R(stat.totalRevenue) : 'R$ 0,00'}</span>
                           <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {ago(stat?.lastOrderAt ?? null)}</span>
@@ -386,76 +387,74 @@ export default function AdminRestaurantsPage() {
                             </span>
                           )}
                           {isBlocked && plan?.blockedReason && (
-                            <span className="text-red-400 italic">"{plan.blockedReason}"</span>
+                            <span className="text-red-400 italic truncate max-w-xs">"{plan.blockedReason}"</span>
                           )}
                         </div>
-                      </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                        {/* Plan selector */}
-                        {!isBlocked && (
-                          <div className="relative">
-                            <select
-                              value={planSlug}
-                              onChange={e => handleSetPlan(r.userId, e.target.value)}
-                              disabled={isChanging}
-                              className={`appearance-none text-[11px] font-bold pl-2.5 pr-6 py-1.5 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-violet-500/30 cursor-pointer disabled:opacity-50 ${planColor(planSlug)}`}
-                            >
-                              {PLAN_OPTIONS.map(o => (
-                                <option key={o.slug} value={o.slug}>{o.label}</option>
-                              ))}
-                            </select>
-                            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none opacity-60" />
-                            {isChanging && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg">
-                                <div className="w-3 h-3 border-2 border-slate-300 border-t-violet-500 rounded-full animate-spin" />
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        {/* Actions — inside the info column so never overflow over the logo */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* Plan selector */}
+                          {!isBlocked && (
+                            <div className="relative">
+                              <select
+                                value={planSlug}
+                                onChange={e => handleSetPlan(r.userId, e.target.value)}
+                                disabled={isChanging}
+                                className={`appearance-none text-[11px] font-bold pl-2.5 pr-6 py-1.5 rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-violet-500/30 cursor-pointer disabled:opacity-50 ${planColor(planSlug)}`}
+                              >
+                                {PLAN_OPTIONS.map(o => (
+                                  <option key={o.slug} value={o.slug}>{o.label}</option>
+                                ))}
+                              </select>
+                              <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none opacity-60" />
+                              {isChanging && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-lg">
+                                  <div className="w-3 h-3 border-2 border-slate-300 border-t-violet-500 rounded-full animate-spin" />
+                                </div>
+                              )}
+                            </div>
+                          )}
 
-                        {/* Disable / Enable */}
-                        {canBlock && (isDisabled ? (
-                          <button onClick={() => handleEnable(r.userId)} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs font-semibold transition-colors" title="Reativar restaurante">
-                            <Power className="w-3.5 h-3.5" /> Reativar
+                          <div className="w-px h-5 bg-slate-200" />
+
+                          {/* Disable / Enable */}
+                          {canBlock && (isDisabled ? (
+                            <button onClick={() => handleEnable(r.userId)} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs font-semibold transition-colors" title="Reativar restaurante">
+                              <Power className="w-3.5 h-3.5" /> Reativar
+                            </button>
+                          ) : (
+                            <button onClick={() => setDisableTarget(r)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Desativar restaurante">
+                              <Power className="w-4 h-4 text-slate-400" />
+                            </button>
+                          ))}
+
+                          {/* Block / Unblock */}
+                          {canBlock && !isDisabled && (isBlocked ? (
+                            <button onClick={() => handleUnblock(r.userId)} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs font-semibold transition-colors" title="Desbloquear">
+                              <Unlock className="w-3.5 h-3.5" /> Desbloquear
+                            </button>
+                          ) : (
+                            <button onClick={() => { setBlockTarget(r); setBlockReason(''); }} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors" title="Bloquear restaurante">
+                              <Ban className="w-4 h-4 text-red-400" />
+                            </button>
+                          ))}
+
+                          <button onClick={() => navigate(`/admin/restaurantes/${r.userId}`)} className="p-1.5 rounded-lg hover:bg-violet-50 transition-colors" title="Ver detalhes">
+                            <Eye className="w-4 h-4 text-violet-400" />
                           </button>
-                        ) : (
-                          <button onClick={() => setDisableTarget(r)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Desativar restaurante">
-                            <Power className="w-4 h-4 text-slate-400" />
+
+                          <button onClick={() => openLog(r.userId)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Histórico de planos">
+                            <History className="w-4 h-4 text-slate-400" />
                           </button>
-                        ))}
 
-                        {/* Block / Unblock — hidden for limited role */}
-                        {canBlock && !isDisabled && (isBlocked ? (
-                          <button onClick={() => handleUnblock(r.userId)} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs font-semibold transition-colors" title="Desbloquear">
-                            <Unlock className="w-3.5 h-3.5" /> Desbloquear
+                          <button onClick={() => copyLink(r.slug)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Copiar link do cardápio">
+                            {copied === r.slug ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-slate-400" />}
                           </button>
-                        ) : (
-                          <button onClick={() => { setBlockTarget(r); setBlockReason(''); }} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors" title="Bloquear restaurante">
-                            <Ban className="w-4 h-4 text-red-400" />
-                          </button>
-                        ))}
 
-                        {/* Detail page (impersonação) */}
-                        <button onClick={() => navigate(`/admin/restaurantes/${r.userId}`)} className="p-1.5 rounded-lg hover:bg-violet-50 transition-colors" title="Ver detalhes / entrar como restaurante">
-                          <Eye className="w-4 h-4 text-violet-400" />
-                        </button>
-
-                        {/* History */}
-                        <button onClick={() => openLog(r.userId)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Histórico de planos">
-                          <History className="w-4 h-4 text-slate-400" />
-                        </button>
-
-                        {/* Copy link */}
-                        <button onClick={() => copyLink(r.slug)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
-                          {copied === r.slug ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-slate-400" />}
-                        </button>
-
-                        {/* Open cardápio */}
-                        <a href={`/m/${r.slug}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
-                          <ExternalLink className="w-4 h-4 text-slate-400" />
-                        </a>
+                          <a href={`/m/${r.slug}`} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="Abrir cardápio">
+                            <ExternalLink className="w-4 h-4 text-slate-400" />
+                          </a>
+                        </div>
                       </div>
                     </div>
                   </div>
