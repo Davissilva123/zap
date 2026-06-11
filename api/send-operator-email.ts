@@ -19,26 +19,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Campos obrigatórios: email, password, loginUrl' });
     }
 
-    const EMAIL_USER = process.env.EMAIL_USER;
-    const EMAIL_APP_PASSWORD = process.env.EMAIL_APP_PASSWORD;
+    const BREVO_API_KEY = process.env.BREVO_API_KEY;
+    const EMAIL_FROM = process.env.EMAIL_FROM ?? 'noreply@zapmenu.com.br';
+    const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME ?? 'ZapMenu';
 
-    if (!EMAIL_USER || !EMAIL_APP_PASSWORD) {
+    if (!BREVO_API_KEY) {
       return res.status(500).json({
-        error: 'Variáveis EMAIL_USER e EMAIL_APP_PASSWORD não configuradas no Vercel.',
+        error: 'Variável BREVO_API_KEY não configurada no Vercel. Crie uma conta gratuita em brevo.com e adicione a chave.',
       });
     }
-
-    // Dynamic import to avoid ESM/CJS issues
-    const nodemailer = await import('nodemailer');
-    const createTransport = nodemailer.default?.createTransport ?? nodemailer.createTransport;
-
-    const transporter = createTransport({
-      service: 'gmail',
-      auth: {
-        user: EMAIL_USER,
-        pass: EMAIL_APP_PASSWORD,
-      },
-    });
 
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -82,11 +71,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               </td></tr>
             </table>
             <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td align="center">
-                  <a href="${loginUrl}" style="display:inline-block;background:#10b981;color:#fff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:10px;">Acessar o sistema</a>
-                </td>
-              </tr>
+              <tr><td align="center">
+                <a href="${loginUrl}" style="display:inline-block;background:#10b981;color:#fff;font-size:15px;font-weight:700;text-decoration:none;padding:14px 40px;border-radius:10px;">Acessar o sistema</a>
+              </td></tr>
             </table>
             <p style="margin:28px 0 0;font-size:13px;color:#94a3b8;line-height:1.6;text-align:center;">Recomendamos alterar sua senha apos o primeiro acesso.</p>
           </td>
@@ -102,12 +89,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 </body>
 </html>`;
 
-    await transporter.sendMail({
-      from: `"ZapMenu${restaurantName ? ` - ${restaurantName}` : ''}" <${EMAIL_USER}>`,
-      to: email,
-      subject: `Seu acesso ao ZapMenu${restaurantName ? ` - ${restaurantName}` : ''}`,
-      html,
+    const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': BREVO_API_KEY,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: EMAIL_FROM_NAME, email: EMAIL_FROM },
+        to: [{ email, name: name ?? email }],
+        subject: `Seu acesso ao ZapMenu${restaurantName ? ` - ${restaurantName}` : ''}`,
+        htmlContent: html,
+      }),
     });
+
+    if (!brevoRes.ok) {
+      const errBody = await brevoRes.json().catch(() => ({ message: brevoRes.statusText }));
+      const msg = errBody?.message ?? errBody?.code ?? JSON.stringify(errBody);
+      return res.status(500).json({ error: `Brevo: ${msg}` });
+    }
 
     return res.status(200).json({ ok: true });
   } catch (err: unknown) {
