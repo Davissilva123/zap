@@ -67,7 +67,6 @@ import CampaignsPage from './pages/CampaignsPage';
 import CMVPage from './pages/CMVPage';
 import FinancasPage from './pages/FinancasPage';
 import FiscalPage from './pages/FiscalPage';
-import WhatsAppPage from './pages/WhatsAppPage';
 
 const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';
 
@@ -178,7 +177,6 @@ export default function App() {
             <Route path="/cmv"        element={<CMVPage />} />
             <Route path="/financas"   element={<FinancasPage />} />
             <Route path="/fiscal"     element={<FiscalPage />} />
-            <Route path="/whatsapp"   element={<WhatsAppPage />} />
             <Route path="/qrcode"     element={<QRCodePage />} />
             <Route path="/settings"   element={<SettingsPage />} />
             <Route path="/upgrade"    element={<UpgradePage />} />

@@ -5,7 +5,7 @@ export type FeatureKey =
   | 'reports' | 'coupons' | 'tables'
   | 'reviews' | 'comandas' | 'drivers'
   | 'crm' | 'stock' | 'cashregister' | 'combos' | 'promotions'
-  | 'campaigns' | 'cmv' | 'financas' | 'fiscal' | 'whatsapp';
+  | 'campaigns' | 'cmv' | 'financas' | 'fiscal';
 
 const LEVEL: Record<PlanSlug, number> = { '': 0, basic: 1, pro: 2, premium: 3 };
 
@@ -35,7 +35,6 @@ export const FEATURE_MIN_PLAN: Record<FeatureKey, PlanSlug> = {
   cmv:          'pro',
   financas:     'pro',
   fiscal:       'premium',
-  whatsapp:     'premium',
 };
 
 export const PLAN_DISPLAY: Record<PlanSlug, string> = {
