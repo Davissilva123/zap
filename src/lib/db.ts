@@ -1407,8 +1407,8 @@ export const db = {
   async addStockMovement(userId: string, menuItemId: string, delta: number, reason = ''): Promise<void> {
     await supabase.from('stock_movements').insert({ user_id: userId, menu_item_id: menuItemId, delta, reason });
     const { data: item } = await supabase.from('menu_items').select('stock').eq('id', menuItemId).single();
-    if (item) {
-      const newStock = Math.max(0, Number((item as any).stock ?? 0) + delta);
+    if (item && (item as any).stock != null) {
+      const newStock = Math.max(0, Number((item as any).stock) + delta);
       await supabase.from('menu_items').update({ stock: newStock }).eq('id', menuItemId);
     }
   },
@@ -1423,5 +1423,47 @@ export const db = {
       .limit(20);
     if (error || !data) return [];
     return (data as any[]).map(r => ({ id: r.id, delta: Number(r.delta), reason: r.reason ?? '', createdAt: r.created_at }));
+  },
+
+  // ---- WhatsApp Inbox ----
+  async getWaConfig(userId: string): Promise<import('./types').WaConfig | null> {
+    const { data } = await supabase.from('whatsapp_evolution_config').select('*').eq('user_id', userId).single();
+    if (!data) return null;
+    return { apiUrl: (data as any).api_url ?? '', apiKey: (data as any).api_key ?? '', instanceName: (data as any).instance_name ?? '', botEnabled: (data as any).bot_enabled ?? true, botWelcome: (data as any).bot_welcome ?? '' };
+  },
+
+  async saveWaConfig(userId: string, cfg: Partial<import('./types').WaConfig>): Promise<void> {
+    const row: Record<string, unknown> = { user_id: userId };
+    if (cfg.apiUrl !== undefined) row.api_url = cfg.apiUrl;
+    if (cfg.apiKey !== undefined) row.api_key = cfg.apiKey;
+    if (cfg.instanceName !== undefined) row.instance_name = cfg.instanceName;
+    if (cfg.botEnabled !== undefined) row.bot_enabled = cfg.botEnabled;
+    if (cfg.botWelcome !== undefined) row.bot_welcome = cfg.botWelcome;
+    await supabase.from('whatsapp_evolution_config').upsert(row, { onConflict: 'user_id' });
+  },
+
+  async getWaConversations(userId: string): Promise<import('./types').WaConversation[]> {
+    const { data } = await supabase.from('whatsapp_conversations').select('*').eq('user_id', userId).order('last_message_at', { ascending: false });
+    if (!data) return [];
+    return (data as any[]).map(r => ({ id: r.id, userId: r.user_id, customerPhone: r.customer_phone, customerName: r.customer_name ?? '', status: r.status, assignedToName: r.assigned_to_name ?? '', lastMessage: r.last_message ?? '', lastMessageAt: r.last_message_at, unreadCount: r.unread_count ?? 0, botState: r.bot_state ?? 'init', createdAt: r.created_at }));
+  },
+
+  async getWaMessages(conversationId: string): Promise<import('./types').WaMessage[]> {
+    const { data } = await supabase.from('whatsapp_messages').select('*').eq('conversation_id', conversationId).order('created_at', { ascending: true });
+    if (!data) return [];
+    return (data as any[]).map(r => ({ id: r.id, conversationId: r.conversation_id, direction: r.direction, body: r.body, fromName: r.from_name ?? '', waMessageId: r.wa_message_id ?? '', createdAt: r.created_at }));
+  },
+
+  async updateWaConversation(id: string, updates: { status?: string; assignedToName?: string; unreadCount?: number; botState?: string }): Promise<void> {
+    const row: Record<string, unknown> = {};
+    if (updates.status !== undefined) row.status = updates.status;
+    if (updates.assignedToName !== undefined) row.assigned_to_name = updates.assignedToName;
+    if (updates.unreadCount !== undefined) row.unread_count = updates.unreadCount;
+    if (updates.botState !== undefined) row.bot_state = updates.botState;
+    await supabase.from('whatsapp_conversations').update(row).eq('id', id);
+  },
+
+  async markWaRead(conversationId: string): Promise<void> {
+    await supabase.from('whatsapp_conversations').update({ unread_count: 0 }).eq('id', conversationId);
   },
 };

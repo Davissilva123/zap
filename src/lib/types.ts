@@ -290,3 +290,35 @@ export interface CustomerRecord {
   lastOrderAt: string;
   segment: 'loyal' | 'active' | 'at_risk' | 'inactive';
 }
+
+export interface WaConversation {
+  id: string;
+  userId: string;
+  customerPhone: string;
+  customerName: string;
+  status: 'bot' | 'pending' | 'active' | 'closed';
+  assignedToName: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+  botState: string;
+  createdAt: string;
+}
+
+export interface WaMessage {
+  id: string;
+  conversationId: string;
+  direction: 'in' | 'out';
+  body: string;
+  fromName: string;
+  waMessageId: string;
+  createdAt: string;
+}
+
+export interface WaConfig {
+  apiUrl: string;
+  apiKey: string;
+  instanceName: string;
+  botEnabled: boolean;
+  botWelcome: string;
+}

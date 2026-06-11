@@ -20,6 +20,15 @@ const statusConfig: Record<string, { label: string; icon: typeof Clock; color: s
   COMPLETED: { label: 'Concluído', icon: CheckCircle, color: 'text-slate-600', bg: 'bg-slate-100' },
 };
 
+function elapsedLabel(isoTime: string, currentNow: number): string {
+  const minutes = Math.floor((currentNow - new Date(isoTime).getTime()) / 60000);
+  if (minutes < 1) return '< 1min';
+  if (minutes < 60) return `${minutes}min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${m.toString().padStart(2, '0')}min`;
+}
+
 function formatAddress(addr: { street: string; number: string; complement: string; neighborhood: string; city: string; state: string }) {
   const parts = [addr.street, addr.number].filter(Boolean);
   if (addr.complement) parts.push(`(${addr.complement})`);
@@ -46,6 +55,7 @@ export default function OrdersPage() {
   const [driverModal, setDriverModal] = useState<{ orderId: string; newStatus: string } | null>(null);
   const [driverSelection, setDriverSelection] = useState<string>('none');
   const [driverCustomName, setDriverCustomName] = useState('');
+  const [now, setNow] = useState(Date.now);
   const knownIdsRef = useRef<Set<string>>(new Set());
   const settingsRef = useRef<RestaurantSettings | null>(null);
 
@@ -63,6 +73,11 @@ export default function OrdersPage() {
     const handler = () => { unlockAudio(); requestNotificationPermission(); };
     window.addEventListener('click', handler, { once: true });
     return () => window.removeEventListener('click', handler);
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
@@ -132,6 +147,12 @@ export default function OrdersPage() {
 
   const doUpdateStatus = async (orderId: string, newStatus: string, driverName?: string, driverId?: string) => {
     const order = orders.find(o => o.id === orderId);
+    // Debita estoque ao confirmar pagamento (PENDING → PAID) ou ao preparar sem confirmar (PENDING → PREPARING)
+    if (order && ((newStatus === 'PAID' && order.status === 'PENDING') || (newStatus === 'PREPARING' && order.status === 'PENDING'))) {
+      await Promise.all(order.items.map(item =>
+        db.addStockMovement(user.id, item.menuItemId, -item.quantity, 'Venda')
+      ));
+    }
     await db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined, driverName, driverId });
     load();
     if (selectedOrder?.id === orderId) {
@@ -180,9 +201,15 @@ export default function OrdersPage() {
 
   const cancelOrder = async (orderId: string) => {
     if (!confirm('Cancelar este pedido?')) return;
+    const order = orders.find(o => o.id === orderId);
+    // Restaura estoque se o pedido já estava confirmado
+    if (order && ['PAID', 'PREPARING', 'DELIVERING'].includes(order.status)) {
+      await Promise.all(order.items.map(item =>
+        db.addStockMovement(user.id, item.menuItemId, item.quantity, 'Cancelamento')
+      ));
+    }
     await db.updateOrder(orderId, { status: 'CANCELLED' });
     // Cancela cobrança PIX no Mercado Pago se aplicável
-    const order = orders.find(o => o.id === orderId);
     if (order?.pixTxId && order.paymentMethod === 'pix' && settings?.mercadoPagoToken) {
       try { await cancelMpPayment(settings.mercadoPagoToken, order.pixTxId); } catch { /* ignore */ }
     }
@@ -340,8 +367,18 @@ export default function OrdersPage() {
                       {order.rating && <span className="badge bg-amber-50 text-amber-600 py-0.5 text-[10px]"><Star className="w-3 h-3" />{order.rating}</span>}
                       {wasSent && <span className="badge bg-emerald-50 text-emerald-600 py-0.5 text-[10px]"><MessageCircle className="w-3 h-3" />Enviado</span>}
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className={`badge ${cfg.bg} ${cfg.color} py-0.5`}>{cfg.label}</span>
+                      {order.status === 'PREPARING' && (
+                        <span className="badge bg-blue-50 text-blue-600 py-0.5 text-[10px]">
+                          <Clock className="w-3 h-3" /> Cozinha: {elapsedLabel(order.paidAt ?? order.createdAt, now)}
+                        </span>
+                      )}
+                      {order.status === 'DELIVERING' && (
+                        <span className="badge bg-teal-50 text-teal-600 py-0.5 text-[10px]">
+                          <Clock className="w-3 h-3" /> Entrega: {elapsedLabel(order.paidAt ?? order.createdAt, now)}
+                        </span>
+                      )}
                       <span className="text-[12px] text-slate-400">{formatDate(order.createdAt)}</span>
                       {order.deliveryType === 'delivery' && order.deliveryAddress && (
                         <span className="text-[12px] text-slate-400 truncate flex items-center gap-0.5"><MapPin className="w-3 h-3 flex-shrink-0" />{formatAddress(order.deliveryAddress)}</span>
