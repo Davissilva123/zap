@@ -116,19 +116,22 @@ export default function OperatorsPage() {
     // Recupera nome do restaurante para o e-mail
     const settings = user ? await import('../lib/db').then(m => m.db.getSettings(user.id)).catch(() => null) : null;
 
-    // Chama Edge Function para enviar o e-mail com credenciais
-    const { error: fnErr } = await supabase.functions.invoke('send-operator-email', {
-      body: {
+    // Chama a Vercel API Route para enviar o e-mail com credenciais
+    const apiRes = await fetch('/api/send-operator-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         name: op.name,
         email: op.email.trim().toLowerCase(),
         password: tempPwd,
         loginUrl: window.location.origin + '/login',
         restaurantName: settings?.name ?? '',
-      },
+      }),
     });
 
-    if (fnErr) {
-      alert('Erro ao enviar e-mail: ' + fnErr.message + '\n\nVerifique se a Edge Function foi publicada e o segredo RESEND_API_KEY está configurado.');
+    if (!apiRes.ok) {
+      const err = await apiRes.json().catch(() => ({}));
+      alert('Erro ao enviar e-mail: ' + (err.error ?? apiRes.statusText) + '\n\nVerifique se RESEND_API_KEY está configurada nas variáveis de ambiente do Vercel.');
       return;
     }
 
