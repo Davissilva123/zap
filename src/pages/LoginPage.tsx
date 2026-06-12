@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
 import { ArrowRight, AtSign, Lock, User, Zap, CheckCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -28,12 +27,27 @@ export default function LoginPage() {
     if (!resetEmail.trim()) return;
     setResetSending(true);
     setResetError('');
-    const { error: err } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setResetSending(false);
-    if (err) { setResetError('Erro ao enviar o email. Verifique o endereço e tente novamente.'); return; }
-    setResetSent(true);
+    try {
+      const apiRes = await fetch('/api/send-reset-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: resetEmail.trim(),
+          redirectTo: `${window.location.origin}/reset-password`,
+        }),
+      });
+      if (!apiRes.ok) {
+        const err = await apiRes.json().catch(() => ({}));
+        const msg = typeof err.error === 'string' ? err.error : 'Erro ao enviar o email.';
+        setResetError(msg);
+        return;
+      }
+      setResetSent(true);
+    } catch {
+      setResetError('Erro ao enviar o email. Verifique o endereço e tente novamente.');
+    } finally {
+      setResetSending(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
