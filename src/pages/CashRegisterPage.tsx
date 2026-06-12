@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
-import { useAuth } from '../lib/auth';
+import { useAuth, useRestaurantId } from '../lib/auth';
 import type { CashSession, CashEntry } from '../lib/types';
 import { Wallet, Plus, Minus, Lock, Unlock, History, X, Check, Loader2, ArrowUpRight, ArrowDownRight, ShoppingBag } from 'lucide-react';
 
@@ -26,6 +26,7 @@ function EntryBadge({ type }: { type: CashEntry['type'] }) {
 
 export default function CashRegisterPage() {
   const { user } = useAuth();
+  const restaurantId = useRestaurantId();
   const [session, setSession] = useState<CashSession | null>(null);
   const [sessions, setSessions] = useState<CashSession[]>([]);
   const [entries, setEntries] = useState<CashEntry[]>([]);
@@ -45,10 +46,10 @@ export default function CashRegisterPage() {
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
-    if (!user) return;
+    if (!restaurantId) return;
     const [cur, hist] = await Promise.all([
-      db.getCurrentCashSession(user.id),
-      db.getCashSessions(user.id),
+      db.getCurrentCashSession(restaurantId),
+      db.getCashSessions(restaurantId),
     ]);
     setSession(cur);
     setSessions(hist);
@@ -61,12 +62,12 @@ export default function CashRegisterPage() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [restaurantId]);
 
   const handleOpen = async () => {
-    if (!user || !openAmt) return;
+    if (!restaurantId || !openAmt) return;
     setSaving(true);
-    await db.openCashSession(user.id, Number(openAmt), openNotes);
+    await db.openCashSession(restaurantId, Number(openAmt), openNotes);
     setOpenModal(false);
     setOpenAmt('');
     setOpenNotes('');
@@ -75,7 +76,7 @@ export default function CashRegisterPage() {
   };
 
   const handleClose = async () => {
-    if (!user || !session || !closeAmt) return;
+    if (!restaurantId || !session || !closeAmt) return;
     setSaving(true);
     await db.closeCashSession(session.id, Number(closeAmt), closeNotes);
     setCloseModal(false);
@@ -86,9 +87,9 @@ export default function CashRegisterPage() {
   };
 
   const handleEntry = async () => {
-    if (!user || !session || !entryModal || !entryAmt) return;
+    if (!restaurantId || !session || !entryModal || !entryAmt) return;
     setSaving(true);
-    await db.addCashEntry(user.id, session.id, entryModal, Number(entryAmt), entryDesc);
+    await db.addCashEntry(restaurantId, session.id, entryModal, Number(entryAmt), entryDesc);
     setEntryModal(null);
     setEntryAmt('');
     setEntryDesc('');
@@ -96,7 +97,7 @@ export default function CashRegisterPage() {
     setSaving(false);
   };
 
-  if (!user) return null;
+  if (!restaurantId) return null;
 
   const balance = session
     ? session.openingAmount + session.totalDeposits + session.totalSales - session.totalWithdrawals
