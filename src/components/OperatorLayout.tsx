@@ -1,4 +1,4 @@
-import { Receipt, BarChart2, UtensilsCrossed, Tag, LogOut, Menu, Zap, X, LayoutGrid, ChefHat, MonitorPlay, Shield, CreditCard, ChevronDown, Wallet } from 'lucide-react';
+import { Receipt, BarChart2, UtensilsCrossed, Tag, LogOut, Menu, Zap, X, LayoutGrid, ChefHat, MonitorPlay, Shield, CreditCard, ChevronDown, Wallet, ClipboardList } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useState, useEffect } from 'react';
@@ -31,10 +31,11 @@ function getNavItems(role: RoleKey): NavItem[] {
   const menu:    NavItem = { to: '/op/cardapio',  icon: UtensilsCrossed, label: 'Cardápio' };
   const coupons: NavItem = { to: '/op/cupons',    icon: Tag,            label: 'Cupons' };
   const pdv:     NavItem = { to: '/op/pdv',       icon: MonitorPlay,    label: 'PDV' };
-  const caixa:   NavItem = { to: '/op/caixa',     icon: Wallet,         label: 'Caixa' };
-  const browse:  NavItem = { to: '/op/menu',      icon: UtensilsCrossed, label: 'Cardápio' };
+  const caixa:    NavItem = { to: '/op/caixa',     icon: Wallet,         label: 'Caixa' };
+  const comandas: NavItem = { to: '/op/comandas',  icon: ClipboardList,  label: 'Comandas' };
+  const browse:   NavItem = { to: '/op/menu',      icon: UtensilsCrossed, label: 'Cardápio' };
 
-  if (role === 'waiter')  return [orders, tables, browse];
+  if (role === 'waiter')  return [orders, tables, comandas, coupons, browse];
   if (role === 'cashier') return [orders, tables, pdv, caixa, coupons, reports];
   if (role === 'kitchen') return [kitchen];
   return [orders, tables, kitchen, pdv, menu, reports, coupons]; // admin

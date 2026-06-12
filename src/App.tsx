@@ -209,6 +209,7 @@ export default function App() {
             <Route path="cupons" element={<CouponsPage />} />
             <Route path="pdv" element={<PDVPage />} />
             <Route path="caixa" element={<CashRegisterPage />} />
+            <Route path="comandas" element={<ComandasPage />} />
             <Route path="menu" element={<OpMenuBrowsePage />} />
           </Route>
 
