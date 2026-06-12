@@ -7,11 +7,21 @@ import { ChefHat, Truck, CheckCircle, Clock, RefreshCw, Volume2, VolumeX } from 
 import { playNewOrderSound } from '../lib/sound';
 
 const STATUS_FLOW: Record<string, { next: Order['status']; label: string; cls: string }> = {
-  PENDING:   { next: 'PREPARING', label: 'Iniciar preparo',  cls: 'bg-blue-500 hover:bg-blue-600' },
-  PAID:      { next: 'PREPARING', label: 'Iniciar preparo',  cls: 'bg-blue-500 hover:bg-blue-600' },
-  PREPARING: { next: 'DELIVERING', label: 'Pronto p/ entrega', cls: 'bg-teal-500 hover:bg-teal-600' },
-  DELIVERING:{ next: 'COMPLETED', label: 'Concluir',          cls: 'bg-emerald-500 hover:bg-emerald-600' },
+  PENDING:    { next: 'PREPARING', label: 'Iniciar preparo',   cls: 'bg-blue-500 hover:bg-blue-600' },
+  PAID:       { next: 'PREPARING', label: 'Iniciar preparo',   cls: 'bg-blue-500 hover:bg-blue-600' },
+  PREPARING:  { next: 'DELIVERING', label: 'Pronto p/ entrega', cls: 'bg-teal-500 hover:bg-teal-600' },
+  DELIVERING: { next: 'COMPLETED', label: 'Concluir',           cls: 'bg-emerald-500 hover:bg-emerald-600' },
 };
+
+// For delivery orders: kitchen marks as READY but owner dispatches (DELIVERING = out for delivery)
+// Kitchen advances: PENDING/PAID → PREPARING → DELIVERING (= "pronto na cozinha, aguardando entregador")
+// Owner advances: DELIVERING → assign driver → COMPLETED
+function getAdvanceConfig(order: Order): { next: Order['status']; label: string; cls: string } | null {
+  if (order.status === 'DELIVERING' && order.deliveryType === 'delivery') {
+    return null; // Kitchen has no action — owner dispatches
+  }
+  return STATUS_FLOW[order.status] ?? null;
+}
 
 function elapsed(iso: string): string {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -71,11 +81,13 @@ export default function KDSPage() {
   }, [restaurantId, soundOn]);
 
   const advance = async (order: Order) => {
-    const cfg = STATUS_FLOW[order.status];
+    const cfg = getAdvanceConfig(order);
     if (!cfg) return;
-    await db.updateOrder(order.id, { status: cfg.next });
+    // For delivery orders in PREPARING, "Pronto na cozinha" → DELIVERING means "ready, awaiting driver"
+    const nextStatus = cfg.next;
+    await db.updateOrder(order.id, { status: nextStatus });
     setOrders(prev => {
-      const updated = prev.map(o => o.id === order.id ? { ...o, status: cfg.next } : o);
+      const updated = prev.map(o => o.id === order.id ? { ...o, status: nextStatus } : o);
       return updated.filter(o => ACTIVE.includes(o.status));
     });
   };
@@ -146,8 +158,14 @@ export default function KDSPage() {
 }
 
 function KDSCard({ order, onAdvance }: { order: Order; onAdvance: (o: Order) => void }) {
-  const cfg = STATUS_FLOW[order.status];
+  const cfg = getAdvanceConfig(order);
   const id = order.id.slice(-6).toUpperCase();
+  const isDeliveryAwaiting = order.status === 'DELIVERING' && order.deliveryType === 'delivery';
+
+  // Override label for delivery orders going to DELIVERING
+  const btnLabel = (order.status === 'PREPARING' && order.deliveryType === 'delivery')
+    ? 'Pronto na cozinha'
+    : cfg?.label;
 
   return (
     <div className={`bg-slate-800 rounded-xl border-2 ${urgencyColor(order.createdAt)} p-4 flex flex-col gap-3`}>
@@ -190,11 +208,18 @@ function KDSCard({ order, onAdvance }: { order: Order; onAdvance: (o: Order) => 
           onClick={() => onAdvance(order)}
           className={`w-full py-2.5 rounded-lg text-white font-semibold text-sm transition-colors ${cfg.cls}`}
         >
-          {cfg.label}
+          {btnLabel}
         </button>
       )}
 
-      {order.status === 'DELIVERING' && (
+      {isDeliveryAwaiting && (
+        <div className="flex items-center gap-1.5 text-xs text-amber-400 justify-center bg-amber-900/30 rounded-lg px-3 py-2">
+          <Clock size={12} />
+          Pronto — aguardando entregador (owner despacha)
+        </div>
+      )}
+
+      {order.status === 'DELIVERING' && order.deliveryType !== 'delivery' && (
         <div className="flex items-center gap-1.5 text-xs text-teal-400 justify-center">
           <CheckCircle size={12} />
           Saiu para entrega

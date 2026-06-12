@@ -1,7 +1,7 @@
 import { Receipt, BarChart2, UtensilsCrossed, Tag, LogOut, Menu, Zap, X, LayoutGrid, ChefHat, MonitorPlay, Shield, CreditCard, ChevronDown } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import KDSPage from '../pages/KDSPage';
 
 const ROLE_LABELS = {
@@ -21,16 +21,19 @@ const VIEW_OPTIONS: { value: RoleKey; label: string; icon: typeof Shield }[] = [
   { value: 'kitchen', label: 'Cozinha', icon: ChefHat },
 ];
 
-function getNavItems(role: RoleKey): NavItem[] {
-  const orders: NavItem = { to: '/op/pedidos', icon: Receipt, label: 'Pedidos' };
-  const tables: NavItem = { to: '/op/mesas', icon: LayoutGrid, label: 'Mesas' };
-  const kitchen: NavItem = { to: '/op/cozinha', icon: ChefHat, label: 'Cozinha' };
-  const reports: NavItem = { to: '/op/relatorios', icon: BarChart2, label: 'Relatórios' };
-  const menu: NavItem = { to: '/op/cardapio', icon: UtensilsCrossed, label: 'Cardápio' };
-  const coupons: NavItem = { to: '/op/cupons', icon: Tag, label: 'Cupons' };
-  const pdv: NavItem = { to: '/op/pdv', icon: MonitorPlay, label: 'PDV' };
+const VIEW_AS_KEY = 'op_view_as';
 
-  if (role === 'waiter') return [orders, tables];
+function getNavItems(role: RoleKey): NavItem[] {
+  const orders:  NavItem = { to: '/op/pedidos',   icon: Receipt,        label: 'Pedidos' };
+  const tables:  NavItem = { to: '/op/mesas',     icon: LayoutGrid,     label: 'Mesas' };
+  const kitchen: NavItem = { to: '/op/cozinha',   icon: ChefHat,        label: 'Cozinha' };
+  const reports: NavItem = { to: '/op/relatorios', icon: BarChart2,     label: 'Relatórios' };
+  const menu:    NavItem = { to: '/op/cardapio',  icon: UtensilsCrossed, label: 'Cardápio' };
+  const coupons: NavItem = { to: '/op/cupons',    icon: Tag,            label: 'Cupons' };
+  const pdv:     NavItem = { to: '/op/pdv',       icon: MonitorPlay,    label: 'PDV' };
+  const browse:  NavItem = { to: '/op/menu',      icon: UtensilsCrossed, label: 'Cardápio' };
+
+  if (role === 'waiter')  return [orders, tables, browse];
   if (role === 'cashier') return [orders, tables, pdv, reports];
   if (role === 'kitchen') return [kitchen];
   return [orders, tables, kitchen, pdv, menu, reports, coupons]; // admin
@@ -40,10 +43,23 @@ export default function OperatorLayout() {
   const { user, operatorInfo, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [viewAs, setViewAs] = useState<RoleKey>('admin');
   const [viewDropdown, setViewDropdown] = useState(false);
 
-  const handleLogout = async () => { await logout(); navigate('/login'); };
+  // Persist viewAs across reconnections / re-mounts
+  const [viewAs, setViewAs] = useState<RoleKey>(() => {
+    const saved = localStorage.getItem(VIEW_AS_KEY) as RoleKey | null;
+    return saved && ['admin', 'cashier', 'waiter', 'kitchen'].includes(saved) ? saved : 'admin';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(VIEW_AS_KEY, viewAs);
+  }, [viewAs]);
+
+  const handleLogout = async () => {
+    localStorage.removeItem(VIEW_AS_KEY);
+    await logout();
+    navigate('/login');
+  };
 
   if (!operatorInfo) return null;
   const role = operatorInfo.role;
@@ -54,7 +70,7 @@ export default function OperatorLayout() {
   if (effectiveRole === 'kitchen') {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col">
-        <header className="sticky top-0 z-30 bg-[#0d1117] border-b border-white/[0.06] px-5 py-3 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-[#0d1117] border-b border-white/[0.06] px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
               <Zap className="w-4 h-4 text-white" />
@@ -64,12 +80,22 @@ export default function OperatorLayout() {
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-300 mt-0.5 inline-block">Cozinha</span>
             </div>
           </div>
-          <button
-            onClick={async () => { await logout(); navigate('/login'); }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all text-xs font-medium"
-          >
-            <LogOut className="w-3.5 h-3.5" /> Sair
-          </button>
+          <div className="flex items-center gap-2">
+            {role === 'admin' && (
+              <button
+                onClick={() => setViewAs('admin')}
+                className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                ← Voltar ao painel
+              </button>
+            )}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all text-xs font-medium"
+            >
+              <LogOut className="w-3.5 h-3.5" /> Sair
+            </button>
+          </div>
         </header>
         <main className="flex-1 overflow-hidden">
           <KDSPage />
@@ -77,6 +103,7 @@ export default function OperatorLayout() {
       </div>
     );
   }
+
   const navItems = getNavItems(effectiveRole);
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -119,7 +146,13 @@ export default function OperatorLayout() {
               {VIEW_OPTIONS.map(opt => (
                 <button
                   key={opt.value}
-                  onClick={() => { setViewAs(opt.value); setViewDropdown(false); navigate('/op/pedidos'); setMobileOpen(false); }}
+                  onClick={() => {
+                    setViewAs(opt.value);
+                    setViewDropdown(false);
+                    setMobileOpen(false);
+                    // Only navigate for non-kitchen roles (kitchen renders inline)
+                    if (opt.value !== 'kitchen') navigate('/op/pedidos');
+                  }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-medium transition-colors ${viewAs === opt.value ? 'bg-emerald-500/15 text-emerald-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
                 >
                   <opt.icon className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} />
@@ -167,7 +200,7 @@ export default function OperatorLayout() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-100 flex">
+    <div className="min-h-screen bg-slate-50 flex">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-[230px] bg-[#0d1117] fixed inset-y-0 border-r border-white/[0.04]">
         {sidebar}
@@ -186,7 +219,7 @@ export default function OperatorLayout() {
       {/* Main */}
       <div className="flex-1 lg:ml-[230px] min-h-screen flex flex-col">
         {/* Mobile header */}
-        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200/60 px-4 py-3 flex items-center gap-3">
+        <header className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200/60 px-4 py-3 flex items-center gap-3 shadow-sm">
           <button onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-600">
             <Menu className="w-5 h-5" />
           </button>
@@ -195,16 +228,16 @@ export default function OperatorLayout() {
               <Zap className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="font-bold text-slate-900 text-sm tracking-tight truncate">{operatorInfo.restaurantName}</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${roleCfg.color.replace('/15', '/20')}`} style={{backgroundColor: 'rgb(239 246 255)'}}>
-              {roleCfg.label}
-            </span>
           </div>
-          <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500">
-            <X className="w-4 h-4" />
+          <span className={`text-[11px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${roleCfg.color}`}>
+            {roleCfg.label}
+          </span>
+          <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+            <LogOut className="w-4 h-4" />
           </button>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto w-full overflow-x-hidden">
+        <main className="flex-1 p-4 sm:p-5 lg:p-8 max-w-5xl mx-auto w-full overflow-x-hidden">
           <Outlet />
         </main>
       </div>

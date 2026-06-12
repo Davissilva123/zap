@@ -1,17 +1,37 @@
 import { useEffect, useState, useCallback } from 'react';
 import { db } from '../../lib/db';
 import { useRestaurantId } from '../../lib/auth';
-import type { RestaurantTable, Category, MenuItem, Order } from '../../lib/types';
+import type { RestaurantTable, Category, MenuItem, Order, RestaurantSettings } from '../../lib/types';
 import {
   LayoutGrid, ArrowLeft, Plus, Minus, ShoppingCart,
   CheckCircle2, Loader2, ChefHat, Inbox, Receipt,
-  XCircle, AlertTriangle,
+  XCircle, AlertTriangle, Clock, Lock,
 } from 'lucide-react';
 
 type CartEntry = { item: MenuItem; qty: number };
 type View = 'tables' | 'ordering';
 
 const OPEN_STATUSES = ['PENDING', 'PREPARING', 'DELIVERING'];
+
+function isRestaurantOpen(s: RestaurantSettings): boolean {
+  if (s.manualClosed) return false;
+  if (!s.openingHours || Object.keys(s.openingHours).length === 0) return true;
+  const now = new Date();
+  const day = String(now.getDay());
+  const hours = s.openingHours[day];
+  if (!hours?.open) return false;
+  const [fh, fm] = hours.from.split(':').map(Number);
+  const [th, tm] = hours.to.split(':').map(Number);
+  const cur = now.getHours() * 60 + now.getMinutes();
+  return cur >= fh * 60 + fm && cur <= th * 60 + tm;
+}
+
+function elapsed(iso: string): string {
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return 'menos de 1 min';
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)}h${(m % 60).toString().padStart(2, '0')}min`;
+}
 
 export default function OpTablesPage() {
   const restaurantId = useRestaurantId();
@@ -20,6 +40,7 @@ export default function OpTablesPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
   const [view, setView] = useState<View>('tables');
@@ -32,16 +53,18 @@ export default function OpTablesPage() {
 
   const load = useCallback(async () => {
     if (!restaurantId) return;
-    const [t, o, c, i] = await Promise.all([
+    const [t, o, c, i, s] = await Promise.all([
       db.getTables(restaurantId),
       db.getOrders(restaurantId),
       db.getCategories(restaurantId),
       db.getMenuItems(restaurantId),
+      db.getSettings(restaurantId),
     ]);
     setTables(t.filter(x => x.active));
     setOrders(o);
     setCategories(c);
     setItems(i.filter(x => x.available));
+    setSettings(s);
     setLoadingData(false);
   }, [restaurantId]);
 
@@ -88,6 +111,10 @@ export default function OpTablesPage() {
   // ── Open new comanda ────────────────────────────────────
   const openComanda = async () => {
     if (!restaurantId || !selectedTable || cart.length === 0) return;
+    if (settings && !isRestaurantOpen(settings)) {
+      setFeedback({ type: 'err', msg: 'Restaurante fechado — não é possível abrir comanda agora.' });
+      return;
+    }
     setActionLoading(true);
     try {
       const newOrder = await db.addOrder({
@@ -201,6 +228,25 @@ export default function OpTablesPage() {
             </button>
           )}
         </div>
+
+        {/* Restaurant closed banner */}
+        {settings && !isRestaurantOpen(settings) && (
+          <div className="flex items-center gap-2 p-3 rounded-xl border bg-red-50 border-red-200 text-red-700 text-sm font-medium">
+            <Lock className="w-4 h-4 flex-shrink-0" />
+            Restaurante fechado — pedidos desativados
+          </div>
+        )}
+
+        {/* Prep time message when comanda is active */}
+        {activeOrder && (
+          <div className="flex items-center gap-2 p-3 rounded-xl border bg-blue-50 border-blue-100 text-blue-800 text-sm">
+            <Clock className="w-4 h-4 flex-shrink-0 text-blue-500" />
+            <span>
+              Pedido aberto há <strong>{elapsed(activeOrder.createdAt)}</strong>
+              {settings?.deliveryTime ? ` · Tempo estimado de preparo: ${settings.deliveryTime}` : ''}
+            </span>
+          </div>
+        )}
 
         {/* Feedback */}
         {feedback && (

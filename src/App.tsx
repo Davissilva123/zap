@@ -43,6 +43,7 @@ import OperatorsPage from './pages/OperatorsPage';
 import OpOrdersPage from './pages/op/OrdersPage';
 import OpTablesPage from './pages/op/TablesPage';
 import OpKitchenPage from './pages/op/KitchenPage';
+import OpMenuBrowsePage from './pages/op/MenuBrowsePage';
 import ReviewsPage from './pages/ReviewsPage';
 import PublicMenuPage from './pages/PublicMenuPage';
 import CustomerPortalPage from './pages/CustomerPortalPage';
@@ -206,6 +207,7 @@ export default function App() {
             <Route path="cardapio" element={<MenuPage />} />
             <Route path="cupons" element={<CouponsPage />} />
             <Route path="pdv" element={<PDVPage />} />
+            <Route path="menu" element={<OpMenuBrowsePage />} />
           </Route>
 
           {/* Driver portal (public, token-based) */}
