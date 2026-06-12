@@ -438,7 +438,7 @@ export const db = {
     return toOrder(data as OrderRow);
   },
 
-  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt' | 'rating' | 'ratingComment' | 'items' | 'total' | 'driverName' | 'driverId'>>): Promise<void> {
+  async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt' | 'rating' | 'ratingComment' | 'items' | 'total' | 'discount' | 'driverName' | 'driverId'>>): Promise<void> {
     const row: Record<string, unknown> = {};
     if (updates.status !== undefined) row.status = updates.status;
     if (updates.paidAt !== undefined) row.paid_at = updates.paidAt;
@@ -446,6 +446,7 @@ export const db = {
     if (updates.ratingComment !== undefined) row.rating_comment = updates.ratingComment;
     if (updates.items !== undefined) row.items = updates.items;
     if (updates.total !== undefined) row.total = updates.total;
+    if (updates.discount !== undefined) row.discount = updates.discount;
     if (updates.driverName !== undefined) row.driver_name = updates.driverName || null;
     if (updates.driverId !== undefined) row.driver_id = updates.driverId || null;
     await supabase.from('orders').update(row).eq('id', id);
