@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { RestaurantSettings, PaymentMethod } from '../lib/types';
-import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift, Crown, XCircle, ExternalLink, Globe, Shield, Copy } from 'lucide-react';
+import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift, Crown, XCircle, ExternalLink, Globe, Shield, Copy, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DeliveryNeighborhood, DayHours } from '../lib/types';
 
@@ -438,6 +438,22 @@ export default function SettingsPage() {
             <span className="text-sm text-slate-500">% do total de cada pedido concluído</span>
           </div>
           <p className="text-[11px] text-slate-400 mt-1">0 = cashback desativado. O saldo acumulado é exibido no portal do cliente.</p>
+        </div>
+      </SectionCard>
+
+      {/* Permissões da equipe */}
+      <SectionCard icon={Users} title="Permissões da equipe" description="Controle o que cada membro pode fazer no sistema">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <span className="text-sm font-medium text-slate-700">Garçom pode dar desconto na comanda</span>
+            <p className="text-xs text-slate-400 mt-0.5">Quando ativado, o garçom vê o botão de desconto ao visualizar as comandas das mesas</p>
+          </div>
+          <div
+            onClick={() => setForm(f => ({ ...f!, waiterDiscountEnabled: !f!.waiterDiscountEnabled }))}
+            className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center cursor-pointer flex-shrink-0 ${form.waiterDiscountEnabled ? 'bg-emerald-500' : 'bg-slate-200'}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.waiterDiscountEnabled ? 'translate-x-5' : ''}`} />
+          </div>
         </div>
       </SectionCard>
 

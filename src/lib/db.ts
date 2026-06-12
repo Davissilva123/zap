@@ -14,6 +14,7 @@ interface SettingsRow {
   minimum_order: number;
   mercado_pago_token: string;
   manual_closed: boolean;
+  waiter_discount_enabled: boolean;
   blocked?: boolean;
   blocked_reason?: string;
   disabled?: boolean;
@@ -52,6 +53,7 @@ function toSettings(r: SettingsRow): RestaurantSettings {
     minimumOrder: Number(r.minimum_order ?? 0),
     mercadoPagoToken: r.mercado_pago_token ?? '',
     manualClosed: r.manual_closed ?? false,
+    waiterDiscountEnabled: r.waiter_discount_enabled ?? false,
     blocked: r.blocked ?? false,
     blockedReason: r.blocked_reason ?? undefined,
     disabled: r.disabled ?? false,
@@ -218,6 +220,7 @@ export const db = {
     if (updates.minimumOrder !== undefined) row.minimum_order = updates.minimumOrder;
     if (updates.mercadoPagoToken !== undefined) row.mercado_pago_token = updates.mercadoPagoToken;
     if (updates.manualClosed !== undefined) row.manual_closed = updates.manualClosed;
+    if (updates.waiterDiscountEnabled !== undefined) row.waiter_discount_enabled = updates.waiterDiscountEnabled;
     await supabase.from('restaurant_settings').update(row).eq('user_id', userId);
   },
 

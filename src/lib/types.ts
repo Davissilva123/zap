@@ -112,6 +112,7 @@ export interface RestaurantSettings {
   cashbackPercent: number;
   minimumOrder: number;
   manualClosed: boolean;
+  waiterDiscountEnabled: boolean;
   blocked?: boolean;
   blockedReason?: string;
   disabled?: boolean;
