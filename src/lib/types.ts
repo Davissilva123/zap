@@ -145,7 +145,7 @@ export interface Order {
   total: number;
   discount: number;
   couponCode?: string;
-  status: 'PENDING' | 'PAID' | 'CANCELLED' | 'PREPARING' | 'DELIVERING' | 'COMPLETED';
+  status: 'PENDING' | 'PAID' | 'CANCELLED' | 'PREPARING' | 'READY' | 'DELIVERING' | 'COMPLETED';
   customerName: string;
   customerPhone: string;
   paymentMethod: PaymentMethod;

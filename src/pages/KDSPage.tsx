@@ -13,13 +13,17 @@ const STATUS_FLOW: Record<string, { next: Order['status']; label: string; cls: s
   DELIVERING: { next: 'COMPLETED', label: 'Concluir',           cls: 'bg-emerald-500 hover:bg-emerald-600' },
 };
 
-// For delivery orders: kitchen marks as READY but owner dispatches (DELIVERING = out for delivery)
-// Kitchen advances: PENDING/PAID → PREPARING → DELIVERING (= "pronto na cozinha, aguardando entregador")
-// Owner advances: DELIVERING → assign driver → COMPLETED
+// Delivery flow: kitchen advances PREPARING → READY ("pronto na cozinha")
+// Owner then assigns driver and advances READY → DELIVERING → COMPLETED
+// Non-delivery (table/pickup): normal flow PREPARING → DELIVERING → COMPLETED
 function getAdvanceConfig(order: Order): { next: Order['status']; label: string; cls: string } | null {
-  if (order.status === 'DELIVERING' && order.deliveryType === 'delivery') {
-    return null; // Kitchen has no action — owner dispatches
+  if (order.status === 'PREPARING' && order.deliveryType === 'delivery') {
+    return { next: 'READY', label: 'Pronto na cozinha', cls: 'bg-orange-500 hover:bg-orange-600' };
   }
+  // READY delivery: kitchen done, waiting for owner to dispatch
+  if (order.status === 'READY') return null;
+  // DELIVERING delivery: owner dispatched, no kitchen action
+  if (order.status === 'DELIVERING' && order.deliveryType === 'delivery') return null;
   return STATUS_FLOW[order.status] ?? null;
 }
 
@@ -47,7 +51,7 @@ export default function KDSPage() {
   const [soundOn, setSoundOn] = useState(true);
   const prevIdsRef = useRef<Set<string>>(new Set());
 
-  const ACTIVE = ['PENDING', 'PAID', 'PREPARING', 'DELIVERING'];
+  const ACTIVE = ['PENDING', 'PAID', 'PREPARING', 'READY', 'DELIVERING'];
 
   const load = async () => {
     if (!restaurantId) return;
@@ -92,10 +96,11 @@ export default function KDSPage() {
     });
   };
 
-  const cols: Record<string, Order[]> = { PENDING: [], PAID: [], PREPARING: [], DELIVERING: [] };
+  const cols: Record<string, Order[]> = { PENDING: [], PAID: [], PREPARING: [], READY: [], DELIVERING: [] };
   for (const o of orders) if (cols[o.status]) cols[o.status].push(o);
-  // Merge PENDING+PAID into same column
+  // Merge PENDING+PAID into same column; merge READY+DELIVERING into "Pronto/Entrega" column
   const pendingCol = [...cols.PENDING, ...cols.PAID].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const readyCol = [...cols.READY, ...cols.DELIVERING].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   void now; // used in urgencyColor/elapsed via closure
 
@@ -147,9 +152,9 @@ export default function KDSPage() {
             <div className="flex items-center gap-2 px-1">
               <Truck size={16} className="text-teal-400" />
               <span className="font-semibold text-teal-400 uppercase text-sm tracking-widest">Pronto / Entrega</span>
-              <span className="ml-auto bg-teal-400 text-slate-900 text-xs font-bold rounded-full px-2">{cols.DELIVERING.length}</span>
+              <span className="ml-auto bg-teal-400 text-slate-900 text-xs font-bold rounded-full px-2">{readyCol.length}</span>
             </div>
-            {cols.DELIVERING.map(order => <KDSCard key={order.id} order={order} onAdvance={advance} />)}
+            {readyCol.map(order => <KDSCard key={order.id} order={order} onAdvance={advance} />)}
           </div>
         </div>
       )}
@@ -160,12 +165,8 @@ export default function KDSPage() {
 function KDSCard({ order, onAdvance }: { order: Order; onAdvance: (o: Order) => void }) {
   const cfg = getAdvanceConfig(order);
   const id = order.id.slice(-6).toUpperCase();
-  const isDeliveryAwaiting = order.status === 'DELIVERING' && order.deliveryType === 'delivery';
-
-  // Override label for delivery orders going to DELIVERING
-  const btnLabel = (order.status === 'PREPARING' && order.deliveryType === 'delivery')
-    ? 'Pronto na cozinha'
-    : cfg?.label;
+  const isReadyDelivery = order.status === 'READY' && order.deliveryType === 'delivery';
+  const isDeliveringDelivery = order.status === 'DELIVERING' && order.deliveryType === 'delivery';
 
   return (
     <div className={`bg-slate-800 rounded-xl border-2 ${urgencyColor(order.createdAt)} p-4 flex flex-col gap-3`}>
@@ -208,14 +209,21 @@ function KDSCard({ order, onAdvance }: { order: Order; onAdvance: (o: Order) => 
           onClick={() => onAdvance(order)}
           className={`w-full py-2.5 rounded-lg text-white font-semibold text-sm transition-colors ${cfg.cls}`}
         >
-          {btnLabel}
+          {cfg.label}
         </button>
       )}
 
-      {isDeliveryAwaiting && (
+      {isReadyDelivery && (
         <div className="flex items-center gap-1.5 text-xs text-amber-400 justify-center bg-amber-900/30 rounded-lg px-3 py-2">
           <Clock size={12} />
-          Pronto — aguardando entregador (owner despacha)
+          Pronto — aguardando entregador
+        </div>
+      )}
+
+      {isDeliveringDelivery && (
+        <div className="flex items-center gap-1.5 text-xs text-teal-400 justify-center bg-teal-900/30 rounded-lg px-3 py-2">
+          <CheckCircle size={12} />
+          Saiu para entrega
         </div>
       )}
 
