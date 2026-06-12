@@ -85,7 +85,9 @@ export default function OrdersPage() {
     if (!user) return;
     load();
 
-    // Real-time subscription for new orders
+    // Polling a cada 15s para manter sincronia com a cozinha
+    const pollInterval = setInterval(() => load(), 15000);
+
     const channel = supabase
       .channel(`orders:${user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` }, (payload) => {
@@ -120,9 +122,15 @@ export default function OrdersPage() {
           printOrder(mapped, settingsRef.current);
         }
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` }, () => {
+        load();
+      })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(channel);
+    };
   }, [user, soundEnabled, autoPrint]);
 
   if (!user) return null;

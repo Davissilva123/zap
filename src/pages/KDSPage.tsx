@@ -100,7 +100,8 @@ export default function KDSPage() {
   for (const o of orders) if (cols[o.status]) cols[o.status].push(o);
   // Merge PENDING+PAID into same column; merge READY+DELIVERING into "Pronto/Entrega" column
   const pendingCol = [...cols.PENDING, ...cols.PAID].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  const readyCol = [...cols.READY, ...cols.DELIVERING].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  // DELIVERING delivery orders = driver dispatched by owner → hide from kitchen
+  const readyCol = [...cols.READY, ...cols.DELIVERING.filter(o => o.deliveryType !== 'delivery')].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
   void now; // used in urgencyColor/elapsed via closure
 

@@ -71,6 +71,9 @@ export default function OpOrdersPage() {
     if (!restaurantId) return;
     load();
 
+    // Polling a cada 15s para manter sincronia com a cozinha
+    const pollInterval = setInterval(() => load(), 15000);
+
     const channel = supabase
       .channel(`op-orders:${restaurantId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `user_id=eq.${restaurantId}` }, (payload) => {
@@ -102,9 +105,15 @@ export default function OpOrdersPage() {
         setOrders(prev => [mapped, ...prev]);
         if (autoPrint && settingsRef.current) printOrder(mapped, settingsRef.current);
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `user_id=eq.${restaurantId}` }, () => {
+        load();
+      })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(channel);
+    };
   }, [restaurantId, soundEnabled, autoPrint]);
 
   if (!user) return null;
