@@ -6,6 +6,45 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
+async function syncSupabasePassword(email: string, password: string) {
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    'apikey': SUPABASE_SERVICE_ROLE_KEY,
+  };
+
+  // Try to create user first
+  const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ email, password, email_confirm: true }),
+  });
+
+  if (createRes.ok) return; // created successfully
+
+  // User already exists — find and update password
+  const listRes = await fetch(
+    `${SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=1000`,
+    { headers }
+  );
+  if (!listRes.ok) return;
+
+  const listData = await listRes.json();
+  const users: { id: string; email: string }[] = listData.users ?? listData ?? [];
+  const found = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+  if (!found) return;
+
+  await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${found.id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ password }),
+  });
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
 
@@ -25,9 +64,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!BREVO_API_KEY) {
       return res.status(500).json({
-        error: 'Variável BREVO_API_KEY não configurada no Vercel. Crie uma conta gratuita em brevo.com e adicione a chave.',
+        error: 'Variável BREVO_API_KEY não configurada no Vercel.',
       });
     }
+
+    // Sync password in Supabase (best-effort, won't block email send)
+    await syncSupabasePassword(email, password).catch(() => {});
 
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">

@@ -86,7 +86,12 @@ export default function OperatorsPage() {
         notes: form.notes,
       });
 
-      if (form.password) setSuccess({ name: form.name.trim(), email: form.email.trim().toLowerCase(), password: form.password });
+      if (form.password) {
+        setSuccess({ name: form.name.trim(), email: form.email.trim().toLowerCase(), password: form.password });
+        // Envia e-mail automaticamente com a senha real que foi criada
+        const settings = await import('../lib/db').then(m => m.db.getSettings(user.id)).catch(() => null);
+        callSendEmailApi(form.name.trim(), form.email.trim().toLowerCase(), form.password, settings?.name ?? '').catch(() => {});
+      }
       setForm(emptyForm);
       setShowForm(false);
       load();
@@ -97,46 +102,40 @@ export default function OperatorsPage() {
     }
   };
 
-  const sendAccessEmail = async (op: Operator) => {
-    // Gera senha temporária
-    const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-    const tempPwd = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-      + 'A1';
-
-    // Cria ou recria conta Auth com a senha temporária
-    const { error: signupErr } = await supabaseNoSession.auth.signUp({
-      email: op.email.trim().toLowerCase(),
-      password: tempPwd,
-    });
-    if (signupErr && !signupErr.message.toLowerCase().includes('already registered')) {
-      alert('Erro ao preparar conta: ' + signupErr.message);
-      return;
-    }
-
-    // Recupera nome do restaurante para o e-mail
-    const settings = user ? await import('../lib/db').then(m => m.db.getSettings(user.id)).catch(() => null) : null;
-
-    // Chama a Vercel API Route para enviar o e-mail com credenciais
+  const callSendEmailApi = async (name: string, email: string, password: string, restaurantName: string) => {
     const apiRes = await fetch('/api/send-operator-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: op.name,
-        email: op.email.trim().toLowerCase(),
-        password: tempPwd,
+        name,
+        email,
+        password,
         loginUrl: window.location.origin + '/login',
-        restaurantName: settings?.name ?? '',
+        restaurantName,
       }),
     });
-
     if (!apiRes.ok) {
       const err = await apiRes.json().catch(() => ({}));
       const msg = typeof err.error === 'string' ? err.error : JSON.stringify(err.error ?? err);
-      alert('Erro ao enviar e-mail:\n' + msg);
-      return;
+      throw new Error(msg);
     }
+  };
 
-    setResetSent(prev => ({ ...prev, [op.id]: true }));
+  const sendAccessEmail = async (op: Operator) => {
+    // Gera nova senha temporária
+    const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+    const tempPwd = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('') + 'A1';
+
+    // Recupera nome do restaurante
+    const settings = user ? await import('../lib/db').then(m => m.db.getSettings(user.id)).catch(() => null) : null;
+
+    // A API atualiza a senha no Supabase E envia o e-mail (senha sempre sincronizada)
+    try {
+      await callSendEmailApi(op.name, op.email.trim().toLowerCase(), tempPwd, settings?.name ?? '');
+      setResetSent(prev => ({ ...prev, [op.id]: true }));
+    } catch (e) {
+      alert('Erro ao enviar e-mail:\n' + String(e));
+    }
   };
 
   const toggle = async (op: Operator) => { await db.updateOperator(op.id, { active: !op.active }); load(); };
