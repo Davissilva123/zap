@@ -45,20 +45,21 @@ export default function OperatorLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [viewDropdown, setViewDropdown] = useState(false);
 
-  // Persist viewAs across reconnections / re-mounts
+  // Persist viewAs across reconnections / re-mounts — save synchronously to avoid race conditions
   const [viewAs, setViewAs] = useState<RoleKey>(() => {
     const saved = localStorage.getItem(VIEW_AS_KEY) as RoleKey | null;
     return saved && ['admin', 'cashier', 'waiter', 'kitchen'].includes(saved) ? saved : 'admin';
   });
 
-  useEffect(() => {
-    localStorage.setItem(VIEW_AS_KEY, viewAs);
-  }, [viewAs]);
+  const changeViewAs = (newRole: RoleKey) => {
+    localStorage.setItem(VIEW_AS_KEY, newRole); // save BEFORE setState
+    setViewAs(newRole);
+  };
 
   const handleLogout = async () => {
     localStorage.removeItem(VIEW_AS_KEY);
     await logout();
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   if (!operatorInfo) return null;
@@ -83,7 +84,7 @@ export default function OperatorLayout() {
           <div className="flex items-center gap-2">
             {role === 'admin' && (
               <button
-                onClick={() => setViewAs('admin')}
+                onClick={() => changeViewAs('admin')}
                 className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 rounded-lg hover:bg-white/10 transition-colors"
               >
                 ← Voltar ao painel
@@ -147,11 +148,10 @@ export default function OperatorLayout() {
                 <button
                   key={opt.value}
                   onClick={() => {
-                    setViewAs(opt.value);
+                    changeViewAs(opt.value);
                     setViewDropdown(false);
                     setMobileOpen(false);
-                    // Only navigate for non-kitchen roles (kitchen renders inline)
-                    if (opt.value !== 'kitchen') navigate('/op/pedidos');
+                    if (opt.value !== 'kitchen') navigate('/op/pedidos', { replace: true });
                   }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-medium transition-colors ${viewAs === opt.value ? 'bg-emerald-500/15 text-emerald-400' : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}`}
                 >
