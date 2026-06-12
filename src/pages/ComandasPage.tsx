@@ -241,40 +241,44 @@ export default function ComandasPage() {
 
               {/* ── Desconto inline ── */}
               {isDiscountOpen && discountModal && (
-                <div className="mx-4 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="mx-4 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-amber-700">Aplicar desconto</span>
                     <button onClick={() => setDiscountModal(null)} className="text-amber-400 hover:text-amber-600">
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  {/* Tipo: % ou R$ */}
                   <div className="flex gap-2">
                     <button
                       onClick={() => setDiscountModal(d => d ? { ...d, type: 'percent' } : d)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${discountModal.type === 'percent' ? 'bg-amber-500 text-white' : 'bg-white border border-amber-200 text-amber-600'}`}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${discountModal.type === 'percent' ? 'bg-amber-500 text-white' : 'bg-white border border-amber-200 text-amber-600'}`}
                     >
-                      %
+                      % Porcentagem
                     </button>
                     <button
                       onClick={() => setDiscountModal(d => d ? { ...d, type: 'fixed' } : d)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${discountModal.type === 'fixed' ? 'bg-amber-500 text-white' : 'bg-white border border-amber-200 text-amber-600'}`}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-colors ${discountModal.type === 'fixed' ? 'bg-amber-500 text-white' : 'bg-white border border-amber-200 text-amber-600'}`}
                     >
-                      R$
+                      R$ Fixo
                     </button>
+                  </div>
+                  {/* Valor + OK */}
+                  <div className="flex gap-2">
                     <input
                       type="number" min="0" step="0.01"
                       value={discountModal.value}
                       onChange={e => setDiscountModal(d => d ? { ...d, value: e.target.value } : d)}
-                      placeholder={discountModal.type === 'percent' ? '10' : '5,00'}
-                      className="flex-1 px-3 py-1.5 border border-amber-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                      placeholder={discountModal.type === 'percent' ? 'Ex: 10' : 'Ex: 5,00'}
+                      className="flex-1 px-3 py-2 border border-amber-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
                       autoFocus
                     />
                     <button
                       onClick={() => applyDiscount(tableOrders)}
                       disabled={!discountModal.value || applyingDiscount}
-                      className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600 disabled:opacity-50 transition-colors"
+                      className="px-5 py-2 bg-amber-500 text-white rounded-lg text-sm font-bold hover:bg-amber-600 disabled:opacity-50 transition-colors flex-shrink-0"
                     >
-                      {applyingDiscount ? <Loader2 className="w-3 h-3 animate-spin" /> : 'OK'}
+                      {applyingDiscount ? <Loader2 className="w-4 h-4 animate-spin" /> : 'OK'}
                     </button>
                   </div>
                   {discountModal.value && (() => {
@@ -282,7 +286,7 @@ export default function ComandasPage() {
                     if (isNaN(num) || num <= 0) return null;
                     const amt = discountModal.type === 'percent' ? Math.min(gross * num / 100, gross) : Math.min(num, gross);
                     return (
-                      <p className="text-[11px] text-amber-700 mt-1.5 font-medium">
+                      <p className="text-[11px] text-amber-700 font-medium">
                         −R$ {amt.toFixed(2).replace('.', ',')} → total R$ {(gross - amt).toFixed(2).replace('.', ',')}
                       </p>
                     );
@@ -291,43 +295,49 @@ export default function ComandasPage() {
               )}
 
               {/* ── Actions ── */}
-              <div className="px-4 pb-4 flex gap-2 border-t border-slate-100 pt-3">
-                <button
-                  onClick={() => printTable(tableName, tableOrders)}
-                  disabled={!settings}
-                  title="Imprimir comanda"
-                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-40 flex-shrink-0"
-                >
-                  <Printer className="w-4 h-4" />
-                </button>
-
-                {canDiscount && (
+              <div className="px-4 pb-4 space-y-2 border-t border-slate-100 pt-3">
+                {/* Linha 1: imprimir + desconto */}
+                <div className="flex gap-2">
                   <button
-                    onClick={() => isDiscountOpen
-                      ? setDiscountModal(null)
-                      : setDiscountModal({ table: tableName, type: 'percent', value: '' })}
-                    title="Dar desconto"
-                    className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors flex-shrink-0 ${
-                      isDiscountOpen
-                        ? 'border-amber-300 bg-amber-50 text-amber-700'
-                        : totalDiscount > 0
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                    }`}
+                    onClick={() => printTable(tableName, tableOrders)}
+                    disabled={!settings}
+                    title="Imprimir comanda"
+                    className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-40"
                   >
-                    <Percent className="w-4 h-4" />
-                    {totalDiscount > 0 && <span className="text-xs">−R$ {totalDiscount.toFixed(2).replace('.', ',')}</span>}
+                    <Printer className="w-4 h-4" />
+                    <span>Imprimir</span>
                   </button>
-                )}
 
+                  {canDiscount && (
+                    <button
+                      onClick={() => isDiscountOpen
+                        ? setDiscountModal(null)
+                        : setDiscountModal({ table: tableName, type: 'percent', value: '' })}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${
+                        isDiscountOpen
+                          ? 'border-amber-300 bg-amber-50 text-amber-700'
+                          : totalDiscount > 0
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Percent className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">
+                        {totalDiscount > 0 ? `−R$ ${totalDiscount.toFixed(2).replace('.', ',')}` : 'Desconto'}
+                      </span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Linha 2: fechar conta */}
                 <button
                   onClick={() => closeTable(tableName, tableOrders)}
                   disabled={isClosing}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 transition-colors disabled:opacity-60 min-w-0"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 transition-colors disabled:opacity-60"
                 >
                   {isClosing
                     ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <><CheckCircle className="w-4 h-4 flex-shrink-0" /><span>Fechar conta</span></>
+                    : <><CheckCircle className="w-4 h-4" /><span>Fechar conta</span></>
                   }
                 </button>
               </div>
