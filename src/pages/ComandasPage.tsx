@@ -3,7 +3,7 @@ import { db } from '../lib/db';
 import { useAuth, useRestaurantId } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import type { Order, RestaurantSettings } from '../lib/types';
-import { LayoutGrid, Loader2, CheckCircle, DollarSign, Clock, Printer, Percent, X } from 'lucide-react';
+import { LayoutGrid, Loader2, CheckCircle, Clock, Printer, Percent, X, ChefHat, Truck, AlertCircle } from 'lucide-react';
 import { printOrder } from '../lib/print';
 
 function elapsed(createdAt: string) {
@@ -12,7 +12,20 @@ function elapsed(createdAt: string) {
   return `${Math.floor(m / 60)}h ${m % 60}min`;
 }
 
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string; icon: typeof Clock }> = {
+  PENDING:   { label: 'Aguardando',  color: 'text-amber-700',  bg: 'bg-amber-50 border-amber-200',   icon: AlertCircle },
+  PAID:      { label: 'Pago',        color: 'text-emerald-700',bg: 'bg-emerald-50 border-emerald-200', icon: CheckCircle },
+  PREPARING: { label: 'Preparando',  color: 'text-blue-700',   bg: 'bg-blue-50 border-blue-200',     icon: ChefHat },
+  READY:     { label: 'Pronto',      color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', icon: ChefHat },
+  DELIVERING:{ label: 'A caminho',   color: 'text-teal-700',   bg: 'bg-teal-50 border-teal-200',     icon: Truck },
+};
+
 type DiscountModal = { table: string; type: 'percent' | 'fixed'; value: string };
+
+function tableLabelName(name: string) {
+  // Avoid "Mesa Mesa 1" if tableName already starts with "Mesa"
+  return /^mesa\s/i.test(name) ? name : `Mesa ${name}`;
+}
 
 export default function ComandasPage() {
   const restaurantId = useRestaurantId();
@@ -24,7 +37,6 @@ export default function ComandasPage() {
   const [discountModal, setDiscountModal] = useState<DiscountModal | null>(null);
   const [applyingDiscount, setApplyingDiscount] = useState(false);
 
-  // Garçom só pode dar desconto se o dono habilitou a permissão
   const isWaiter = operatorInfo?.role === 'waiter';
   const canDiscount = !isWaiter || (settings?.waiterDiscountEnabled ?? false);
 
@@ -51,7 +63,7 @@ export default function ComandasPage() {
   }, [restaurantId, load]);
 
   const closeTable = async (tableName: string, tableOrders: Order[]) => {
-    if (!confirm(`Fechar conta da ${tableName}? Todos os pedidos ativos serão marcados como concluídos.`)) return;
+    if (!confirm(`Fechar a conta da ${tableLabelName(tableName)}? Todos os pedidos serão marcados como concluídos.`)) return;
     setClosing(tableName);
     await Promise.all(tableOrders.map(o => db.updateOrder(o.id, { status: 'COMPLETED' })));
     await load();
@@ -66,31 +78,24 @@ export default function ComandasPage() {
       items: tableOrders.flatMap(o => o.items),
       total: tableOrders.reduce((s, o) => s + o.total, 0),
       discount: totalDiscount,
-      customerName: `Mesa ${tableName}`,
+      customerName: tableLabelName(tableName),
       notes: tableOrders.filter(o => o.notes).map(o => o.notes).join(' | ') || undefined,
     };
     printOrder(merged, settings);
   };
 
-  const openDiscountModal = (tableName: string) => {
-    setDiscountModal({ table: tableName, type: 'percent', value: '' });
-  };
-
   const applyDiscount = async (tableOrders: Order[]) => {
-    if (!discountModal || !discountModal.value) return;
-    const numValue = Number(discountModal.value.replace(',', '.'));
-    if (isNaN(numValue) || numValue <= 0) return;
-
+    if (!discountModal?.value) return;
+    const num = Number(discountModal.value.replace(',', '.'));
+    if (isNaN(num) || num <= 0) return;
     const gross = tableOrders.reduce((s, o) => s + o.total, 0);
-    const discountAmount = discountModal.type === 'percent'
-      ? Math.min(gross * numValue / 100, gross)
-      : Math.min(numValue, gross);
-
+    const amount = discountModal.type === 'percent'
+      ? Math.min(gross * num / 100, gross)
+      : Math.min(num, gross);
     setApplyingDiscount(true);
-    // Zera desconto de todos os pedidos e aplica no primeiro
     const sorted = [...tableOrders].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     await Promise.all(sorted.slice(1).map(o => db.updateOrder(o.id, { discount: 0 })));
-    await db.updateOrder(sorted[0].id, { discount: discountAmount });
+    await db.updateOrder(sorted[0].id, { discount: amount });
     setDiscountModal(null);
     setApplyingDiscount(false);
     await load();
@@ -109,7 +114,6 @@ export default function ComandasPage() {
     </div>
   );
 
-  // Group by table name
   const byTable: Record<string, Order[]> = {};
   orders.forEach(o => {
     const t = o.tableName || 'Sem mesa';
@@ -119,92 +123,127 @@ export default function ComandasPage() {
   const tables = Object.entries(byTable).sort(([a], [b]) => a.localeCompare(b));
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center">
-            <LayoutGrid className="w-5 h-5 text-violet-600" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Comandas</h1>
-            <p className="text-slate-500 text-sm mt-0.5">
-              <span className="text-violet-600 font-semibold">{tables.length} mesa{tables.length !== 1 ? 's' : ''} ativa{tables.length !== 1 ? 's' : ''}</span>
-              {' · '}
-              <span className="text-emerald-600 font-semibold">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span>
-            </p>
-          </div>
+    <div className="space-y-5 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-2xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+          <LayoutGrid className="w-5 h-5 text-violet-600" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Comandas</h1>
+          <p className="text-slate-400 text-sm">
+            {tables.length === 0
+              ? 'Nenhuma mesa ativa'
+              : <><span className="text-violet-600 font-semibold">{tables.length} mesa{tables.length !== 1 ? 's' : ''}</span> · <span className="text-emerald-600 font-semibold">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span></>
+            }
+          </p>
         </div>
       </div>
 
       {tables.length === 0 && (
-        <div className="card p-16 text-center">
-          <LayoutGrid className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+            <LayoutGrid className="w-7 h-7 text-slate-300" />
+          </div>
           <p className="text-slate-500 font-medium">Nenhuma mesa com pedido ativo</p>
-          <p className="text-slate-400 text-sm mt-1">Os pedidos de mesa aparecerão aqui</p>
+          <p className="text-slate-400 text-sm">Os pedidos de mesa aparecem aqui em tempo real</p>
         </div>
       )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {tables.map(([tableName, tableOrders]) => {
           const gross = tableOrders.reduce((s, o) => s + o.total, 0);
           const totalDiscount = tableOrders.reduce((s, o) => s + (o.discount || 0), 0);
-          const netTotal = gross - totalDiscount;
+          const net = gross - totalDiscount;
           const oldest = tableOrders.reduce((a, b) => a.createdAt < b.createdAt ? a : b);
-          const allItems = tableOrders.flatMap(o => o.items);
-          const itemMap: Record<string, { name: string; emoji: string; qty: number; price: number }> = {};
-          allItems.forEach(i => {
-            if (!itemMap[i.menuItemId + i.name]) itemMap[i.menuItemId + i.name] = { name: i.name, emoji: i.emoji, qty: 0, price: i.price };
-            itemMap[i.menuItemId + i.name].qty += i.quantity;
-          });
           const isClosing = closing === tableName;
           const isDiscountOpen = discountModal?.table === tableName;
 
+          // Merge items by name+id
+          const itemMap: Record<string, { name: string; emoji: string; qty: number; price: number }> = {};
+          tableOrders.flatMap(o => o.items).forEach(i => {
+            const k = i.menuItemId + i.name;
+            if (!itemMap[k]) itemMap[k] = { name: i.name, emoji: i.emoji, qty: 0, price: i.price };
+            itemMap[k].qty += i.quantity;
+          });
+          const items = Object.values(itemMap);
+
+          // Notes
+          const notes = tableOrders.filter(o => o.notes).map(o => o.notes).filter(Boolean);
+
+          // Per-order status summary
+          const statusGroups: Record<string, number> = {};
+          tableOrders.forEach(o => { statusGroups[o.status] = (statusGroups[o.status] || 0) + 1; });
+
           return (
-            <div key={tableName} className="card overflow-hidden">
-              {/* Header */}
-              <div className="bg-violet-50 border-b border-violet-100 px-5 py-4 flex items-center justify-between">
+            <div key={tableName} className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+
+              {/* ── Card header ── */}
+              <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3 border-b border-slate-100">
                 <div>
-                  <p className="font-bold text-slate-900 text-base">Mesa {tableName}</p>
-                  <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {elapsed(oldest.createdAt)} · {tableOrders.length} pedido{tableOrders.length !== 1 ? 's' : ''}
-                  </p>
+                  <p className="font-bold text-slate-900 text-[17px] leading-tight">{tableLabelName(tableName)}</p>
+                  <div className="flex items-center gap-1.5 mt-1 text-slate-400 text-xs">
+                    <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>{elapsed(oldest.createdAt)}</span>
+                    <span className="text-slate-200">·</span>
+                    <span>{tableOrders.length} pedido{tableOrders.length !== 1 ? 's' : ''}</span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className={`text-2xl font-extrabold leading-none ${totalDiscount > 0 ? 'text-emerald-600' : 'text-emerald-600'}`}>
-                    R$ {netTotal.toFixed(2).replace('.', ',')}
+                <div className="text-right flex-shrink-0">
+                  <p className="text-2xl font-extrabold text-emerald-600 leading-none tracking-tight">
+                    R$ {net.toFixed(2).replace('.', ',')}
                   </p>
                   {totalDiscount > 0 && (
-                    <p className="text-[11px] text-slate-400 mt-0.5 line-through">R$ {gross.toFixed(2).replace('.', ',')}</p>
+                    <p className="text-xs text-slate-400 line-through mt-0.5">R$ {gross.toFixed(2).replace('.', ',')}</p>
                   )}
-                  <p className="text-[11px] text-slate-400 mt-0.5">total acumulado</p>
                 </div>
               </div>
 
-              {/* Items summary */}
-              <div className="px-5 py-3 space-y-1.5 max-h-52 overflow-y-auto">
-                {Object.values(itemMap).map((item, i) => (
+              {/* ── Items ── */}
+              <div className="px-5 py-3 space-y-2 flex-1 max-h-48 overflow-y-auto">
+                {items.map((item, i) => (
                   <div key={i} className="flex items-center justify-between gap-2">
-                    <span className="text-sm text-slate-700">{item.emoji} {item.name}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {item.emoji && <span className="text-base leading-none flex-shrink-0">{item.emoji}</span>}
+                      <span className="text-sm text-slate-700 font-medium truncate">{item.name}</span>
+                    </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs font-bold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">{item.qty}x</span>
-                      <span className="text-xs text-slate-500 font-semibold">R$ {(item.price * item.qty).toFixed(2).replace('.', ',')}</span>
+                      <span className="text-xs font-bold text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">{item.qty}x</span>
+                      <span className="text-sm font-semibold text-slate-600 w-16 text-right">
+                        R$ {(item.price * item.qty).toFixed(2).replace('.', ',')}
+                      </span>
                     </div>
                   </div>
                 ))}
-                {tableOrders.some(o => o.notes) && (
-                  <div className="pt-1.5 border-t border-slate-100">
-                    {tableOrders.filter(o => o.notes).map(o => (
-                      <p key={o.id} className="text-xs text-slate-500 italic">Obs: {o.notes}</p>
+                {notes.length > 0 && (
+                  <div className="pt-2 border-t border-slate-100 space-y-0.5">
+                    {notes.map((n, i) => (
+                      <p key={i} className="text-xs text-amber-600 italic">⚠️ {n}</p>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Discount inline form */}
+              {/* ── Status por pedido ── */}
+              <div className="px-5 pb-3 flex flex-wrap gap-1.5">
+                {Object.entries(statusGroups).map(([status, count]) => {
+                  const cfg = STATUS_MAP[status];
+                  if (!cfg) return null;
+                  const Icon = cfg.icon;
+                  return (
+                    <span key={status} className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg border ${cfg.bg} ${cfg.color}`}>
+                      <Icon className="w-3 h-3" />
+                      {cfg.label}{count > 1 ? ` ×${count}` : ''}
+                    </span>
+                  );
+                })}
+              </div>
+
+              {/* ── Desconto inline ── */}
               {isDiscountOpen && discountModal && (
-                <div className="mx-4 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-amber-700">Aplicar desconto</span>
+                <div className="mx-4 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-amber-700">Aplicar desconto</span>
                     <button onClick={() => setDiscountModal(null)} className="text-amber-400 hover:text-amber-600">
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -212,108 +251,104 @@ export default function ComandasPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setDiscountModal(d => d ? { ...d, type: 'percent' } : d)}
-                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${discountModal.type === 'percent' ? 'bg-amber-500 text-white' : 'bg-white border border-amber-200 text-amber-600'}`}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${discountModal.type === 'percent' ? 'bg-amber-500 text-white' : 'bg-white border border-amber-200 text-amber-600'}`}
                     >
-                      <Percent className="w-3 h-3" /> %
+                      %
                     </button>
                     <button
                       onClick={() => setDiscountModal(d => d ? { ...d, type: 'fixed' } : d)}
-                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${discountModal.type === 'fixed' ? 'bg-amber-500 text-white' : 'bg-white border border-amber-200 text-amber-600'}`}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${discountModal.type === 'fixed' ? 'bg-amber-500 text-white' : 'bg-white border border-amber-200 text-amber-600'}`}
                     >
                       R$
                     </button>
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
+                      type="number" min="0" step="0.01"
                       value={discountModal.value}
                       onChange={e => setDiscountModal(d => d ? { ...d, value: e.target.value } : d)}
-                      placeholder={discountModal.type === 'percent' ? 'Ex: 10' : 'Ex: 5,00'}
+                      placeholder={discountModal.type === 'percent' ? '10' : '5,00'}
                       className="flex-1 px-3 py-1.5 border border-amber-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
+                      autoFocus
                     />
                     <button
                       onClick={() => applyDiscount(tableOrders)}
                       disabled={!discountModal.value || applyingDiscount}
-                      className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600 transition-colors disabled:opacity-50"
+                      className="px-3 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600 disabled:opacity-50 transition-colors"
                     >
                       {applyingDiscount ? <Loader2 className="w-3 h-3 animate-spin" /> : 'OK'}
                     </button>
                   </div>
-                  {discountModal.value && (
-                    <p className="text-[11px] text-amber-600 font-medium">
-                      Desconto: R$ {(discountModal.type === 'percent'
-                        ? Math.min(gross * Number(discountModal.value.replace(',', '.')) / 100, gross)
-                        : Math.min(Number(discountModal.value.replace(',', '.')), gross)
-                      ).toFixed(2).replace('.', ',')}
-                      {' '}→ Total: R$ {(gross - (discountModal.type === 'percent'
-                        ? Math.min(gross * Number(discountModal.value.replace(',', '.')) / 100, gross)
-                        : Math.min(Number(discountModal.value.replace(',', '.')), gross)
-                      )).toFixed(2).replace('.', ',')}
-                    </p>
-                  )}
+                  {discountModal.value && (() => {
+                    const num = Number(discountModal.value.replace(',', '.'));
+                    if (isNaN(num) || num <= 0) return null;
+                    const amt = discountModal.type === 'percent' ? Math.min(gross * num / 100, gross) : Math.min(num, gross);
+                    return (
+                      <p className="text-[11px] text-amber-700 mt-1.5 font-medium">
+                        −R$ {amt.toFixed(2).replace('.', ',')} → total R$ {(gross - amt).toFixed(2).replace('.', ',')}
+                      </p>
+                    );
+                  })()}
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="px-4 pb-3 flex gap-2">
+              {/* ── Actions ── */}
+              <div className="px-4 pb-4 flex gap-2 border-t border-slate-100 pt-3">
                 <button
                   onClick={() => printTable(tableName, tableOrders)}
                   disabled={!settings}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 text-[13px] font-medium hover:bg-slate-50 transition-colors disabled:opacity-40"
+                  title="Imprimir comanda"
+                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-40 flex-shrink-0"
                 >
-                  <Printer className="w-4 h-4" /> Imprimir
+                  <Printer className="w-4 h-4" />
                 </button>
-                {canDiscount && !isDiscountOpen && (
+
+                {canDiscount && (
                   <button
-                    onClick={() => openDiscountModal(tableName)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-[13px] font-medium hover:bg-amber-100 transition-colors"
+                    onClick={() => isDiscountOpen
+                      ? setDiscountModal(null)
+                      : setDiscountModal({ table: tableName, type: 'percent', value: '' })}
+                    title="Dar desconto"
+                    className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-colors flex-shrink-0 ${
+                      isDiscountOpen
+                        ? 'border-amber-300 bg-amber-50 text-amber-700'
+                        : totalDiscount > 0
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
                   >
-                    <Percent className="w-4 h-4" /> Desconto
+                    <Percent className="w-4 h-4" />
+                    {totalDiscount > 0 && <span className="text-xs">−R$ {totalDiscount.toFixed(2).replace('.', ',')}</span>}
                   </button>
                 )}
+
                 <button
                   onClick={() => closeTable(tableName, tableOrders)}
                   disabled={isClosing}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-emerald-500 text-white text-[13px] font-bold hover:bg-emerald-600 transition-colors disabled:opacity-60"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 transition-colors disabled:opacity-60 min-w-0"
                 >
-                  {isClosing ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4" /> Fechar conta</>}
+                  {isClosing
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <><CheckCircle className="w-4 h-4 flex-shrink-0" /><span>Fechar conta</span></>
+                  }
                 </button>
               </div>
 
-              {/* Per-order status dots */}
-              <div className="px-4 pb-3 flex gap-1.5 flex-wrap">
-                {tableOrders.map(o => (
-                  <span key={o.id} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    o.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
-                    o.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
-                    o.status === 'PREPARING' ? 'bg-blue-100 text-blue-700' :
-                    o.status === 'READY' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'
-                  }`}>
-                    {o.status === 'PENDING' ? 'Pendente' : o.status === 'PAID' ? 'Pago' : o.status === 'PREPARING' ? 'Preparando' : o.status === 'READY' ? 'Pronto' : o.status}
-                    {' '}· R$ {o.total.toFixed(2).replace('.', ',')}
-                  </span>
-                ))}
+              {/* ── Total footer ── */}
+              <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+                <span className="text-xs text-slate-400 font-medium">Total a cobrar</span>
+                <div className="flex items-center gap-2">
+                  {totalDiscount > 0 && (
+                    <button
+                      onClick={() => removeDiscount(tableOrders)}
+                      disabled={applyingDiscount}
+                      className="text-[11px] text-red-400 hover:text-red-600 flex items-center gap-0.5 transition-colors"
+                    >
+                      <X className="w-3 h-3" /> desconto
+                    </button>
+                  )}
+                  <span className="text-base font-extrabold text-emerald-600">R$ {net.toFixed(2).replace('.', ',')}</span>
+                </div>
               </div>
 
-              {/* Footer: total e desconto aplicado */}
-              <div className="px-5 pb-4 flex items-center justify-between border-t border-slate-100 pt-3">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-emerald-500" />
-                  <span className="text-sm font-bold text-slate-700">
-                    Total a cobrar: <span className="text-emerald-600">R$ {netTotal.toFixed(2).replace('.', ',')}</span>
-                  </span>
-                </div>
-                {totalDiscount > 0 && (
-                  <button
-                    onClick={() => removeDiscount(tableOrders)}
-                    disabled={applyingDiscount}
-                    title="Remover desconto"
-                    className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-600 transition-colors"
-                  >
-                    <X className="w-3 h-3" /> Desconto: -R$ {totalDiscount.toFixed(2).replace('.', ',')}
-                  </button>
-                )}
-              </div>
             </div>
           );
         })}
