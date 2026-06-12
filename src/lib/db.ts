@@ -15,6 +15,7 @@ interface SettingsRow {
   mercado_pago_token: string;
   manual_closed: boolean;
   waiter_discount_enabled: boolean;
+  free_shipping_enabled: boolean;
   blocked?: boolean;
   blocked_reason?: string;
   disabled?: boolean;
@@ -54,6 +55,7 @@ function toSettings(r: SettingsRow): RestaurantSettings {
     mercadoPagoToken: r.mercado_pago_token ?? '',
     manualClosed: r.manual_closed ?? false,
     waiterDiscountEnabled: r.waiter_discount_enabled ?? false,
+    freeShippingEnabled: r.free_shipping_enabled ?? false,
     blocked: r.blocked ?? false,
     blockedReason: r.blocked_reason ?? undefined,
     disabled: r.disabled ?? false,
@@ -221,6 +223,7 @@ export const db = {
     if (updates.mercadoPagoToken !== undefined) row.mercado_pago_token = updates.mercadoPagoToken;
     if (updates.manualClosed !== undefined) row.manual_closed = updates.manualClosed;
     if (updates.waiterDiscountEnabled !== undefined) row.waiter_discount_enabled = updates.waiterDiscountEnabled;
+    if (updates.freeShippingEnabled !== undefined) row.free_shipping_enabled = updates.freeShippingEnabled;
     await supabase.from('restaurant_settings').update(row).eq('user_id', userId);
   },
 

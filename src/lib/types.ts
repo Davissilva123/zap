@@ -113,6 +113,7 @@ export interface RestaurantSettings {
   minimumOrder: number;
   manualClosed: boolean;
   waiterDiscountEnabled: boolean;
+  freeShippingEnabled: boolean;
   blocked?: boolean;
   blockedReason?: string;
   disabled?: boolean;

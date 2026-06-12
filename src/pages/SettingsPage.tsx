@@ -334,7 +334,20 @@ export default function SettingsPage() {
           <p className="text-[11px] text-slate-400 mt-1">Ex: "30-45" ou "50" ou "1h"</p>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <span className="text-sm font-medium text-slate-700">Frete grátis para todos</span>
+            <p className="text-xs text-slate-400 mt-0.5">Quando ativado, todos os clientes recebem entrega gratuita</p>
+          </div>
+          <div
+            onClick={() => setForm(f => ({ ...f!, freeShippingEnabled: !f!.freeShippingEnabled }))}
+            className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center cursor-pointer flex-shrink-0 ${form.freeShippingEnabled ? 'bg-emerald-500' : 'bg-slate-200'}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.freeShippingEnabled ? 'translate-x-5' : ''}`} />
+          </div>
+        </div>
+
+        <div className={`grid sm:grid-cols-2 gap-4 ${form.freeShippingEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
           <div>
             <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Taxa de entrega padrão (R$)</label>
             <input type="number" min={0} step={0.5} value={form.deliveryFee}
@@ -351,8 +364,8 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Taxas por bairro</label>
+        <div className={form.freeShippingEnabled ? 'opacity-40 pointer-events-none' : ''}>
+          <label className="block text-[11px] font-semibold text-slate-500 mb-2 uppercase tracking-wider">Taxas por bairro <span className="normal-case font-normal text-slate-400">(taxa 0 = frete grátis nesse bairro)</span></label>
           <div className="space-y-2">
             {(form.deliveryNeighborhoods || []).map((nb, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -377,6 +390,7 @@ export default function SettingsPage() {
                     className="w-16 text-sm outline-none text-center"
                   />
                 </div>
+                {nb.fee === 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full flex-shrink-0">Grátis</span>}
                 <button onClick={() => setForm(f => ({ ...f!, deliveryNeighborhoods: f!.deliveryNeighborhoods.filter((_, j) => j !== i) }))}
                   className="p-1.5 hover:bg-red-50 rounded-lg">
                   <Trash2 className="w-4 h-4 text-red-400" />

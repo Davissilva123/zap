@@ -111,6 +111,11 @@ export default function PublicMenuPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
+    if (!settings) return;
+    setDeliveryFee(settings.freeShippingEnabled ? 0 : (settings.deliveryFee || 0));
+  }, [settings?.freeShippingEnabled, settings?.deliveryFee]);
+
+  useEffect(() => {
     if (!slug) return;
     const load = async () => {
       const data = await db.getPublicMenu(slug);
@@ -210,11 +215,17 @@ export default function PublicMenuPage() {
     setCouponMsg('');
   };
 
+  const computeDeliveryFee = (neighborhood: string, s: RestaurantSettings): number => {
+    if (s.freeShippingEnabled) return 0;
+    const match = s.deliveryNeighborhoods?.find(n => n.name.toLowerCase() === neighborhood.toLowerCase());
+    if (match) return match.fee;
+    return s.deliveryFee || 0;
+  };
+
   const handleNeighborhoodChange = (neighborhood: string) => {
     setAddress(a => ({ ...a, neighborhood }));
     if (!settings) return;
-    const match = settings.deliveryNeighborhoods?.find(n => n.name === neighborhood);
-    setDeliveryFee(match ? match.fee : (settings.deliveryFee || 0));
+    setDeliveryFee(computeDeliveryFee(neighborhood, settings));
   };
 
   const handleCepChange = async (raw: string) => {
@@ -238,11 +249,8 @@ export default function PublicMenuPage() {
             city: data.localidade || a.city,
             state: data.uf || a.state,
           }));
-          if (settings?.deliveryNeighborhoods?.length) {
-            const match = settings.deliveryNeighborhoods.find(n =>
-              n.name.toLowerCase() === (data.bairro || '').toLowerCase()
-            );
-            if (match) setDeliveryFee(match.fee);
+          if (settings && data.bairro) {
+            setDeliveryFee(computeDeliveryFee(data.bairro, settings));
           }
         }
       } catch {
@@ -1532,9 +1540,13 @@ export default function PublicMenuPage() {
                         )}
                       </div>
 
-                      {address.neighborhood && deliveryFee > 0 && (
+                      {address.neighborhood && (
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                          <Truck className="w-3.5 h-3.5 text-slate-400" /> Taxa de entrega: <strong className="text-slate-700">R$ {deliveryFee.toFixed(2).replace('.', ',')}</strong>
+                          <Truck className="w-3.5 h-3.5 text-slate-400" />
+                          {deliveryFee === 0
+                            ? <strong className="text-emerald-600">Frete grátis!</strong>
+                            : <>Taxa de entrega: <strong className="text-slate-700">R$ {deliveryFee.toFixed(2).replace('.', ',')}</strong></>
+                          }
                         </div>
                       )}
 
@@ -1602,7 +1614,7 @@ export default function PublicMenuPage() {
                         { label: 'Entrega', value: deliveryType === 'pickup' ? '🏠 Retirada no local' : '🛵 Delivery' },
                         ...(deliveryType === 'delivery' && address.street ? [{ label: 'Endereço', value: formatAddress(address) }] : []),
                         { label: 'Subtotal', value: `R$ ${cartSubtotal.toFixed(2).replace('.', ',')}` },
-                        ...(deliveryType === 'delivery' && deliveryFee > 0 ? [{ label: 'Taxa de entrega', value: `R$ ${deliveryFee.toFixed(2).replace('.', ',')}` }] : []),
+                        ...(deliveryType === 'delivery' ? [{ label: 'Taxa de entrega', value: deliveryFee === 0 ? 'Grátis' : `R$ ${deliveryFee.toFixed(2).replace('.', ',')}` }] : []),
                       ].map(row => (
                         <div key={row.label} className="flex justify-between items-start gap-3 text-sm">
                           <span className="text-slate-400 flex-shrink-0 font-medium">{row.label}</span>
@@ -1918,10 +1930,12 @@ export default function PublicMenuPage() {
                       <span className="text-sm text-slate-400 font-medium">Subtotal</span>
                       <span className="text-sm font-bold text-slate-700">R$ {cartSubtotal.toFixed(2).replace('.', ',')}</span>
                     </div>
-                    {deliveryType === 'delivery' && deliveryFee > 0 && (
+                    {deliveryType === 'delivery' && (
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-slate-400 font-medium">Taxa de entrega</span>
-                        <span className="text-sm font-bold text-slate-700">R$ {deliveryFee.toFixed(2).replace('.', ',')}</span>
+                        <span className={`text-sm font-bold ${deliveryFee === 0 ? 'text-emerald-600' : 'text-slate-700'}`}>
+                          {deliveryFee === 0 ? 'Grátis' : `R$ ${deliveryFee.toFixed(2).replace('.', ',')}`}
+                        </span>
                       </div>
                     )}
                     {couponDiscount > 0 && (
