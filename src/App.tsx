@@ -108,6 +108,7 @@ function OperatorRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, isOperator } = useAuth();
   if (loading) return <Spinner />;
   if (!user) return <Navigate to="/" replace />;
+  // Só redireciona se definitivamente não for operador (não durante transições de auth)
   if (!isOperator) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
 }

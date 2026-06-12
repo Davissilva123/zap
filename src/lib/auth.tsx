@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { User } from './types';
 import { supabase } from './supabase';
@@ -93,19 +93,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [operatorInfo, setOperatorInfo] = useState<OperatorInfo | null>(null);
   const [adminRole, setAdminRole] = useState<AdminRole>(null);
 
+  // Ref to track whether role detection has already been done for this session.
+  // Prevents re-running detectAndSetup on TOKEN_REFRESHED, reconnects, etc.
+  const detectedRef = useRef(false);
+
   useEffect(() => {
-    // Safety net: always clear loading after 8s no matter what
     const safetyTimer = setTimeout(() => setLoading(false), 8000);
 
+    // Initial session check — runs detectAndSetup once
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (error) console.error('[Auth] getSession error:', error);
-      if (session?.user) {
-        const u = toUser(session.user);
+      if (session?.user && !detectedRef.current) {
+        detectedRef.current = true; // mark before await to block concurrent runs
         const { isOperator: op, operatorInfo: opInfo, adminRole: ar } = await safeDetectAndSetup(session.user);
         setIsOperator(op);
         setOperatorInfo(opInfo);
         setAdminRole(ar);
-        setUser(u);
+        setUser(toUser(session.user));
       }
       clearTimeout(safetyTimer);
       setLoading(false);
@@ -118,24 +122,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let subscription: { unsubscribe: () => void } | null = null;
     try {
       const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-        // TOKEN_REFRESHED: só atualiza o token, não re-detecta papel (evita FALLBACK por timeout)
-        if (event === 'TOKEN_REFRESHED' && session?.user) {
-          setUser(toUser(session.user));
-          return;
-        }
-        if (session?.user) {
-          const u = toUser(session.user);
-          const { isOperator: op, operatorInfo: opInfo, adminRole: ar } = await safeDetectAndSetup(session.user);
-          setIsOperator(op);
-          setOperatorInfo(opInfo);
-          setAdminRole(ar);
-          setUser(u);
-        } else {
+        // Logout: limpa tudo e permite nova detecção no próximo login
+        if (event === 'SIGNED_OUT' || !session?.user) {
+          detectedRef.current = false;
           setUser(null);
           setIsOperator(false);
           setOperatorInfo(null);
           setAdminRole(null);
+          return;
         }
+
+        // Se já detectamos o papel, apenas atualiza o token do usuário.
+        // Isso previne re-detecção em TOKEN_REFRESHED, INITIAL_SESSION,
+        // reconexões de rede e qualquer outro evento que não seja um login real.
+        if (detectedRef.current) {
+          setUser(toUser(session.user));
+          return;
+        }
+
+        // Primeira detecção (SIGNED_IN sem getSession ter rodado antes)
+        detectedRef.current = true;
+        const { isOperator: op, operatorInfo: opInfo, adminRole: ar } = await safeDetectAndSetup(session.user);
+        setIsOperator(op);
+        setOperatorInfo(opInfo);
+        setAdminRole(ar);
+        setUser(toUser(session.user));
       });
       subscription = data.subscription;
     } catch (err) {
