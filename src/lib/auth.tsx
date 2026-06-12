@@ -117,7 +117,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let subscription: { unsubscribe: () => void } | null = null;
     try {
-      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        // TOKEN_REFRESHED: só atualiza o token, não re-detecta papel (evita FALLBACK por timeout)
+        if (event === 'TOKEN_REFRESHED' && session?.user) {
+          setUser(toUser(session.user));
+          return;
+        }
         if (session?.user) {
           const u = toUser(session.user);
           const { isOperator: op, operatorInfo: opInfo, adminRole: ar } = await safeDetectAndSetup(session.user);
