@@ -439,19 +439,51 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
-        <div className="pt-2 border-t border-slate-100">
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Cashback (% do pedido)</label>
-          <div className="flex items-center gap-3">
-            <input
-              type="number" min={0} max={50} step={0.5}
-              value={form.cashbackPercent ?? 0}
-              onChange={e => setForm(f => ({ ...f!, cashbackPercent: Number(e.target.value) }))}
-              className="input-field w-28"
-              placeholder="0"
-            />
-            <span className="text-sm text-slate-500">% do total de cada pedido concluído</span>
+        <div className="pt-2 border-t border-slate-100 space-y-4">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Cashback (% do pedido)</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number" min={0} max={50} step={0.5}
+                value={form.cashbackPercent ?? 0}
+                onChange={e => setForm(f => ({ ...f!, cashbackPercent: Number(e.target.value) }))}
+                className="input-field w-28"
+                placeholder="0"
+              />
+              <span className="text-sm text-slate-500">% do total de cada pedido concluído</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">0 = cashback desativado. O saldo acumulado é exibido no portal do cliente.</p>
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">0 = cashback desativado. O saldo acumulado é exibido no portal do cliente.</p>
+          {(form.cashbackPercent ?? 0) > 0 && (
+            <div className="flex items-start justify-between gap-4 pt-2 border-t border-slate-100">
+              <div>
+                <span className="text-sm font-medium text-slate-700">Permitir resgate pelo cliente</span>
+                <p className="text-xs text-slate-400 mt-0.5">O cliente aplica o cashback como desconto direto no checkout, sem precisar entrar em contato</p>
+              </div>
+              <div
+                onClick={() => setForm(f => ({ ...f!, cashbackEnabled: !f!.cashbackEnabled }))}
+                className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center cursor-pointer flex-shrink-0 ${form.cashbackEnabled ? 'bg-emerald-500' : 'bg-slate-200'}`}
+              >
+                <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.cashbackEnabled ? 'translate-x-5' : ''}`} />
+              </div>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Cardápio público */}
+      <SectionCard icon={Link2} title="Cardápio público" description="Comportamento do cardápio exibido para os clientes">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <span className="text-sm font-medium text-slate-700">Ocultar itens esgotados</span>
+            <p className="text-xs text-slate-400 mt-0.5">Itens com estoque zerado não aparecem no cardápio público. Quando desativado, aparecem marcados como "Esgotado"</p>
+          </div>
+          <div
+            onClick={() => setForm(f => ({ ...f!, hideOutOfStock: !f!.hideOutOfStock }))}
+            className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center cursor-pointer flex-shrink-0 ${form.hideOutOfStock ? 'bg-emerald-500' : 'bg-slate-200'}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.hideOutOfStock ? 'translate-x-5' : ''}`} />
+          </div>
         </div>
       </SectionCard>
 

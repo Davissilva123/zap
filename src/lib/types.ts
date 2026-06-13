@@ -110,10 +110,12 @@ export interface RestaurantSettings {
   loyaltyOrdersNeeded: number;
   loyaltyReward: string;
   cashbackPercent: number;
+  cashbackEnabled: boolean;
   minimumOrder: number;
   manualClosed: boolean;
   waiterDiscountEnabled: boolean;
   freeShippingEnabled: boolean;
+  hideOutOfStock: boolean;
   blocked?: boolean;
   blockedReason?: string;
   disabled?: boolean;

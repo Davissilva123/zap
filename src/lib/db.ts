@@ -11,11 +11,13 @@ interface SettingsRow {
   delivery_neighborhoods: DeliveryNeighborhood[];
   loyalty_enabled: boolean; loyalty_orders_needed: number; loyalty_reward: string;
   cashback_percent: number;
+  cashback_enabled: boolean;
   minimum_order: number;
   mercado_pago_token: string;
   manual_closed: boolean;
   waiter_discount_enabled: boolean;
   free_shipping_enabled: boolean;
+  hide_out_of_stock: boolean;
   blocked?: boolean;
   blocked_reason?: string;
   disabled?: boolean;
@@ -51,11 +53,13 @@ function toSettings(r: SettingsRow): RestaurantSettings {
     loyaltyOrdersNeeded: r.loyalty_orders_needed ?? 10,
     loyaltyReward: r.loyalty_reward ?? '',
     cashbackPercent: Number(r.cashback_percent ?? 0),
+    cashbackEnabled: r.cashback_enabled ?? false,
     minimumOrder: Number(r.minimum_order ?? 0),
     mercadoPagoToken: r.mercado_pago_token ?? '',
     manualClosed: r.manual_closed ?? false,
     waiterDiscountEnabled: r.waiter_discount_enabled ?? false,
     freeShippingEnabled: r.free_shipping_enabled ?? false,
+    hideOutOfStock: r.hide_out_of_stock ?? true,
     blocked: r.blocked ?? false,
     blockedReason: r.blocked_reason ?? undefined,
     disabled: r.disabled ?? false,
@@ -219,12 +223,34 @@ export const db = {
     if (updates.loyaltyOrdersNeeded !== undefined) row.loyalty_orders_needed = updates.loyaltyOrdersNeeded;
     if (updates.loyaltyReward !== undefined) row.loyalty_reward = updates.loyaltyReward;
     if (updates.cashbackPercent !== undefined) row.cashback_percent = updates.cashbackPercent;
+    if (updates.cashbackEnabled !== undefined) row.cashback_enabled = updates.cashbackEnabled;
     if (updates.minimumOrder !== undefined) row.minimum_order = updates.minimumOrder;
     if (updates.mercadoPagoToken !== undefined) row.mercado_pago_token = updates.mercadoPagoToken;
     if (updates.manualClosed !== undefined) row.manual_closed = updates.manualClosed;
     if (updates.waiterDiscountEnabled !== undefined) row.waiter_discount_enabled = updates.waiterDiscountEnabled;
     if (updates.freeShippingEnabled !== undefined) row.free_shipping_enabled = updates.freeShippingEnabled;
+    if (updates.hideOutOfStock !== undefined) row.hide_out_of_stock = updates.hideOutOfStock;
     await supabase.from('restaurant_settings').update(row).eq('user_id', userId);
+  },
+
+  // ---- Cashback ----
+  async getCashbackRedeemed(restaurantId: string, customerUserId: string): Promise<number> {
+    const { data } = await supabase
+      .from('cashback_redemptions')
+      .select('amount')
+      .eq('restaurant_user_id', restaurantId)
+      .eq('customer_user_id', customerUserId);
+    if (!data) return 0;
+    return (data as { amount: number }[]).reduce((s, r) => s + Number(r.amount), 0);
+  },
+
+  async recordCashbackRedemption(restaurantId: string, customerUserId: string, amount: number, orderId: string): Promise<void> {
+    await supabase.from('cashback_redemptions').insert({
+      restaurant_user_id: restaurantId,
+      customer_user_id: customerUserId,
+      amount,
+      order_id: orderId,
+    });
   },
 
   // ---- Categories ----

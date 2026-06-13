@@ -84,6 +84,10 @@ export default function PublicMenuPage() {
   const [appliedCouponId, setAppliedCouponId] = useState<string | null>(null);
   const [appliedCouponUses, setAppliedCouponUses] = useState(0);
 
+  // Cashback
+  const [cashbackBalance, setCashbackBalance] = useState(0);
+  const [useCashback, setUseCashback] = useState(false);
+
   // Busca no cardápio
   const [menuSearch, setMenuSearch] = useState('');
 
@@ -152,6 +156,29 @@ export default function PublicMenuPage() {
     if (customer?.user_metadata?.phone) setCustomerPhone(customer.user_metadata.phone);
   }, [customer]);
 
+  // Carregar saldo de cashback quando cliente e restaurante estiverem disponíveis
+  useEffect(() => {
+    if (!customer || !settings?.userId || !settings.cashbackEnabled || (settings.cashbackPercent ?? 0) <= 0) {
+      setCashbackBalance(0);
+      setUseCashback(false);
+      return;
+    }
+    const earnedFromOrders = async () => {
+      const [all, redeemed] = await Promise.all([
+        db.getOrders(settings.userId),
+        db.getCashbackRedeemed(settings.userId, customer.id),
+      ]);
+      const completed = all.filter(o =>
+        o.customerUserId === customer.id &&
+        ['COMPLETED', 'DELIVERING', 'PREPARING', 'PAID'].includes(o.status)
+      );
+      const earned = completed.reduce((s, o) => s + o.total, 0) * (settings.cashbackPercent / 100);
+      const balance = Math.max(0, earned - redeemed);
+      setCashbackBalance(Math.floor(balance * 100) / 100);
+    };
+    earnedFromOrders();
+  }, [customer, settings?.userId, settings?.cashbackEnabled, settings?.cashbackPercent]);
+
   // Persiste carrinho no localStorage
   useEffect(() => {
     if (!slug) return;
@@ -160,7 +187,8 @@ export default function PublicMenuPage() {
   }, [cart, slug]);
 
   const cartSubtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const cartTotal = cartSubtotal + (deliveryType === 'delivery' ? deliveryFee : 0) - couponDiscount;
+  const cashbackApplied = useCashback ? Math.min(cashbackBalance, cartSubtotal + (deliveryType === 'delivery' ? deliveryFee : 0) - couponDiscount) : 0;
+  const cartTotal = Math.max(0, cartSubtotal + (deliveryType === 'delivery' ? deliveryFee : 0) - couponDiscount - cashbackApplied);
   const cartCount = cart.reduce((sum, i) => sum + i.quantity, 0);
   const availablePaymentMethods = settings?.paymentMethods?.filter(m => m) || [];
 
@@ -296,7 +324,7 @@ export default function PublicMenuPage() {
     const delivAddr = deliveryType === 'delivery' ? address : null;
     const tableName = deliveryType === 'table' ? (mesaParam ?? undefined) : undefined;
     const couponCodeToSend = couponValid ? couponCode : undefined;
-    const discountToSend = couponValid ? couponDiscount : 0;
+    const discountToSend = (couponValid ? couponDiscount : 0) + cashbackApplied;
 
     const schedFor = scheduleEnabled && scheduledFor ? new Date(scheduledFor).toISOString() : null;
 
@@ -336,6 +364,7 @@ export default function PublicMenuPage() {
         const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, delivAddr, pixResult, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor, orderNotes || undefined);
         setPlacedOrderId(order.id);
         if (appliedCouponId) await db.useCoupon(appliedCouponId, appliedCouponUses);
+        if (cashbackApplied > 0 && customer) await db.recordCashbackRedemption(settings.userId, customer.id, cashbackApplied, order.id);
         await fetchLoyalty(order.id);
         setPixCopyPaste(pixResult.pixCopyPaste);
         setPixQrCode(pixResult.qrCodeImage || pixResult.qrCode);
@@ -354,13 +383,14 @@ export default function PublicMenuPage() {
       const order = await createOrder(settings.userId, cart, cartTotal, customerName.trim(), customerPhone.trim(), selectedPayment as PaymentMethod, deliveryType, delivAddr, null, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor, orderNotes || undefined);
       setPlacedOrderId(order.id);
       if (appliedCouponId) await db.useCoupon(appliedCouponId, appliedCouponUses);
+      if (cashbackApplied > 0 && customer) await db.recordCashbackRedemption(settings.userId, customer.id, cashbackApplied, order.id);
       await fetchLoyalty(order.id);
       setStep('order_placed');
     } catch (err) {
       setErrorMsg(String(err));
       setStep('error');
     }
-  }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address, customer, mesaParam, couponValid, couponCode, couponDiscount, appliedCouponId, appliedCouponUses, scheduleEnabled, scheduledFor, orderNotes]);
+  }, [settings, cart, cartTotal, customerName, customerPhone, selectedPayment, deliveryType, address, customer, mesaParam, couponValid, couponCode, couponDiscount, appliedCouponId, appliedCouponUses, scheduleEnabled, scheduledFor, orderNotes, cashbackApplied]);
 
   useEffect(() => {
     if (!polling || !pixTxId || !settings) return;
@@ -830,7 +860,11 @@ export default function PublicMenuPage() {
 
         {/* Normal category view */}
         {searchResults === null && filteredCategories.map(cat => {
-          const catItems = items.filter(i => i.categoryId === cat.id);
+          const catItems = items.filter(i => {
+            if (i.categoryId !== cat.id) return false;
+            if (settings?.hideOutOfStock && i.stock != null && i.stock <= 0) return false;
+            return true;
+          });
           if (catItems.length === 0) return null;
           return (
             <div key={cat.id} className="mt-6">
@@ -1434,6 +1468,31 @@ export default function PublicMenuPage() {
                       )}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ── CASHBACK (cart step) ── */}
+              {step === 'cart' && cart.length > 0 && settings?.cashbackEnabled && cashbackBalance >= 1 && (
+                <div className="px-5 pb-3">
+                  <button
+                    onClick={() => setUseCashback(v => !v)}
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition-colors ${useCashback ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${useCashback ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+                        <span className="text-white text-sm font-bold">$</span>
+                      </div>
+                      <div className="text-left min-w-0">
+                        <p className={`text-sm font-bold ${useCashback ? 'text-emerald-700' : 'text-slate-700'}`}>
+                          Usar R$ {cashbackBalance.toFixed(2).replace('.', ',')} de cashback
+                        </p>
+                        <p className="text-xs text-slate-400">Aplicar como desconto neste pedido</p>
+                      </div>
+                    </div>
+                    <div className={`w-10 h-5 rounded-full flex items-center transition-colors duration-200 flex-shrink-0 ${useCashback ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${useCashback ? 'translate-x-5' : ''}`} />
+                    </div>
+                  </button>
                 </div>
               )}
 
@@ -2043,8 +2102,14 @@ export default function PublicMenuPage() {
                     )}
                     {couponDiscount > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-emerald-600 font-medium flex items-center gap-1"><Tag className="w-3.5 h-3.5" /> Desconto</span>
+                        <span className="text-sm text-emerald-600 font-medium flex items-center gap-1"><Tag className="w-3.5 h-3.5" /> Cupom</span>
                         <span className="text-sm font-bold text-emerald-600">-R$ {couponDiscount.toFixed(2).replace('.', ',')}</span>
+                      </div>
+                    )}
+                    {cashbackApplied > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-emerald-600 font-medium flex items-center gap-1"><span className="font-bold">$</span> Cashback</span>
+                        <span className="text-sm font-bold text-emerald-600">-R$ {cashbackApplied.toFixed(2).replace('.', ',')}</span>
                       </div>
                     )}
                     <div className="flex justify-between items-center pt-1.5 border-t border-slate-100">
