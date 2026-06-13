@@ -5,6 +5,7 @@ import { db } from '../lib/db';
 import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS, type PixChargeResult } from '../lib/xgate';
 import { createMpPixCharge, checkMpPayment, cancelMpPayment } from '../lib/mercadopago';
 import { useCustomerAuth } from '../lib/customerAuth';
+import { supabaseCustomer } from '../lib/supabaseCustomer';
 import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption } from '../lib/types';
 import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift, Search, Info } from 'lucide-react';
 
@@ -156,27 +157,29 @@ export default function PublicMenuPage() {
     if (customer?.user_metadata?.phone) setCustomerPhone(customer.user_metadata.phone);
   }, [customer]);
 
-  // Carregar saldo de cashback quando cliente e restaurante estiverem disponíveis
+  // Carregar saldo de cashback usando supabaseCustomer (autenticado como o cliente)
   useEffect(() => {
     if (!customer || !settings?.userId || !settings.cashbackEnabled || (settings.cashbackPercent ?? 0) <= 0) {
       setCashbackBalance(0);
       setUseCashback(false);
       return;
     }
-    const earnedFromOrders = async () => {
-      const [all, redeemed] = await Promise.all([
-        db.getOrders(settings.userId),
-        db.getCashbackRedeemed(settings.userId, customer.id),
-      ]);
-      const completed = all.filter(o =>
-        o.customerUserId === customer.id &&
-        ['COMPLETED', 'DELIVERING', 'PREPARING', 'PAID'].includes(o.status)
-      );
-      const earned = completed.reduce((s, o) => s + o.total, 0) * (settings.cashbackPercent / 100);
+    const loadBalance = async () => {
+      // Busca os pedidos do cliente via supabaseCustomer (RLS garante que são só os dele)
+      const { data: ordersData } = await supabaseCustomer
+        .from('orders')
+        .select('total, status')
+        .eq('user_id', settings.userId)
+        .in('status', ['COMPLETED', 'DELIVERING', 'PREPARING', 'PAID']);
+
+      const earned = (ordersData ?? []).reduce((s: number, o: { total: number }) => s + Number(o.total), 0)
+        * (settings.cashbackPercent / 100);
+
+      const redeemed = await db.getCashbackRedeemed(settings.userId, customer.id);
       const balance = Math.max(0, earned - redeemed);
       setCashbackBalance(Math.floor(balance * 100) / 100);
     };
-    earnedFromOrders();
+    loadBalance();
   }, [customer, settings?.userId, settings?.cashbackEnabled, settings?.cashbackPercent]);
 
   // Persiste carrinho no localStorage
