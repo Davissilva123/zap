@@ -46,6 +46,7 @@ export default function PDVPage() {
   const [scaleLoading, setScaleLoading] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
   const [cashSession, setCashSession] = useState<CashSession | null | undefined>(undefined); // undefined = loading
+  const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog');
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -198,9 +199,26 @@ export default function PDVPage() {
   const catName = (id: string) => categories.find(c => c.id === id)?.name ?? '';
 
   return (
-    <div className="flex h-screen bg-slate-100 overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-screen bg-slate-100 overflow-hidden">
+      {/* Mobile tab bar */}
+      <div className="lg:hidden flex border-b border-slate-200 bg-white flex-shrink-0">
+        <button
+          onClick={() => setMobileTab('catalog')}
+          className={`flex-1 py-2.5 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${mobileTab === 'catalog' ? 'text-emerald-600 border-b-2 border-emerald-500' : 'text-slate-500'}`}
+        >
+          <LayoutGrid size={15} /> Cardápio
+        </button>
+        <button
+          onClick={() => setMobileTab('cart')}
+          className={`flex-1 py-2.5 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${mobileTab === 'cart' ? 'text-emerald-600 border-b-2 border-emerald-500' : 'text-slate-500'}`}
+        >
+          <ShoppingCart size={15} /> Carrinho
+          {cart.length > 0 && <span className="bg-emerald-500 text-white text-[10px] font-bold rounded-full px-1.5">{cart.length}</span>}
+        </button>
+      </div>
+
       {/* Left: Product grid */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`flex-1 flex flex-col min-w-0 ${mobileTab === 'cart' ? 'hidden lg:flex' : ''}`}>
         {/* Toolbar */}
         <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
           <div className="relative flex-1 max-w-sm">
@@ -298,7 +316,7 @@ export default function PDVPage() {
       </div>
 
       {/* Right: Cart */}
-      <div className="w-80 flex-shrink-0 bg-white border-l border-slate-200 flex flex-col">
+      <div className={`lg:w-80 flex-shrink-0 bg-white border-l border-slate-200 flex flex-col ${mobileTab === 'catalog' ? 'hidden lg:flex' : 'flex-1'}`}>
         <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200">
           <ShoppingCart size={18} className="text-emerald-600" />
           <span className="font-semibold text-slate-800">Carrinho</span>

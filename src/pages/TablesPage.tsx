@@ -64,8 +64,8 @@ export default function TablesPage() {
             className="input flex-1"
             placeholder="Ex: Mesa 1, Mesa 2, Varanda A..."
           />
-          <button onClick={add} disabled={saving || !newName.trim()} className="btn-primary flex items-center gap-1.5">
-            <Plus className="w-4 h-4" /> Adicionar
+          <button onClick={add} disabled={saving || !newName.trim()} className="btn-primary flex items-center gap-1.5 flex-shrink-0">
+            <Plus className="w-4 h-4" /> <span className="hidden xs:inline">Adicionar</span>
           </button>
         </div>
         <p className="text-xs text-slate-400 mt-2">Sugestão rápida:</p>
