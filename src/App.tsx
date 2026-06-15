@@ -68,6 +68,7 @@ const OpKitchenPage   = lazy(() => import('./pages/op/KitchenPage'));
 const OpMenuBrowsePage      = lazy(() => import('./pages/op/MenuBrowsePage'));
 const PrivacyPolicyPage     = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsPage             = lazy(() => import('./pages/TermsPage'));
+const SupportPage           = lazy(() => import('./pages/SupportPage'));
 
 // ── Error boundary ──────────────────────────────────────────────────────────
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -234,6 +235,7 @@ export default function App() {
               {/* Legal pages (public) */}
               <Route path="/privacidade" element={<PrivacyPolicyPage />} />
               <Route path="/termos"      element={<TermsPage />} />
+              <Route path="/suporte"     element={<SupportPage />} />
 
               {/* Driver portal */}
               <Route path="/entregador/:token" element={<DriverPortalPage />} />

@@ -440,18 +440,21 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="py-10 bg-slate-900">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-5">
+          <div className="flex flex-col items-center gap-6">
+            {/* Logo */}
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
                 <Zap className="w-3.5 h-3.5 text-white" />
               </div>
               <span className="font-bold text-white text-[15px]">ZapMenu</span>
             </div>
-            <div className="flex items-center gap-5 sm:gap-7 text-sm text-slate-500">
+            {/* Links */}
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-sm text-slate-500">
               <button onClick={() => navigate('/login')} className="hover:text-slate-300 transition-colors">Entrar</button>
               <a href="#precos"   className="hover:text-slate-300 transition-colors">Preços</a>
               <a href="#recursos" className="hover:text-slate-300 transition-colors">Recursos</a>
               <a href="#contato"  className="hover:text-slate-300 transition-colors">Contato</a>
+              <button onClick={() => navigate('/suporte')} className="hover:text-slate-300 transition-colors">Suporte</button>
               <button onClick={() => navigate('/privacidade')} className="hover:text-slate-300 transition-colors">Privacidade</button>
               <button onClick={() => navigate('/termos')} className="hover:text-slate-300 transition-colors">Termos</button>
               <div className="flex items-center gap-1.5">

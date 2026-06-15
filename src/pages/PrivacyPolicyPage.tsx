@@ -23,7 +23,7 @@ export default function PrivacyPolicyPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 space-y-8 text-slate-700 leading-relaxed">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-8 space-y-8 text-slate-700 leading-relaxed">
 
           <section>
             <h2 className="text-lg font-semibold text-slate-900 mb-3">1. Quem somos</h2>
