@@ -58,4 +58,5 @@ export default {
     },
   },
   plugins: [],
+  // safe-area-bottom é aplicado via CSS manual no index.css
 };

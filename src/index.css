@@ -7,10 +7,22 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 
+  html {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background: #f1f5f9;
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  /* Safe area para bottom nav no iPhone (notch / home indicator) */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   ::selection {
@@ -20,6 +32,13 @@
 
   input:focus, textarea:focus, select:focus {
     outline: none;
+  }
+
+  /* Impede iOS Safari de dar zoom automático ao focar em inputs com font < 16px */
+  @media (max-width: 1023px) {
+    input, select, textarea {
+      font-size: 16px;
+    }
   }
 }
 
@@ -87,3 +106,4 @@
     text-wrap: balance;
   }
 }
+

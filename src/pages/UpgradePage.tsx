@@ -51,6 +51,22 @@ const FEATURE_LABELS: Record<FeatureKey, string> = {
   reviews: 'Avaliações dos clientes',
   comandas: 'Comandas digitais',
   drivers: 'Entregadores',
+  crm: 'CRM de clientes',
+  stock: 'Controle de estoque',
+  cashregister: 'Caixa',
+  combos: 'Combos',
+  promotions: 'Promoções',
+  campaigns: 'Campanhas de marketing',
+  cmv: 'CMV',
+  financas: 'Financeiro',
+  fiscal: 'Módulo Fiscal',
+  pdv: 'PDV',
+  kds: 'KDS (Cozinha)',
+  recipes: 'Fichas técnicas',
+  suppliers: 'Fornecedores',
+  purchase_orders: 'Pedidos de compra',
+  contas: 'Contas a pagar/receber',
+  dre: 'DRE',
 };
 
 export default function UpgradePage() {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Zap, QrCode, MessageCircle, CreditCard, ChefHat, Bike, BarChart2, Star, Tag, Check,
-  ArrowRight, Smartphone, Shield, Crown, X, Phone, Mail, MapPin, Send,
+  ArrowRight, Smartphone, Shield, X, Phone, Mail, MapPin, Send,
   ClipboardList, Users, LayoutDashboard, Package, Percent, Printer, Wifi, Clock,
 } from 'lucide-react';
 import { db } from '../lib/db';
@@ -134,8 +134,8 @@ export default function LandingPage() {
   const [waMsg, setWaMsg] = useState(FALLBACK_WA_MSG);
   const [contactEmail, setContactEmail] = useState('contato@zapmenu.com.br');
   const [contactPhone, setContactPhone] = useState('+55 (11) 99999-9999');
-  const [heroTitle, setHeroTitle] = useState('Cardápio digital para o seu restaurante');
-  const [heroSubtitle, setHeroSubtitle] = useState('Crie seu cardápio, gere QR Codes e receba pedidos com pagamento via PIX — tudo em um só lugar.');
+  const [_heroTitle, setHeroTitle] = useState('Cardápio digital para o seu restaurante');
+  const [_heroSubtitle, setHeroSubtitle] = useState('Crie seu cardápio, gere QR Codes e receba pedidos com pagamento via PIX — tudo em um só lugar.');
   const [businessHours, setBusinessHours] = useState('Segunda a sexta, das 9h às 18h. Suporte via WhatsApp.');
   const [trialSettings, setTrialSettings] = useState<Record<string, { enabled: boolean; days: number }>>({
     basic: { enabled: true, days: 7 },
@@ -144,6 +144,10 @@ export default function LandingPage() {
   });
 
   useEffect(() => {
+    // Captura código de indicação da URL e salva para uso no cadastro
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref) localStorage.setItem('zm_ref', ref);
+
     db.getMarketingSettings().then(s => {
       if (!s) return;
       if (s.whatsappNumber) setWaNumber(s.whatsappNumber);
@@ -448,6 +452,8 @@ export default function LandingPage() {
               <a href="#precos"   className="hover:text-slate-300 transition-colors">Preços</a>
               <a href="#recursos" className="hover:text-slate-300 transition-colors">Recursos</a>
               <a href="#contato"  className="hover:text-slate-300 transition-colors">Contato</a>
+              <button onClick={() => navigate('/privacidade')} className="hover:text-slate-300 transition-colors">Privacidade</button>
+              <button onClick={() => navigate('/termos')} className="hover:text-slate-300 transition-colors">Termos</button>
               <div className="flex items-center gap-1.5">
                 <Shield className="w-3.5 h-3.5 text-emerald-500" /><span>Dados protegidos</span>
               </div>

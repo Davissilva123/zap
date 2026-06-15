@@ -5,7 +5,7 @@ import type { RestaurantSettings } from '../lib/types';
 import {
   Shield, Store, RefreshCw, ExternalLink, Zap, TrendingUp,
   ShoppingBag, DollarSign, Search, Copy, ChevronDown, Check,
-  MessageCircle, Bike, Users, Star, Clock,
+  Clock,
 } from 'lucide-react';
 
 const SUPER_ADMIN_EMAIL = import.meta.env.VITE_SUPER_ADMIN_EMAIL ?? 'sdavi6790@gmail.com';

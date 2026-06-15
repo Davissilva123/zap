@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { MenuItem, RecipeIngredient, Supplier } from '../lib/types';
-import { BookOpen, Plus, Trash2, Save, X, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Save, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
 
 const UNITS = ['g', 'kg', 'ml', 'L', 'un', 'cx', 'pct', 'col', 'xíc'];
 
@@ -154,7 +154,8 @@ export default function RecipesPage() {
 
               {isOpen && (
                 <div className="border-t border-slate-100 px-5 pb-5 pt-3">
-                  <table className="w-full text-sm mb-3">
+                  <div className="overflow-x-auto">
+                  <table className="w-full text-sm mb-3 min-w-[540px]">
                     <thead>
                       <tr className="text-xs text-slate-500 border-b border-slate-100">
                         <th className="text-left pb-2 font-medium">Ingrediente</th>
@@ -212,6 +213,7 @@ export default function RecipesPage() {
                       })}
                     </tbody>
                   </table>
+                  </div>{/* /overflow-x-auto */}
 
                   <div className="flex items-center justify-between">
                     <button onClick={() => addRow(item.id)} className="flex items-center gap-1.5 text-sm text-emerald-600 hover:text-emerald-700 font-medium">

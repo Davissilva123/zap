@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { Coupon } from '../lib/types';
 import {
-  openReport, downloadCsv,
+  openReport,
   reportFaturamento, reportProdutos, reportHorarioPico, reportRetencao,
   reportCancelamentos, reportDRE, reportPagamentos, reportExtrato, reportMensal,
   reportLivroCaixa, reportCupons, reportComprovantes, reportAtendimento, reportAvaliacoes,

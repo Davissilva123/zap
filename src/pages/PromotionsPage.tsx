@@ -84,7 +84,7 @@ export default function PromotionsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Promocoes Automaticas</h1>
           <p className="text-slate-500 mt-0.5 text-sm">Descontos por horario — happy hour, almoco, etc.</p>

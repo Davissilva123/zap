@@ -146,8 +146,9 @@ export default function CRMPage() {
         </div>
       ) : (
         <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
           {/* Header */}
-          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider min-w-[480px]">
             <div className="col-span-4">Cliente</div>
             <button className="col-span-2 flex items-center gap-1 hover:text-slate-700 transition-colors" onClick={() => toggleSort('totalOrders')}>
               Pedidos {sortKey === 'totalOrders' ? (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : null}
@@ -161,7 +162,7 @@ export default function CRMPage() {
             <div className="col-span-2">Segmento</div>
           </div>
 
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 min-w-[480px]">
             {filtered.map(c => (
               <div key={c.phone}>
                 <button
@@ -213,6 +214,7 @@ export default function CRMPage() {
               </div>
             ))}
           </div>
+          </div>{/* /overflow-x-auto */}
         </div>
       )}
 

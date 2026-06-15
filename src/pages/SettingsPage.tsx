@@ -6,7 +6,7 @@ import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { RestaurantSettings, PaymentMethod } from '../lib/types';
 import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift, Crown, XCircle, ExternalLink, Globe, Shield, Copy, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { DeliveryNeighborhood, DayHours } from '../lib/types';
+import type { DayHours } from '../lib/types';
 
 const allPaymentMethods: PaymentMethod[] = ['pix', 'credit_card', 'debit_card', 'cash', 'meal_voucher'];
 
@@ -40,7 +40,7 @@ function SectionCard({ icon: Icon, title, description, children }: { icon: typeo
 
 function ImageUploadField({ label, preview, onFileChange, onRemove, inputRef, hint }: {
   label: string; preview: string; onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onRemove: () => void; inputRef: React.RefObject<HTMLInputElement | null>; hint?: string;
+  onRemove: () => void; inputRef: React.RefObject<HTMLInputElement>; hint?: string;
 }) {
   return (
     <div>
@@ -595,16 +595,63 @@ export default function SettingsPage() {
         </SectionCard>
       )}
 
+      {/* Programa de indicação */}
+      <ReferralSection slug={form?.slug ?? ''} />
+
       {/* Custom Domain */}
       <CustomDomainSection slug={form?.slug ?? ''} />
 
       {/* 2FA */}
       <TwoFactorSection />
+
+      {/* Zona de perigo — LGPD */}
+      <DeleteAccountSection />
     </div>
   );
 }
 
-function CustomDomainSection({ slug }: { slug: string }) {
+function ReferralSection({ slug }: { slug: string }) {
+  const [copied, setCopied] = useState(false);
+  const referralUrl = slug ? `${window.location.origin}/?ref=${slug}` : '';
+
+  const copy = () => {
+    if (!referralUrl) return;
+    navigator.clipboard.writeText(referralUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <SectionCard icon={Users} title="Programa de Indicação" description="Indique outros restaurantes e ganhe benefícios">
+      <div className="space-y-3">
+        <p className="text-sm text-slate-600">
+          Compartilhe seu link de indicação. Quando um novo restaurante se cadastrar pelo seu link,
+          ambos ganham desconto na próxima renovação.
+        </p>
+        {referralUrl ? (
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={referralUrl}
+              className="input-field flex-1 font-mono text-xs bg-slate-50"
+            />
+            <button
+              onClick={copy}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors flex-shrink-0"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? 'Copiado!' : 'Copiar'}
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400">Salve suas configurações com um slug para gerar o link de indicação.</p>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+function CustomDomainSection({ slug: _slug }: { slug: string }) {
   const [domain, setDomain] = useState(() => localStorage.getItem('zm_custom_domain') ?? '');
   const [copied, setCopied] = useState(false);
   const target = `${window.location.hostname}`;
@@ -775,3 +822,99 @@ function TwoFactorSection() {
     </SectionCard>
   );
 }
+
+function DeleteAccountSection() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [step, setStep] = useState<'idle' | 'confirm' | 'typing' | 'deleting'>('idle');
+  const [confirmText, setConfirmText] = useState('');
+  const [error, setError] = useState('');
+
+  const CONFIRM_WORD = 'EXCLUIR';
+
+  const handleDelete = async () => {
+    if (!user) return;
+    setStep('deleting');
+    setError('');
+    try {
+      await db.deleteMyAccount();
+      await logout();
+      navigate('/');
+    } catch (e: any) {
+      setError(e?.message ?? 'Erro ao excluir conta. Tente novamente.');
+      setStep('typing');
+    }
+  };
+
+  return (
+    <div className="card overflow-hidden border border-red-200">
+      <div className="px-6 py-4 border-b border-red-100 flex items-center gap-3 bg-red-50">
+        <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+          <AlertTriangle className="w-4 h-4 text-red-500" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-red-800 text-sm">Zona de Perigo</h3>
+          <p className="text-xs text-red-500 mt-0.5">Ações irreversíveis — não podem ser desfeitas</p>
+        </div>
+      </div>
+      <div className="px-6 py-5">
+        {step === 'idle' && (
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Excluir minha conta</p>
+              <p className="text-xs text-slate-500 mt-0.5">Remove permanentemente todos os dados: cardápio, pedidos, clientes, configurações. Conforme a LGPD (Lei 13.709/2018).</p>
+            </div>
+            <button
+              onClick={() => setStep('confirm')}
+              className="flex-shrink-0 px-4 py-2 border border-red-300 text-red-600 hover:bg-red-50 text-sm font-semibold rounded-xl transition-colors"
+            >
+              Excluir conta
+            </button>
+          </div>
+        )}
+
+        {step !== 'idle' && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 bg-red-50 rounded-xl border border-red-200">
+              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-red-800">
+                <p className="font-bold mb-1">Esta ação é permanente e irreversível.</p>
+                <p>Todos os dados serão apagados: cardápio, pedidos, clientes, cupons, cashback, operadores e configurações. Não há como recuperar.</p>
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">
+                Digite <span className="font-mono text-red-600">{CONFIRM_WORD}</span> para confirmar
+              </label>
+              <input
+                value={confirmText}
+                onChange={e => { setConfirmText(e.target.value.toUpperCase()); setStep('typing'); }}
+                className="input w-full font-mono"
+                placeholder={CONFIRM_WORD}
+                autoComplete="off"
+              />
+            </div>
+            {error && <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-xl">{error}</p>}
+            <div className="flex gap-3">
+              <button
+                onClick={handleDelete}
+                disabled={confirmText !== CONFIRM_WORD || step === 'deleting'}
+                className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors"
+              >
+                {step === 'deleting' ? <><Loader2 className="w-4 h-4 animate-spin" /> Excluindo...</> : <><Trash2 className="w-4 h-4" /> Excluir permanentemente</>}
+              </button>
+              <button
+                onClick={() => { setStep('idle'); setConfirmText(''); setError(''); }}
+                disabled={step === 'deleting'}
+                className="px-4 py-2.5 border border-slate-200 text-slate-600 text-sm font-semibold rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

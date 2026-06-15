@@ -7,25 +7,14 @@ import { createMpPixCharge, checkMpPayment, cancelMpPayment } from '../lib/merca
 import { useCustomerAuth } from '../lib/customerAuth';
 import { supabaseCustomer } from '../lib/supabaseCustomer';
 import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption } from '../lib/types';
-import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift, Search, Info } from 'lucide-react';
+import { isRestaurantOpen } from '../lib/menuUtils';
+import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift, Search, Info, ChevronRight } from 'lucide-react';
 
 interface CartItem extends OrderItem { categoryId: string; }
 type CheckoutStep = 'cart' | 'auth' | 'delivery' | 'payment' | 'paying' | 'pix' | 'success' | 'error' | 'no-xgate' | 'no-methods' | 'order_placed';
 const emptyAddress: DeliveryAddress = { street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zip: '' };
 
 
-function isRestaurantOpen(settings: RestaurantSettings): boolean {
-  if (settings.manualClosed) return false;
-  if (!settings.openingHours || Object.keys(settings.openingHours).length === 0) return true;
-  const now = new Date();
-  const day = String(now.getDay());
-  const hours = settings.openingHours[day];
-  if (!hours?.open) return false;
-  const [fh, fm] = hours.from.split(':').map(Number);
-  const [th, tm] = hours.to.split(':').map(Number);
-  const cur = now.getHours() * 60 + now.getMinutes();
-  return cur >= fh * 60 + fm && cur <= th * 60 + tm;
-}
 
 export default function PublicMenuPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -42,7 +31,10 @@ export default function PublicMenuPage() {
     try {
       const saved = localStorage.getItem(`cart_${slug}`);
       return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+    } catch (err) {
+      console.error('[MenuZap] Erro ao ler carrinho do localStorage:', err);
+      return [];
+    }
   });
   const [showCart, setShowCart] = useState(false);
   const [step, setStep] = useState<CheckoutStep>('cart');
@@ -145,7 +137,7 @@ export default function PublicMenuPage() {
           const repeatItems = JSON.parse(repeatRaw) as import('../lib/types').OrderItem[];
           setCart(repeatItems.map(i => ({ ...i, categoryId: data.items.find(m => m.id === i.menuItemId || m.name === i.name)?.categoryId || '' })));
           setShowCart(true);
-        } catch { /* ignore parse errors */ }
+        } catch (err) { console.error('[MenuZap] Erro ao restaurar pedido repetido:', err); }
       }
     };
     load();
@@ -331,7 +323,7 @@ export default function PublicMenuPage() {
 
     const schedFor = scheduleEnabled && scheduledFor ? new Date(scheduledFor).toISOString() : null;
 
-    const fetchLoyalty = async (orderId: string) => {
+    const fetchLoyalty = async (_orderId: string) => {
       if (settings.loyaltyEnabled && customer?.id) {
         const count = await db.getCustomerOrderCount(settings.userId, customer.id);
         setLoyaltyCount(count);
@@ -339,7 +331,23 @@ export default function PublicMenuPage() {
     };
 
     if (selectedPayment === 'pix') {
-      const hasMp = !!settings.mercadoPagoToken;
+      // Se o total é zero (cashback/cupom cobre tudo), pula o gateway PIX
+      if (cartTotal <= 0) {
+        setErrorMsg('');
+        try {
+          const order = await createOrder(settings.userId, cart, 0, customerName.trim(), customerPhone.trim(), 'pix', deliveryType, delivAddr, null, customer?.id, couponCodeToSend, discountToSend, tableName, schedFor, orderNotes || undefined);
+          setPlacedOrderId(order.id);
+          if (appliedCouponId) await db.useCoupon(appliedCouponId, appliedCouponUses);
+          if (cashbackApplied > 0 && customer) await db.recordCashbackRedemption(settings.userId, customer.id, cashbackApplied, order.id);
+          await fetchLoyalty(order.id);
+          setStep('order_placed');
+        } catch (err) {
+          setErrorMsg(String(err));
+          setStep('error');
+        }
+        return;
+      }
+      const hasMp = !!(settings.mercadoPagoToken?.trim());
       const hasXgate = !!(settings.xgateEmail && settings.xgatePassword);
       if (!hasMp && !hasXgate) { setStep('no-xgate'); return; }
       setStep('paying');
@@ -411,7 +419,7 @@ export default function PublicMenuPage() {
             setPolling(false); setStep('success');
           }
         }
-      } catch { /* keep polling */ }
+      } catch (err) { console.error('[MenuZap] Erro ao verificar status PIX:', err); }
     }, 5000);
     return () => clearInterval(interval);
   }, [polling, settings, pixTxId]);
@@ -435,7 +443,7 @@ export default function PublicMenuPage() {
   const handleCancelPix = async () => {
     setPolling(false);
     if (pixGatewayRef.current === 'mp' && settings?.mercadoPagoToken && pixTxId) {
-      try { await cancelMpPayment(settings.mercadoPagoToken, pixTxId); } catch { /* ignore */ }
+      try { await cancelMpPayment(settings.mercadoPagoToken, pixTxId); } catch (err) { console.error('[MenuZap] Erro ao cancelar pagamento MP:', err); }
     }
     setStep('payment');
     setPixTxId(''); setPixCopyPaste(''); setPixQrCode('');
@@ -570,96 +578,130 @@ export default function PublicMenuPage() {
 
       {/* ── HERO ── */}
       {settings.coverUrl ? (
-        /* ── WITH COVER IMAGE — logo + nome DENTRO da capa, sem overlap externo ── */
+        /* ── WITH COVER — iFood responsivo (mobile card / desktop barra) ── */
         <>
-          <div className="relative overflow-hidden" style={{ height: 320 }}>
-            <img src={settings.coverUrl} alt="capa" className="w-full h-full object-cover scale-[1.02]" />
-
-            {/* Gradiente premium */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-
-            {/* Botão conta — top right */}
-            <div className="absolute top-5 right-5">
-              {customer ? (
-                <button onClick={() => navigate(`/m/${slug}/conta`)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md text-white text-xs font-semibold border border-white/20 shadow">
-                  <User className="w-3.5 h-3.5" /> Meus pedidos
-                </button>
-              ) : (
-                <button onClick={() => { setShowCart(true); setStep('auth'); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-md text-white text-xs font-semibold border border-white/20 shadow">
-                  <LogIn className="w-3.5 h-3.5" /> Entrar
-                </button>
-              )}
-            </div>
-
-            {/* Logo + nome no rodapé da capa */}
-            <div className="absolute bottom-0 left-0 right-0 px-5 pb-6">
-              <div className="max-w-xl mx-auto flex items-end gap-4">
+          {/* ══ MOBILE ══ */}
+          <div className="md:hidden">
+            {/* Hero: fundo desfocado + logo centralizado */}
+            <div className="relative bg-black overflow-hidden" style={{ height: 240 }}>
+              <img src={settings.coverUrl} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-45" />
+              <div className="absolute inset-0 flex items-center justify-center">
                 {settings.logoUrl ? (
-                  <img
-                    src={settings.logoUrl}
-                    alt={settings.name}
-                    className="w-[84px] h-[84px] rounded-2xl object-contain bg-white shadow-2xl flex-shrink-0 border-2 border-white/40 ring-1 ring-black/10"
-                  />
+                  <img src={settings.logoUrl} alt={settings.name} className="w-28 h-28 rounded-full object-cover border-4 border-white/30 shadow-2xl" />
                 ) : (
-                  <div
-                    className="w-[84px] h-[84px] rounded-2xl flex items-center justify-center shadow-2xl flex-shrink-0 ring-2 ring-white/30"
-                    style={{ backgroundColor: accent }}
-                  >
-                    <ChefHat className="w-10 h-10 text-white" />
+                  <div className="w-28 h-28 rounded-full flex items-center justify-center border-4 border-white/30 shadow-2xl" style={{ backgroundColor: accent }}>
+                    <ChefHat className="w-12 h-12 text-white" />
                   </div>
                 )}
-                <div className="flex-1 min-w-0 pb-1">
-                  <h1 className="text-2xl font-extrabold text-white leading-tight tracking-tight drop-shadow-lg">
-                    {settings.name}
-                  </h1>
-                  {settings.description && (
-                    <p className="text-white/75 text-sm mt-1 line-clamp-2 leading-snug drop-shadow-sm">
-                      {settings.description}
-                    </p>
+              </div>
+              <div className="absolute top-4 right-4">
+                {customer ? (
+                  <button onClick={() => navigate(`/m/${slug}/conta`)} className="w-9 h-9 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20 shadow">
+                    <User className="w-4 h-4 text-white" />
+                  </button>
+                ) : (
+                  <button onClick={() => { setShowCart(true); setStep('auth'); }} className="w-9 h-9 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center border border-white/20 shadow">
+                    <LogIn className="w-4 h-4 text-white" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Card branco flutuante */}
+            <div className="relative z-10 mx-3 -mt-5 bg-white rounded-3xl shadow-xl">
+              <div className="px-5 pt-5 pb-5">
+                <div className="flex items-start justify-between gap-2">
+                  <h1 className="text-2xl font-bold text-slate-900 leading-tight">{settings.name}</h1>
+                  {(settings.address || settings.phone || (settings.openingHours && Object.keys(settings.openingHours).length > 0)) && (
+                    <button onClick={() => setShowHours(true)} className="text-slate-400 flex-shrink-0 mt-1"><ChevronRight className="w-5 h-5" /></button>
                   )}
+                </div>
+                {settings.description && <p className="text-sm text-slate-500 mt-1 line-clamp-2">{settings.description}</p>}
+                {(settings.minimumOrder ?? 0) > 0 && <p className="text-sm text-slate-400 mt-0.5">Min R$ {(settings.minimumOrder).toFixed(2).replace('.', ',')}</p>}
+                <div className="border-t border-slate-100 my-3" />
+                {publicReviews.length > 0 && (
+                  <>
+                    <button onClick={() => setShowReviews(true)} className="flex items-center justify-between w-full mb-3">
+                      <div className="flex items-center gap-1.5">
+                        <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                        <span className="text-sm font-bold text-slate-900">{avgRating}</span>
+                        <span className="text-sm text-slate-500">({publicReviews.length} avaliações)</span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                    </button>
+                    <div className="border-t border-slate-100 mb-3" />
+                  </>
+                )}
+                <div className="flex items-center gap-x-2 gap-y-1 flex-wrap text-sm text-slate-600">
+                  {(() => { const open = isRestaurantOpen(settings); return <span className={`font-bold ${open ? 'text-emerald-600' : 'text-red-500'}`}>{open ? 'Aberto agora' : 'Fechado'}</span>; })()}
+                  {settings.deliveryTime && <><span className="text-slate-300">•</span><span>{settings.deliveryTime} min</span></>}
+                  {settings.freeShippingEnabled ? <><span className="text-slate-300">•</span><span className="font-bold text-emerald-600">Grátis</span></> : (settings.deliveryFee ?? 0) > 0 ? <><span className="text-slate-300">•</span><span>R$ {(settings.deliveryFee).toFixed(2).replace('.', ',')}</span></> : null}
+                  {mesaParam && <span className="flex items-center gap-1 font-bold text-violet-700 ml-1"><LayoutGrid className="w-3.5 h-3.5" />{mesaParam}</span>}
                 </div>
               </div>
             </div>
+
+            {/* Promo cards */}
+            {settings.freeShippingEnabled && (
+              <div className="flex gap-3 overflow-x-auto px-4 pt-3 pb-1 no-scrollbar">
+                <div className="flex-shrink-0 flex items-center gap-2.5 bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center"><Truck className="w-4 h-4 text-emerald-600" /></div>
+                  <div><p className="text-xs text-slate-400">Entrega</p><p className="text-sm font-bold text-emerald-600">Grátis</p></div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Barra de info abaixo da capa */}
-          <div className="bg-white border-b border-slate-100 shadow-sm">
-            <div className="max-w-xl mx-auto px-5 py-3 flex flex-wrap gap-2 items-center">
-              {(() => {
-                const open = isRestaurantOpen(settings);
-                return (
-                  <span className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${open ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-                    <span className={`w-2 h-2 rounded-full ${open ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                    {open ? 'Aberto agora' : 'Fechado'}
-                  </span>
-                );
-              })()}
-              {mesaParam && (
-                <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-violet-50 text-violet-700 border border-violet-100">
-                  <LayoutGrid className="w-3.5 h-3.5" /> {mesaParam}
-                </span>
-              )}
-              {settings.deliveryTime && (
-                <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" /> {settings.deliveryTime} min
-                </span>
-              )}
-              {(settings.address || settings.phone || (settings.openingHours && Object.keys(settings.openingHours).length > 0)) && (
-                <button
-                  onClick={() => setShowHours(true)}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors"
-                >
-                  <Info className="w-3.5 h-3.5 text-slate-400" /> Sobre o restaurante
-                </button>
-              )}
-              {publicReviews.length > 0 && (
-                <button
-                  onClick={() => setShowReviews(true)}
-                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
-                >
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> {avgRating} · Avaliações
-                </button>
-              )}
+          {/* ══ DESKTOP ══ */}
+          <div className="hidden md:block">
+            {/* Banner claro */}
+            <div className="relative overflow-hidden" style={{ height: 220 }}>
+              <img src={settings.coverUrl} alt="capa" className="w-full h-full object-cover" />
+              <div className="absolute top-4 right-6">
+                {customer ? (
+                  <button onClick={() => navigate(`/m/${slug}/conta`)} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-black/50 backdrop-blur-md text-white text-sm font-semibold border border-white/20 shadow">
+                    <User className="w-4 h-4" /> Meus pedidos
+                  </button>
+                ) : (
+                  <button onClick={() => { setShowCart(true); setStep('auth'); }} className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-black/50 backdrop-blur-md text-white text-sm font-semibold border border-white/20 shadow">
+                    <LogIn className="w-4 h-4" /> Entrar
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Barra horizontal de info */}
+            <div className="bg-white border-b border-slate-100 shadow-sm">
+              <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-4">
+                {settings.logoUrl ? (
+                  <img src={settings.logoUrl} alt={settings.name} className="w-14 h-14 rounded-full object-cover flex-shrink-0 shadow-sm border border-slate-100" />
+                ) : (
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm" style={{ backgroundColor: accent }}>
+                    <ChefHat className="w-7 h-7 text-white" />
+                  </div>
+                )}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <h1 className="text-xl font-bold text-slate-900 truncate">{settings.name}</h1>
+                  {publicReviews.length > 0 && (
+                    <button onClick={() => setShowReviews(true)} className="flex items-center gap-1 flex-shrink-0">
+                      <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                      <span className="text-sm font-bold text-slate-700">{avgRating}</span>
+                    </button>
+                  )}
+                  {(settings.address || settings.phone || (settings.openingHours && Object.keys(settings.openingHours).length > 0)) && (
+                    <button onClick={() => setShowHours(true)} className="text-sm font-semibold flex-shrink-0" style={{ color: accent }}>Ver mais</button>
+                  )}
+                </div>
+                <div className="flex items-center gap-4 text-sm text-slate-500 flex-shrink-0">
+                  {(() => { const open = isRestaurantOpen(settings); return <span className={`font-bold ${open ? 'text-emerald-600' : 'text-red-500'}`}>{open ? 'Aberto' : 'Fechado'}</span>; })()}
+                  {settings.deliveryTime && <span>{settings.deliveryTime} min</span>}
+                  {settings.freeShippingEnabled ? <span className="font-bold text-emerald-600">Grátis</span> : (settings.deliveryFee ?? 0) > 0 ? <span>R$ {(settings.deliveryFee).toFixed(2).replace('.', ',')}</span> : null}
+                  {(settings.minimumOrder ?? 0) > 0 && (
+                    <><span className="border-l border-slate-200 pl-4">Pedido mínimo R$ {(settings.minimumOrder).toFixed(2).replace('.', ',')}</span></>
+                  )}
+                  {mesaParam && <span className="flex items-center gap-1 font-bold text-violet-700"><LayoutGrid className="w-4 h-4" />{mesaParam}</span>}
+                </div>
+              </div>
             </div>
           </div>
         </>
@@ -889,7 +931,7 @@ export default function PublicMenuPage() {
                     <div
                       key={item.id}
                       className={`bg-white rounded-2xl overflow-hidden shadow-sm flex items-stretch transition-all duration-200 active:scale-[0.99] ${inCart ? 'shadow-md ring-1' : 'border border-black/5'}`}
-                      style={inCart ? { ringColor: accent + '50', boxShadow: `0 4px 16px ${accent}20` } : {}}
+                      style={inCart ? { boxShadow: `0 4px 16px ${accent}20` } : {}}
                     >
                       {/* Left color bar */}
                       <div className="w-1 flex-shrink-0 rounded-l" style={{ backgroundColor: inCart ? accent : 'transparent' }} />
@@ -1077,6 +1119,25 @@ export default function PublicMenuPage() {
                   </div>
                 </div>
               )}
+
+              {/* Formas de pagamento */}
+              {settings.paymentMethods && settings.paymentMethods.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Formas de pagamento</p>
+                  <div className="flex flex-wrap gap-2">
+                    {settings.paymentMethods.map(method => {
+                      const cfg = PAYMENT_METHOD_LABELS[method];
+                      if (!cfg) return null;
+                      return (
+                        <span key={method} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-sm font-semibold">
+                          <span>{cfg.emoji}</span>
+                          {cfg.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="px-5 pb-5 pt-2">
@@ -1236,7 +1297,7 @@ export default function PublicMenuPage() {
                               onClick={() => {
                                 setSelectedOptions(prev => {
                                   if (isSelected) { const next = { ...prev }; delete next[group.id]; return next; }
-                                  return { ...prev, [group.id]: { groupId: group.id, optionId: opt.id, name: opt.name, priceDelta: opt.priceDelta } };
+                                  return { ...prev, [group.id]: { groupId: group.id, groupName: group.name, optionId: opt.id, optionName: opt.name, priceDelta: opt.priceDelta } };
                                 });
                               }}
                               className="w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 text-left transition-all duration-150"
@@ -2187,9 +2248,11 @@ export default function PublicMenuPage() {
                   className="w-full py-4 rounded-2xl text-white font-extrabold text-base active:scale-[0.98] transition-transform flex items-center justify-center gap-2 disabled:opacity-40"
                   style={selectedPayment ? { backgroundColor: accent, boxShadow: `0 8px 24px ${accent}40` } : { backgroundColor: '#94a3b8' }}
                 >
-                  {selectedPayment === 'pix' ? <QrCode className="w-5 h-5" /> : null}
+                  {selectedPayment === 'pix' && cartTotal > 0 ? <QrCode className="w-5 h-5" /> : null}
                   {!selectedPayment
                     ? 'Selecione uma forma de pagamento'
+                    : cartTotal <= 0
+                    ? 'Confirmar pedido grátis'
                     : selectedPayment === 'pix'
                     ? `Gerar PIX — R$ ${cartTotal.toFixed(2).replace('.', ',')}`
                     : `Confirmar pedido — R$ ${cartTotal.toFixed(2).replace('.', ',')}`}

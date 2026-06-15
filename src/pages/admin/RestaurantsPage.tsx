@@ -174,7 +174,7 @@ export default function AdminRestaurantsPage() {
       ...restaurants.map(r => {
         const p = getPlan(r.userId);
         const s = getStat(r.userId);
-        const d = trialDaysLeft(p?.trialEndsAt ?? null);
+        const _d = trialDaysLeft(p?.trialEndsAt ?? null); void _d;
         return [
           r.name,
           getEmail(r.userId),

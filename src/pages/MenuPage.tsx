@@ -135,7 +135,7 @@ export default function MenuPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-slate-900 text-sm">{item.name}</span>
-              {item.featured && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" title="Em destaque" />}
+              {item.featured && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
               {!item.available && <span className="badge bg-red-50 text-red-600 text-[10px] py-0.5 font-bold">Esgotado</span>}
               {item.stock != null && item.available && (
                 <div className="flex items-center gap-0.5">
@@ -164,17 +164,17 @@ export default function MenuPage() {
           {item.promoPrice && <div className="hidden sm:flex flex-col items-end flex-shrink-0"><span className="text-base font-bold text-emerald-600">R$ {item.promoPrice.toFixed(2).replace('.', ',')}</span><span className="text-xs text-slate-400 line-through">R$ {item.price.toFixed(2).replace('.', ',')}</span></div>}
           <div className="flex items-center gap-0.5 flex-shrink-0">
             <button onClick={() => toggleAvailable(item)} title={item.available ? 'Marcar como Esgotado' : 'Marcar como Disponível'}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${item.available ? 'hover:bg-slate-100 text-slate-500' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}>
+              className={`flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${item.available ? 'hover:bg-slate-100 text-slate-500' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}>
               {item.available ? <ToggleRight className="w-4 h-4 text-emerald-500" /> : <ToggleLeft className="w-4 h-4 text-red-400" />}
               <span className="hidden sm:inline">{item.available ? 'Disponível' : 'Esgotado'}</span>
             </button>
-            <button onClick={() => setShowGroupsFor(showGroupsFor === item.id ? null : item.id)} title="Adicionais" className={`p-2 rounded-lg hover:bg-slate-100 transition-colors ${showGroupsFor === item.id ? 'bg-emerald-50' : ''}`}>
+            <button onClick={() => setShowGroupsFor(showGroupsFor === item.id ? null : item.id)} title="Adicionais" className={`hidden sm:flex p-2 rounded-lg hover:bg-slate-100 transition-colors ${showGroupsFor === item.id ? 'bg-emerald-50' : ''}`}>
               <Settings2 className={`w-4 h-4 ${showGroupsFor === item.id ? 'text-emerald-500' : 'text-slate-400'}`} />
             </button>
             <button onClick={() => openEdit(item)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
               <Pencil className="w-4 h-4 text-slate-400" />
             </button>
-            <button onClick={() => deleteItem(item.id)} className="p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
+            <button onClick={() => deleteItem(item.id)} className="hidden sm:flex p-2 rounded-lg hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
               <Trash2 className="w-4 h-4 text-red-400" />
             </button>
           </div>

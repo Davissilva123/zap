@@ -108,12 +108,12 @@ export default function KDSPage() {
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col" style={{ fontFamily: 'system-ui, sans-serif' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-3 bg-slate-800 border-b border-slate-700">
-        <div className="flex items-center gap-3">
-          <ChefHat size={24} className="text-emerald-400" />
-          <span className="text-xl font-bold tracking-wide">KDS — Display de Cozinha</span>
+      <div className="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-slate-700 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <ChefHat size={22} className="text-emerald-400" />
+          <span className="font-bold tracking-wide">KDS — Cozinha</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <span className="text-slate-400 text-sm">{new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
           <button onClick={() => setSoundOn(s => !s)} className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600">
             {soundOn ? <Volume2 size={16} className="text-emerald-400" /> : <VolumeX size={16} className="text-slate-400" />}
@@ -127,7 +127,7 @@ export default function KDSPage() {
       {loading ? (
         <div className="flex-1 flex items-center justify-center text-slate-400">Carregando pedidos...</div>
       ) : (
-        <div className="flex-1 grid grid-cols-3 gap-4 p-4 overflow-auto">
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 overflow-auto">
           {/* Column: Aguardando */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 px-1">

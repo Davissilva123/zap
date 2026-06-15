@@ -134,9 +134,9 @@ export default function OpOrdersPage() {
     const order = orders.find(o => o.id === orderId);
     await db.updateOrder(orderId, { status: newStatus as Order['status'], paidAt: newStatus === 'PAID' ? new Date().toISOString() : undefined });
     if (newStatus === 'PAID' && order?.paymentMethod === 'cash') {
-      const session = await db.getCurrentCashSession(restaurantId);
+      const session = await db.getCurrentCashSession(restaurantId!);
       if (session) {
-        await db.addCashEntry(restaurantId, session.id, 'sale', order.total, `Pedido #${order.id.slice(-6).toUpperCase()}`);
+        await db.addCashEntry(restaurantId!, session.id, 'sale', order.total, `Pedido #${order.id.slice(-6).toUpperCase()}`);
       }
     }
     load();
@@ -161,7 +161,7 @@ export default function OpOrdersPage() {
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pedidos</h1>
           <p className="text-slate-500 mt-0.5 text-sm">{orders.length} pedidos recebidos</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setSoundEnabled(s => !s)}
             title={soundEnabled ? 'Silenciar notificações' : 'Ativar notificações sonoras'}
@@ -171,17 +171,17 @@ export default function OpOrdersPage() {
           </button>
           <button
             onClick={() => setAutoPrint(a => !a)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[13px] font-medium transition-colors ${autoPrint ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'}`}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-[13px] font-medium transition-colors ${autoPrint ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'}`}
           >
             <Printer className="w-4 h-4" />
-            {autoPrint ? 'Auto-imprimir ON' : 'Auto-imprimir OFF'}
+            <span className="hidden sm:inline">{autoPrint ? 'Auto-imprimir ON' : 'Auto-imprimir OFF'}</span>
           </button>
         </div>
       </div>
 
       {/* Search + date filter */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-2">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text" value={search} onChange={e => setSearch(e.target.value)}
@@ -194,15 +194,14 @@ export default function OpOrdersPage() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-slate-400 flex-shrink-0" />
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-            className="input-field text-sm py-2 w-full sm:w-36" title="Data início" />
-          <span className="text-slate-400 text-sm flex-shrink-0">até</span>
+            className="input-field text-sm py-2 flex-1 sm:flex-none sm:w-36" title="De" />
           <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-            className="input-field text-sm py-2 w-full sm:w-36" title="Data fim" />
+            className="input-field text-sm py-2 flex-1 sm:flex-none sm:w-36" title="Até" />
           {(dateFrom || dateTo) && (
-            <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="p-1.5 rounded-lg hover:bg-slate-100">
+            <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="p-1.5 rounded-lg hover:bg-slate-100 flex-shrink-0">
               <X className="w-3.5 h-3.5 text-slate-400" />
             </button>
           )}
@@ -242,45 +241,46 @@ export default function OpOrdersPage() {
           const cfg = statusConfig[order.status] || statusConfig.PENDING;
           const payCfg = PAYMENT_METHOD_LABELS[order.paymentMethod];
           return (
-            <div key={order.id} className="card-hover">
-              <div className="flex items-start gap-3 p-3 sm:p-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${cfg.bg}`}>
-                  <cfg.icon className={`w-5 h-5 ${cfg.color}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-900 text-[15px]">{order.customerName}</span>
-                    <span className="badge bg-slate-100 text-slate-500 py-0.5 text-[10px]">{payCfg?.emoji} {payCfg?.label}</span>
-                    <span className="badge bg-slate-100 text-slate-500 py-0.5 text-[10px]">
-                      {order.deliveryType === 'delivery' ? <Truck className="w-3 h-3" /> : order.deliveryType === 'table' ? <LayoutGrid className="w-3 h-3" /> : <ShoppingBag className="w-3 h-3" />}
-                      {order.deliveryType === 'delivery' ? 'Delivery' : order.deliveryType === 'table' ? (order.tableName || 'Mesa') : 'Retirada'}
-                    </span>
-                    {order.couponCode && <span className="badge bg-emerald-50 text-emerald-600 py-0.5 text-[10px]"><Tag className="w-3 h-3" />{order.couponCode}</span>}
-                    {order.rating && <span className="badge bg-amber-50 text-amber-600 py-0.5 text-[10px]"><Star className="w-3 h-3" />{order.rating}</span>}
+            <div key={order.id} className="card-hover" onClick={() => setSelectedOrder(order)}>
+              <div className="p-3 sm:p-4 space-y-2">
+                {/* Linha 1: ícone status + nome + total */}
+                <div className="flex items-center gap-2.5">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
+                    <cfg.icon className={`w-4.5 h-4.5 ${cfg.color}`} />
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`badge ${cfg.bg} ${cfg.color} py-0.5`}>{cfg.label}</span>
-                    <span className="text-[12px] text-slate-400">{formatDate(order.createdAt)}</span>
-                    {order.deliveryType === 'delivery' && order.deliveryAddress && (
-                      <span className="text-[12px] text-slate-400 truncate flex items-center gap-0.5"><MapPin className="w-3 h-3 flex-shrink-0" />{formatAddress(order.deliveryAddress)}</span>
-                    )}
+                  <div className="flex-1 min-w-0">
+                    <span className="font-semibold text-slate-900 text-[14px] leading-tight block truncate">{order.customerName}</span>
+                    <span className={`text-[11px] font-medium ${cfg.color}`}>{cfg.label}</span>
                   </div>
+                  <span className="text-sm font-bold text-slate-900 flex-shrink-0">R$ {order.total.toFixed(2).replace('.', ',')}</span>
                 </div>
-                <div className="flex items-center gap-0.5 flex-shrink-0">
-                  <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight mr-1">R$ {order.total.toFixed(2).replace('.', ',')}</span>
+
+                {/* Linha 2: badges + data */}
+                <div className="flex items-center gap-1.5 flex-wrap pl-[46px]">
+                  <span className="badge bg-slate-100 text-slate-500 py-0 text-[10px] px-2">{payCfg?.emoji} {payCfg?.label}</span>
+                  <span className="badge bg-slate-100 text-slate-500 py-0 text-[10px] px-2">
+                    {order.deliveryType === 'delivery' ? '🛵' : order.deliveryType === 'table' ? '🪑' : '🏃'}
+                    {order.deliveryType === 'delivery' ? 'Delivery' : order.deliveryType === 'table' ? (order.tableName || 'Mesa') : 'Retirada'}
+                  </span>
+                  {order.couponCode && <span className="badge bg-emerald-50 text-emerald-600 py-0 text-[10px] px-2">{order.couponCode}</span>}
+                  <span className="text-[11px] text-slate-400 ml-auto flex-shrink-0">{formatDate(order.createdAt)}</span>
+                </div>
+
+                {/* Linha 3: botões de ação — só no sm+ na lateral, no mobile embaixo */}
+                <div className="flex items-center gap-1.5 pl-[46px]" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setSelectedOrder(order)} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium transition-colors">
+                    <Eye className="w-3.5 h-3.5" /> Ver detalhes
+                  </button>
                   {settings && (
-                    <button onClick={(e) => { e.stopPropagation(); printOrder(order, settings); }} className="p-1.5 rounded-xl hover:bg-blue-50 transition-colors" title="Imprimir">
-                      <Printer className="w-4 h-4 text-blue-400" />
+                    <button onClick={(e) => { e.stopPropagation(); printOrder(order, settings); }} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-400 transition-colors">
+                      <Printer className="w-3.5 h-3.5" />
                     </button>
                   )}
                   {canCancel && order.status !== 'CANCELLED' && order.status !== 'COMPLETED' && (
-                    <button onClick={(e) => { e.stopPropagation(); cancelOrder(order.id); }} className="p-1.5 rounded-xl hover:bg-red-50 transition-colors" title="Cancelar">
-                      <Ban className="w-4 h-4 text-red-400" />
+                    <button onClick={(e) => { e.stopPropagation(); cancelOrder(order.id); }} className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 transition-colors">
+                      <Ban className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  <button onClick={() => setSelectedOrder(order)} className="p-1.5 rounded-xl hover:bg-slate-100/80 transition-colors">
-                    <Eye className="w-4 h-4 text-slate-400" />
-                  </button>
                 </div>
               </div>
             </div>

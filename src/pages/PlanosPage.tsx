@@ -99,7 +99,7 @@ export default function PlanosPage({ reason }: Props) {
       // Novo usuário sem plano — tenta criar trial e redireciona
       if (!plan || plan.status === 'none' || isNew) {
         if (user) {
-          supabase.rpc('create_trial_plan', { p_user_id: user.id })
+          Promise.resolve(supabase.rpc('create_trial_plan', { p_user_id: user.id }))
             .then(() => db.getMyPlan())
             .then(p => { if (p && p.status === 'trial') navigate('/dashboard', { replace: true }); })
             .catch(() => {});

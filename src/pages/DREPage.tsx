@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { Order, MenuItem, FinancialEntry } from '../lib/types';
-import { BarChart3, TrendingUp, TrendingDown, DollarSign, AlertCircle, Download } from 'lucide-react';
+import { BarChart3, AlertCircle, Download } from 'lucide-react';
 
 const fmt = (v: number, sign = false) => {
   const s = `R$ ${Math.abs(v).toFixed(2).replace('.', ',')}`;
@@ -131,7 +131,7 @@ export default function DREPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <BarChart3 size={22} className="text-emerald-600" />
           <div>
@@ -139,7 +139,7 @@ export default function DREPage() {
             <p className="text-sm text-slate-500">Resultado financeiro consolidado do período</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           {period === 'month' && (
             <input type="month" value={month} onChange={e => setMonth(e.target.value)}
               className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
@@ -163,7 +163,7 @@ export default function DREPage() {
       ) : !dre ? null : (
         <>
           {/* KPIs */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
               <p className="text-xs text-emerald-600 font-medium uppercase tracking-wide">Receita Líquida</p>
               <p className="text-2xl font-bold text-emerald-700 mt-1">{fmt(dre.receitaLiquida)}</p>
@@ -183,7 +183,8 @@ export default function DREPage() {
 
           {/* DRE Table */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[360px]">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr>
                   <th className="text-left px-5 py-3 font-semibold text-slate-600">Linha</th>
@@ -217,6 +218,7 @@ export default function DREPage() {
                 ))}
               </tbody>
             </table>
+            </div>{/* /overflow-x-auto */}
           </div>
 
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">

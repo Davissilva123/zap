@@ -109,6 +109,7 @@ export default function OrdersPage() {
           paymentMethod: newOrder.payment_method as Order['paymentMethod'],
           deliveryAddress: newOrder.delivery_address as Order['deliveryAddress'],
           deliveryType: newOrder.delivery_type as Order['deliveryType'],
+          discount: 0,
           pixTxId: newOrder.pix_tx_id,
           pixQrCode: newOrder.pix_qr_code,
           pixCopyPaste: newOrder.pix_copy_paste,
@@ -255,7 +256,7 @@ export default function OrdersPage() {
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Pedidos</h1>
           <p className="text-slate-500 mt-0.5 text-sm">{orders.length} pedidos recebidos</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setSoundEnabled(s => !s)}
             title={soundEnabled ? 'Silenciar notificações' : 'Ativar notificações sonoras'}
@@ -266,14 +267,14 @@ export default function OrdersPage() {
           <button
             onClick={() => setAutoPrint(a => !a)}
             title={autoPrint ? 'Desativar impressão automática' : 'Ativar impressão automática'}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[13px] font-medium transition-colors ${autoPrint ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'}`}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-[13px] font-medium transition-colors ${autoPrint ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-50'}`}
           >
             <Printer className="w-4 h-4" />
-            {autoPrint ? 'Auto-imprimir ON' : 'Auto-imprimir OFF'}
+            <span className="hidden sm:inline">{autoPrint ? 'Auto-imprimir ON' : 'Auto-imprimir OFF'}</span>
           </button>
           {whatsappConfigured && (
             <div className="badge bg-emerald-50 text-emerald-700 py-1.5 px-3 gap-1.5">
-              <MessageCircle className="w-3.5 h-3.5" /> WhatsApp ativo
+              <MessageCircle className="w-3.5 h-3.5" /><span className="hidden sm:inline"> WhatsApp ativo</span>
             </div>
           )}
         </div>
@@ -291,8 +292,8 @@ export default function OrdersPage() {
       )}
 
       {/* Search + date filter */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-2">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text" value={search} onChange={e => setSearch(e.target.value)}
@@ -305,15 +306,16 @@ export default function OrdersPage() {
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-slate-400 flex-shrink-0" />
-          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-            className="input-field text-sm py-2 w-full sm:w-36" title="Data início" />
-          <span className="text-slate-400 text-sm flex-shrink-0">até</span>
-          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-            className="input-field text-sm py-2 w-full sm:w-36" title="Data fim" />
+          <div className="grid grid-cols-2 gap-2 flex-1 min-w-0">
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              className="input-field text-sm py-2 min-w-0" title="De" />
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              className="input-field text-sm py-2 min-w-0" title="Até" />
+          </div>
           {(dateFrom || dateTo) && (
-            <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="p-1.5 rounded-lg hover:bg-slate-100">
+            <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="p-1.5 rounded-lg hover:bg-slate-100 flex-shrink-0">
               <X className="w-3.5 h-3.5 text-slate-400" />
             </button>
           )}
@@ -366,61 +368,67 @@ export default function OrdersPage() {
                     </span>
                   </div>
                 )}
-                <div className="flex items-start gap-3 p-3 sm:p-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${cfg.bg}`}>
-                    <cfg.icon className={`w-5 h-5 ${cfg.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-slate-900 text-[15px]">{order.customerName}</span>
-                      <span className="badge bg-slate-100 text-slate-500 py-0.5 text-[10px]">{payCfg?.emoji} {payCfg?.label}</span>
-                      <span className="badge bg-slate-100 text-slate-500 py-0.5 text-[10px]">
-                        {order.deliveryType === 'delivery' ? <Truck className="w-3 h-3" /> : order.deliveryType === 'table' ? <LayoutGrid className="w-3 h-3" /> : <ShoppingBag className="w-3 h-3" />}
-                        {order.deliveryType === 'delivery' ? 'Delivery' : order.deliveryType === 'table' ? (order.tableName || 'Mesa') : 'Retirada'}
-                      </span>
-                      {order.couponCode && <span className="badge bg-emerald-50 text-emerald-600 py-0.5 text-[10px]"><Tag className="w-3 h-3" />{order.couponCode}</span>}
-                      {order.rating && <span className="badge bg-amber-50 text-amber-600 py-0.5 text-[10px]"><Star className="w-3 h-3" />{order.rating}</span>}
-                      {wasSent && <span className="badge bg-emerald-50 text-emerald-600 py-0.5 text-[10px]"><MessageCircle className="w-3 h-3" />Enviado</span>}
+                <div className="grid grid-cols-[1fr_auto] gap-x-3 p-3 sm:p-4">
+                  {/* Left: icon + content */}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${cfg.bg}`}>
+                      <cfg.icon className={`w-5 h-5 ${cfg.color}`} />
                     </div>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className={`badge ${cfg.bg} ${cfg.color} py-0.5`}>{cfg.label}</span>
-                      {order.status === 'PREPARING' && (
-                        <span className="badge bg-blue-50 text-blue-600 py-0.5 text-[10px]">
-                          <Clock className="w-3 h-3" /> Cozinha: {elapsedLabel(order.paidAt ?? order.createdAt, now)}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-slate-900 text-[15px] truncate">{order.customerName}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <span className="badge bg-slate-100 text-slate-500 py-0.5 text-[10px]">{payCfg?.emoji} {payCfg?.label}</span>
+                        <span className="badge bg-slate-100 text-slate-500 py-0.5 text-[10px]">
+                          {order.deliveryType === 'delivery' ? <Truck className="w-3 h-3" /> : order.deliveryType === 'table' ? <LayoutGrid className="w-3 h-3" /> : <ShoppingBag className="w-3 h-3" />}
+                          {order.deliveryType === 'delivery' ? 'Delivery' : order.deliveryType === 'table' ? (order.tableName || 'Mesa') : 'Retirada'}
                         </span>
-                      )}
-                      {order.status === 'DELIVERING' && (
-                        <span className="badge bg-teal-50 text-teal-600 py-0.5 text-[10px]">
-                          <Clock className="w-3 h-3" /> Entrega: {elapsedLabel(order.paidAt ?? order.createdAt, now)}
-                        </span>
-                      )}
-                      <span className="text-[12px] text-slate-400">{formatDate(order.createdAt)}</span>
-                      {order.deliveryType === 'delivery' && order.deliveryAddress && (
-                        <span className="text-[12px] text-slate-400 truncate flex items-center gap-0.5"><MapPin className="w-3 h-3 flex-shrink-0" />{formatAddress(order.deliveryAddress)}</span>
-                      )}
+                        {order.couponCode && <span className="badge bg-emerald-50 text-emerald-600 py-0.5 text-[10px]"><Tag className="w-3 h-3" />{order.couponCode}</span>}
+                        {order.rating && <span className="badge bg-amber-50 text-amber-600 py-0.5 text-[10px]"><Star className="w-3 h-3" />{order.rating}</span>}
+                        {wasSent && <span className="badge bg-emerald-50 text-emerald-600 py-0.5 text-[10px]"><MessageCircle className="w-3 h-3" />Enviado</span>}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className={`badge ${cfg.bg} ${cfg.color} py-0.5`}>{cfg.label}</span>
+                        {order.status === 'PREPARING' && (
+                          <span className="badge bg-blue-50 text-blue-600 py-0.5 text-[10px]">
+                            <Clock className="w-3 h-3" /> Cozinha: {elapsedLabel(order.paidAt ?? order.createdAt, now)}
+                          </span>
+                        )}
+                        {order.status === 'DELIVERING' && (
+                          <span className="badge bg-teal-50 text-teal-600 py-0.5 text-[10px]">
+                            <Clock className="w-3 h-3" /> Entrega: {elapsedLabel(order.paidAt ?? order.createdAt, now)}
+                          </span>
+                        )}
+                        <span className="text-[12px] text-slate-400">{formatDate(order.createdAt)}</span>
+                        {order.deliveryType === 'delivery' && order.deliveryAddress && (
+                          <div className="flex items-center gap-0.5 text-[12px] text-slate-400 w-full min-w-0"><MapPin className="w-3 h-3 flex-shrink-0" /><span className="truncate min-w-0 flex-1">{formatAddress(order.deliveryAddress)}</span></div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                    <span className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight mr-1">R$ {order.total.toFixed(2).replace('.', ',')}</span>
-                    {isSending && <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />}
-                    {whatsappConfigured && !wasSent && !isSending && (
-                      <button onClick={(e) => { e.stopPropagation(); sendManualWhatsapp(order, order.status); }} className="p-1.5 rounded-xl hover:bg-emerald-50 transition-colors" title="Enviar notificação WhatsApp">
-                        <MessageCircle className="w-4 h-4 text-emerald-500" />
+                  {/* Right: price + action buttons */}
+                  <div className="flex flex-col items-end justify-center gap-1.5">
+                    <span className="text-sm font-bold text-slate-900 tracking-tight whitespace-nowrap">R$ {order.total.toFixed(2).replace('.', ',')}</span>
+                    <div className="flex items-center gap-0.5">
+                      {isSending && <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />}
+                      {whatsappConfigured && !wasSent && !isSending && (
+                        <button onClick={(e) => { e.stopPropagation(); sendManualWhatsapp(order, order.status); }} className="p-1.5 rounded-xl hover:bg-emerald-50 transition-colors" title="Enviar notificação WhatsApp">
+                          <MessageCircle className="w-4 h-4 text-emerald-500" />
+                        </button>
+                      )}
+                      {settings && (
+                        <button onClick={(e) => { e.stopPropagation(); printOrder(order, settings); }} className="p-1.5 rounded-xl hover:bg-blue-50 transition-colors" title="Imprimir cupom">
+                          <Printer className="w-4 h-4 text-blue-400" />
+                        </button>
+                      )}
+                      {canCancel && (
+                        <button onClick={(e) => { e.stopPropagation(); cancelOrder(order.id); }} className="p-1.5 rounded-xl hover:bg-red-50 transition-colors" title="Cancelar pedido">
+                          <Ban className="w-4 h-4 text-red-400" />
+                        </button>
+                      )}
+                      <button onClick={() => setSelectedOrder(order)} className="p-1.5 rounded-xl hover:bg-slate-100/80 transition-colors">
+                        <Eye className="w-4 h-4 text-slate-400" />
                       </button>
-                    )}
-                    {settings && (
-                      <button onClick={(e) => { e.stopPropagation(); printOrder(order, settings); }} className="p-1.5 rounded-xl hover:bg-blue-50 transition-colors" title="Imprimir cupom">
-                        <Printer className="w-4 h-4 text-blue-400" />
-                      </button>
-                    )}
-                    {canCancel && (
-                      <button onClick={(e) => { e.stopPropagation(); cancelOrder(order.id); }} className="p-1.5 rounded-xl hover:bg-red-50 transition-colors" title="Cancelar pedido">
-                        <Ban className="w-4 h-4 text-red-400" />
-                      </button>
-                    )}
-                    <button onClick={() => setSelectedOrder(order)} className="p-1.5 rounded-xl hover:bg-slate-100/80 transition-colors">
-                      <Eye className="w-4 h-4 text-slate-400" />
-                    </button>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
-import { supabase } from '../lib/supabase';
 import { supabaseNoSession } from '../lib/supabaseNoSession';
 import type { Operator } from '../lib/types';
 import { Plus, Trash2, ToggleLeft, ToggleRight, Users, Shield, UtensilsCrossed, CreditCard, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff, Send, Copy, Check, X, ChefHat, Lock } from 'lucide-react';

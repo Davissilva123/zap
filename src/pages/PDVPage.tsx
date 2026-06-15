@@ -6,7 +6,7 @@ import { isSerialSupported, printReceiptSerial, printOrder } from '../lib/print'
 import { isScaleSupported, readScaleWeight, formatWeight } from '../lib/scale';
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, CreditCard,
-  Scale, X, CheckCircle, Keyboard, LayoutGrid, AlertCircle, Lock,
+  Scale, X, CheckCircle, Keyboard, LayoutGrid, Lock,
 } from 'lucide-react';
 
 const PAYMENT_OPTS: { value: PaymentMethod; label: string; icon: string }[] = [
@@ -26,7 +26,7 @@ interface CartItem {
 function fmt(v: number) { return `R$ ${v.toFixed(2).replace('.', ',')}` }
 
 export default function PDVPage() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const restaurantId = useRestaurantId();
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);

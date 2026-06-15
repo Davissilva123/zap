@@ -74,3 +74,11 @@ export const OPERATOR_LIMIT: Record<PlanSlug, number> = {
   pro:      5,
   premium:  -1,
 };
+
+// Quantidade máxima de itens do cardápio por plano (-1 = ilimitado)
+export const MENU_ITEM_LIMIT: Record<PlanSlug, number> = {
+  '':       0,
+  basic:    50,
+  pro:      200,
+  premium:  -1,
+};

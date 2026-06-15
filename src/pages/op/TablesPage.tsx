@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { db } from '../../lib/db';
 import { useRestaurantId } from '../../lib/auth';
 import type { RestaurantTable, Category, MenuItem, Order, RestaurantSettings } from '../../lib/types';
+import { isRestaurantOpen } from '../../lib/menuUtils';
 import {
   LayoutGrid, ArrowLeft, Plus, Minus, ShoppingCart,
   CheckCircle2, Loader2, ChefHat, Inbox, Receipt,
@@ -12,19 +13,6 @@ type CartEntry = { item: MenuItem; qty: number };
 type View = 'tables' | 'ordering';
 
 const OPEN_STATUSES = ['PENDING', 'PREPARING', 'DELIVERING'];
-
-function isRestaurantOpen(s: RestaurantSettings): boolean {
-  if (s.manualClosed) return false;
-  if (!s.openingHours || Object.keys(s.openingHours).length === 0) return true;
-  const now = new Date();
-  const day = String(now.getDay());
-  const hours = s.openingHours[day];
-  if (!hours?.open) return false;
-  const [fh, fm] = hours.from.split(':').map(Number);
-  const [th, tm] = hours.to.split(':').map(Number);
-  const cur = now.getHours() * 60 + now.getMinutes();
-  return cur >= fh * 60 + fm && cur <= th * 60 + tm;
-}
 
 function elapsed(iso: string): string {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -105,7 +93,6 @@ export default function OpTablesPage() {
 
   const cartQty = (itemId: string) => cart.find(e => e.item.id === itemId)?.qty ?? 0;
   const cartTotal = cart.reduce((s, e) => s + e.item.price * e.qty, 0);
-  const cartCount = cart.reduce((s, e) => s + e.qty, 0);
   const fmt = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
 
   // ── Open new comanda ────────────────────────────────────
@@ -119,7 +106,7 @@ export default function OpTablesPage() {
     try {
       const newOrder = await db.addOrder({
         userId: restaurantId,
-        items: cart.map(e => ({ ...e.item, quantity: e.qty })),
+        items: cart.map(e => ({ menuItemId: e.item.id, name: e.item.name, emoji: e.item.emoji, price: e.item.price, quantity: e.qty })),
         total: cartTotal,
         discount: 0,
         status: 'PENDING',
@@ -152,9 +139,9 @@ export default function OpTablesPage() {
     try {
       const merged = [...activeOrder.items];
       cart.forEach(({ item, qty }) => {
-        const idx = merged.findIndex(i => i.id === item.id);
+        const idx = merged.findIndex(i => i.menuItemId === item.id);
         if (idx >= 0) merged[idx] = { ...merged[idx], quantity: merged[idx].quantity + qty };
-        else merged.push({ ...item, quantity: qty });
+        else merged.push({ menuItemId: item.id, name: item.name, emoji: item.emoji, price: item.price, quantity: qty });
       });
       const newTotal = merged.reduce((s, i) => s + i.price * i.quantity, 0);
       await db.updateOrder(activeOrder.id, { items: merged, total: newTotal });

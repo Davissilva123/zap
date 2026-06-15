@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import type { Scan, Category, MenuItem, RestaurantSettings, Order } from '../lib/types';
 import { Eye, UtensilsCrossed, Grid3X3, TrendingUp, ArrowUpRight, PowerOff, Loader2, Receipt, DollarSign, ShoppingBag, BarChart2, Clock, CalendarDays, Wifi } from 'lucide-react';
+import OnboardingChecklist from '../components/OnboardingChecklist';
 
 function LiveBadge() {
   return (
@@ -176,6 +177,9 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Onboarding checklist — visível até o usuário fechar ou concluir tudo */}
+      <OnboardingChecklist settings={settings} categories={categories} items={items} />
 
       {/* Live order metrics */}
       <div>

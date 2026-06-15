@@ -174,14 +174,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!name.trim()) return 'Nome é obrigatório';
     if (!email.trim()) return 'E-mail é obrigatório';
     if (password.length < 6) return 'Senha deve ter pelo menos 6 caracteres';
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+    const referredBy = localStorage.getItem('zm_ref') || undefined;
+    const { data, error } = await supabase.auth.signUp({
+      email, password,
+      options: { data: { name, ...(referredBy ? { referredBy } : {}) } },
+    });
     if (error) {
       if (error.message.toLowerCase().includes('already registered')) return 'Este e-mail já está cadastrado';
       return error.message;
     }
-    // Cria trial como backup caso o trigger do banco não tenha disparado ainda
     if (data.user) {
-      await supabase.rpc('create_trial_plan', { p_user_id: data.user.id }).catch(() => {});
+      await Promise.resolve(supabase.rpc('create_trial_plan', { p_user_id: data.user.id })).catch(() => {});
+      // E-mail de boas-vindas (fire and forget)
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+      fetch(`${SUPABASE_URL}/functions/v1/send-welcome-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        body: JSON.stringify({ name: name.trim(), email, dashboardUrl: `${window.location.origin}/dashboard` }),
+      }).catch(() => {});
+      if (referredBy) localStorage.removeItem('zm_ref');
     }
     return null;
   };

@@ -225,7 +225,7 @@ export default function AdminLayout() {
       )}
 
       {/* Main */}
-      <div className="flex-1 lg:ml-[220px] min-h-screen flex flex-col">
+      <div className="flex-1 lg:ml-[220px] min-h-screen flex flex-col min-w-0 overflow-x-hidden">
         {/* Mobile header */}
         <header className="lg:hidden sticky top-0 z-30 bg-[#0d0d1a] border-b border-white/[0.06] px-4 py-3 flex items-center gap-3">
           <button onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-xl hover:bg-white/5 text-slate-400">
@@ -248,8 +248,10 @@ export default function AdminLayout() {
           <NotificationBell />
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto w-full overflow-x-hidden">
-          <Outlet />
+        <main className="flex-1 w-full overflow-x-hidden">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 min-w-0">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

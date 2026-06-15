@@ -13,7 +13,6 @@ export function showNewOrderNotification(customerName: string, total: number, on
       body: `${customerName} — R$ ${total.toFixed(2).replace('.', ',')}`,
       icon: '/icon.svg',
       tag: 'new-order',
-      renotify: true,
     });
     if (onClick) n.onclick = () => { window.focus(); n.close(); onClick(); };
     setTimeout(() => n.close(), 8000);

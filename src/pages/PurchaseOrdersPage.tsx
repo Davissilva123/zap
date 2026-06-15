@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
-import type { PurchaseOrder, PurchaseOrderItem, Supplier } from '../lib/types';
-import { ClipboardList, Plus, Edit2, Trash2, X, Save, ChevronDown, ChevronRight, Send, Package, CheckCircle2 } from 'lucide-react';
+import type { PurchaseOrder, Supplier } from '../lib/types';
+import { ClipboardList, Plus, Trash2, X, Save, ChevronDown, ChevronRight, Send, CheckCircle2 } from 'lucide-react';
 
 const STATUS_CFG = {
   draft:     { label: 'Rascunho',  cls: 'bg-slate-100 text-slate-600' },
@@ -85,7 +85,7 @@ export default function PurchaseOrdersPage() {
   const setStatus = async (id: string, status: PurchaseOrder['status']) => {
     const updates: Partial<PurchaseOrder> = { id, status };
     if (status === 'received') updates.receivedDate = new Date().toISOString().slice(0, 10);
-    await db.upsertPurchaseOrder(user.id!, updates);
+    await db.upsertPurchaseOrder(user!.id, updates);
     setOrders(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
   };
 
@@ -97,7 +97,7 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <ClipboardList size={22} className="text-emerald-600" />
           <div>
@@ -157,7 +157,8 @@ export default function PurchaseOrdersPage() {
 
               {isOpen && (
                 <div className="border-t border-slate-100 px-5 pb-5 pt-3">
-                  <table className="w-full text-sm mb-3">
+                  <div className="overflow-x-auto">
+                  <table className="w-full text-sm mb-3 min-w-[480px]">
                     <thead>
                       <tr className="text-xs text-slate-500 border-b border-slate-100">
                         <th className="text-left pb-2 font-medium">Item</th>
@@ -201,6 +202,7 @@ export default function PurchaseOrdersPage() {
                       })}
                     </tbody>
                   </table>
+                  </div>{/* /overflow-x-auto */}
                   <div className="flex items-center justify-between">
                     <button onClick={() => addItemRow(order.id)} className="flex items-center gap-1.5 text-sm text-emerald-600 hover:text-emerald-700 font-medium">
                       <Plus size={14} /> Adicionar item

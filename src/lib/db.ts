@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { Category, MenuItem, Scan, RestaurantSettings, Order, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, ItemOption, OpeningHours, DeliveryNeighborhood, Coupon, RestaurantTable, Operator, Driver, Branch, Combo, ComboItem, Promotion, CashSession, CashEntry, CustomerRecord } from './types';
+import { MENU_ITEM_LIMIT, PLAN_DISPLAY, type PlanSlug } from './planFeatures';
 
 // ---- Supabase row shapes (snake_case) ----
 interface SettingsRow {
@@ -235,22 +236,17 @@ export const db = {
 
   // ---- Cashback ----
   async getCashbackRedeemed(restaurantId: string, customerUserId: string): Promise<number> {
-    const { data } = await supabase
-      .from('cashback_redemptions')
-      .select('amount')
-      .eq('restaurant_user_id', restaurantId)
-      .eq('customer_user_id', customerUserId);
-    if (!data) return 0;
-    return (data as { amount: number }[]).reduce((s, r) => s + Number(r.amount), 0);
+    const { data } = await supabase.rpc('get_cashback_redeemed', {
+      p_data: { restaurant_user_id: restaurantId, customer_user_id: customerUserId },
+    });
+    return Number(data ?? 0);
   },
 
   async recordCashbackRedemption(restaurantId: string, customerUserId: string, amount: number, orderId: string): Promise<void> {
-    await supabase.from('cashback_redemptions').insert({
-      restaurant_user_id: restaurantId,
-      customer_user_id: customerUserId,
-      amount,
-      order_id: orderId,
+    const { error } = await supabase.rpc('record_cashback_redemption', {
+      p_data: { restaurant_user_id: restaurantId, customer_user_id: customerUserId, amount, order_id: orderId },
     });
+    if (error) throw new Error(error.message);
   },
 
   // ---- Categories ----
@@ -290,6 +286,16 @@ export const db = {
   },
 
   async addMenuItem(userId: string, item: Omit<MenuItem, 'id' | 'userId' | 'createdAt' | 'order'>): Promise<MenuItem> {
+    // Enforce plan item limit
+    const plan = await this.getMyPlan().catch(() => null);
+    const planSlug = ((plan?.planSlug ?? 'basic') as PlanSlug);
+    const limit = MENU_ITEM_LIMIT[planSlug];
+    if (limit > 0) {
+      const { count } = await supabase.from('menu_items').select('*', { count: 'exact', head: true }).eq('user_id', userId);
+      if ((count ?? 0) >= limit) {
+        throw new Error(`Limite de ${limit} itens atingido no plano ${PLAN_DISPLAY[planSlug]}. Faça upgrade para adicionar mais itens.`);
+      }
+    }
     const { data: existing } = await supabase.from('menu_items').select('order').eq('user_id', userId).order('order', { ascending: false }).limit(1);
     const maxOrder = existing && existing.length > 0 ? (existing[0] as { order: number }).order : -1;
     const { data, error } = await supabase.from('menu_items').insert({ user_id: userId, category_id: item.categoryId, name: item.name, description: item.description, emoji: item.emoji, image_url: item.imageUrl ?? '', price: item.price, promo_price: item.promoPrice ?? null, available: item.available, featured: item.featured ?? false, stock: item.stock ?? null, cost: item.cost ?? null, order: maxOrder + 1 }).select().single();
@@ -432,36 +438,39 @@ export const db = {
   },
 
   async addOrder(order: Omit<Order, 'id' | 'createdAt'>): Promise<Order> {
-    const baseRow: Record<string, unknown> = {
+    const row: Record<string, unknown> = {
       user_id: order.userId,
-      items: order.items, total: order.total, discount: order.discount ?? 0,
+      customer_user_id: order.customerUserId || null,
+      items: order.items,
+      total: order.total,
+      discount: order.discount ?? 0,
       coupon_code: order.couponCode ?? null,
       status: order.status,
-      customer_name: order.customerName, customer_phone: order.customerPhone,
-      payment_method: order.paymentMethod, delivery_address: order.deliveryAddress,
-      delivery_type: order.deliveryType, table_name: order.tableName ?? null,
+      customer_name: order.customerName,
+      customer_phone: order.customerPhone,
+      payment_method: order.paymentMethod,
+      delivery_address: order.deliveryAddress,
+      delivery_type: order.deliveryType,
+      table_name: order.tableName ?? null,
       notes: order.notes ?? null,
       pix_tx_id: order.pixTxId ?? '',
-      pix_qr_code: order.pixQrCode ?? '', pix_copy_paste: order.pixCopyPaste ?? '', paid_at: order.paidAt,
+      pix_qr_code: order.pixQrCode ?? '',
+      pix_copy_paste: order.pixCopyPaste ?? '',
+      paid_at: order.paidAt ?? null,
+      scheduled_for: order.scheduledFor ?? null,
     };
-    // optional columns — added via migrations; include only when available
-    if (order.scheduledFor) baseRow.scheduled_for = order.scheduledFor;
-    const row = order.customerUserId ? { ...baseRow, customer_user_id: order.customerUserId } : baseRow;
-    const { data, error } = await supabase.from('orders').insert(row).select().single();
-    if (error?.message?.includes('customer_user_id')) {
-      const { data: d2, error: e2 } = await supabase.from('orders').insert(baseRow).select().single();
-      if (e2) throw new Error(e2.message || JSON.stringify(e2));
-      return toOrder(d2 as OrderRow);
-    }
-    if (error?.message?.includes('scheduled_for')) {
-      const rowWithout = { ...row };
-      delete rowWithout.scheduled_for;
-      const { data: d3, error: e3 } = await supabase.from('orders').insert(rowWithout).select().single();
-      if (e3) throw new Error(e3.message || JSON.stringify(e3));
-      return toOrder(d3 as OrderRow);
-    }
+    const { data, error } = await supabase.rpc('add_order', { p_data: row });
     if (error) throw new Error(error.message || JSON.stringify(error));
-    return toOrder(data as OrderRow);
+    const result = toOrder(data as OrderRow);
+    // Notificação por e-mail ao dono do restaurante (fire and forget)
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+    fetch(`${SUPABASE_URL}/functions/v1/send-order-notification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({ restaurantUserId: order.userId, order: result }),
+    }).catch(() => {});
+    return result;
   },
 
   async updateOrder(id: string, updates: Partial<Pick<Order, 'status' | 'paidAt' | 'rating' | 'ratingComment' | 'items' | 'total' | 'discount' | 'driverName' | 'driverId'>>): Promise<void> {
@@ -1555,5 +1564,11 @@ export const db = {
     const { data } = await supabase.from('menu_item_branches').select('menu_item_id').eq('branch_id', branchId).eq('available', true);
     if (!data || data.length === 0) return null; // null = no restrictions set
     return (data as any[]).map(r => r.menu_item_id as string);
+  },
+
+  // ---- LGPD: exclusão de conta ----
+  async deleteMyAccount(): Promise<void> {
+    const { error } = await supabase.rpc('delete_my_account_data');
+    if (error) throw new Error(error.message);
   },
 };

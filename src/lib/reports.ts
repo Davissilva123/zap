@@ -243,7 +243,7 @@ export function reportRetencao(ctx: ReportCtx): string {
 
 // ─── 5. Taxa de Cancelamento ──────────────────────────────────────────────────
 export function reportCancelamentos(ctx: ReportCtx): string {
-  const { restaurantName, period, rangeOrders, allPeriodOrders } = ctx;
+  const { restaurantName, period, rangeOrders: _rangeOrders, allPeriodOrders } = ctx;
   const cancelled = allPeriodOrders.filter(o => o.status === 'CANCELLED');
   const total = allPeriodOrders.length;
   const rate = total ? (cancelled.length / total * 100).toFixed(1) : '0.0';

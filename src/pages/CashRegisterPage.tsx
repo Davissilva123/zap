@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth, useRestaurantId } from '../lib/auth';
 import type { CashSession, CashEntry } from '../lib/types';
-import { Wallet, Plus, Minus, Lock, Unlock, History, X, Check, Loader2, ArrowUpRight, ArrowDownRight, ShoppingBag } from 'lucide-react';
+import { Wallet, Lock, Unlock, History, X, Check, Loader2, ArrowUpRight, ArrowDownRight, ShoppingBag } from 'lucide-react';
 
 function fmt(n: number) { return n.toFixed(2).replace('.', ','); }
 
@@ -25,7 +25,7 @@ function EntryBadge({ type }: { type: CashEntry['type'] }) {
 }
 
 export default function CashRegisterPage() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const restaurantId = useRestaurantId();
   const [session, setSession] = useState<CashSession | null>(null);
   const [sessions, setSessions] = useState<CashSession[]>([]);
@@ -237,7 +237,7 @@ export default function CashRegisterPage() {
                     <span className="text-xs text-slate-400">Fechado: {new Date(s.closedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                   )}
                 </div>
-                <div className="grid grid-cols-4 gap-2 text-sm">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                   <div><p className="text-xs text-slate-400">Abertura</p><p className="font-bold">R$ {fmt(s.openingAmount)}</p></div>
                   <div><p className="text-xs text-slate-400">Vendas</p><p className="font-bold text-emerald-600">R$ {fmt(s.totalSales)}</p></div>
                   <div><p className="text-xs text-slate-400">Sangrias</p><p className="font-bold text-red-600">-R$ {fmt(s.totalWithdrawals)}</p></div>

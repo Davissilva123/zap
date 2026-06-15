@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { Supplier } from '../lib/types';
-import { Truck, Plus, Edit2, Trash2, X, Save, Search, Phone, Mail, Building2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Truck, Plus, Edit2, Trash2, X, Save, Search, Phone, Mail, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const empty = (): Partial<Supplier> => ({ name: '', email: '', phone: '', cnpj: '', address: '', contactName: '', notes: '', active: true });
 
@@ -61,7 +61,7 @@ export default function SuppliersPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Truck size={22} className="text-emerald-600" />
           <div>
@@ -92,7 +92,8 @@ export default function SuppliersPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[480px]">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="text-left px-5 py-3 font-semibold text-slate-600">Fornecedor</th>
@@ -132,6 +133,7 @@ export default function SuppliersPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

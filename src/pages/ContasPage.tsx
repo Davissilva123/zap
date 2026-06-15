@@ -22,9 +22,6 @@ const emptyForm = (): Partial<FinancialEntry> => ({
   status: 'pending', category: '', notes: '', recurrence: 'none',
 });
 
-function isOverdue(e: FinancialEntry): boolean {
-  return e.status === 'pending' && new Date(e.dueDate) < new Date(new Date().toISOString().slice(0, 10));
-}
 
 export default function ContasPage() {
   const { user } = useAuth();
@@ -117,7 +114,7 @@ export default function ContasPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Wallet size={22} className="text-emerald-600" />
           <div>
@@ -125,7 +122,7 @@ export default function ContasPage() {
             <p className="text-sm text-slate-500">Fluxo de caixa e obrigações financeiras</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <input type="month" value={month} onChange={e => setMonth(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           <button onClick={() => open()} className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-medium">
@@ -169,7 +166,8 @@ export default function ContasPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[500px]">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
                 <th className="text-left px-5 py-3 font-semibold text-slate-600">Descrição</th>
@@ -222,6 +220,7 @@ export default function ContasPage() {
               })}
             </tbody>
           </table>
+          </div>{/* /overflow-x-auto */}
         </div>
       )}
 

@@ -5,7 +5,7 @@ import { useCustomerAuth } from '../lib/customerAuth';
 import { db } from '../lib/db';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { Order, RestaurantSettings } from '../lib/types';
-import { ArrowLeft, Clock, CheckCircle, XCircle, Truck, ShoppingBag, Package, LogOut, User, Loader2, Ban, ChefHat, MapPin, Zap, RotateCcw, Gift, Star, DollarSign, MessageSquare, WifiOff, LocateFixed } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, XCircle, Truck, ShoppingBag, Package, LogOut, User, Loader2, Ban, ChefHat, MapPin, Zap, RotateCcw, Gift, Star, DollarSign, WifiOff, LocateFixed } from 'lucide-react';
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; color: string; bg: string; pulse?: boolean }> = {
   PENDING: { label: 'Aguardando', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', pulse: true },
@@ -40,6 +40,7 @@ function rowToOrder(r: OrderRowDb): Order {
     customerName: r.customer_name, customerPhone: r.customer_phone,
     paymentMethod: r.payment_method as Order['paymentMethod'],
     deliveryAddress: r.delivery_address, deliveryType: r.delivery_type as Order['deliveryType'],
+    discount: 0,
     pixTxId: r.pix_tx_id, pixQrCode: r.pix_qr_code, pixCopyPaste: r.pix_copy_paste,
     createdAt: r.created_at, paidAt: r.paid_at,
     driverId: r.driver_id ?? undefined,
@@ -420,7 +421,7 @@ export default function CustomerPortalPage() {
                             const currentIdx = statuses.indexOf(order.status);
                             const stepIdx = statuses.indexOf(s!);
                             const done = currentIdx >= stepIdx && order.status !== 'CANCELLED';
-                            const active = order.status === s || (s === 'PENDING' && order.status === 'PAID');
+                            const _active = order.status === s || (s === 'PENDING' && order.status === 'PAID'); void _active;
                             return (
                               <div key={s} className="flex items-center flex-1 last:flex-none">
                                 <div

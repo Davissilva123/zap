@@ -250,7 +250,7 @@ export default function FinancasPage() {
           <h2 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
             <Wallet className="w-4 h-4 text-emerald-500" /> Caixa — sessões do período
           </h2>
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-3 gap-2 mb-4 min-w-0">
             <div className="bg-emerald-50 rounded-xl p-3 text-center">
               <p className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider mb-1">Vendas</p>
               <p className="text-lg font-black text-emerald-700">{fmt(periodSessions.reduce((s, c) => s + c.totalSales, 0))}</p>
