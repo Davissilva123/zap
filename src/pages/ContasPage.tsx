@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { FinancialEntry, FinancialEntryType, Supplier } from '../lib/types';
@@ -113,7 +113,7 @@ export default function ContasPage() {
   ];
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Wallet size={22} className="text-emerald-600" />
@@ -148,10 +148,10 @@ export default function ContasPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-1.5">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${tab === t.key ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+            className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${tab === t.key ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
             {t.label}
             {t.key === 'overdue' && totOverdue > 0 && <span className="ml-2 bg-red-500 text-white text-xs rounded-full px-1.5">{entries.filter(e => e.status === 'overdue').length}</span>}
           </button>
@@ -166,16 +166,15 @@ export default function ContasPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[500px]">
+          <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">Descrição</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Categoria</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Vencimento</th>
-                <th className="text-right px-4 py-3 font-semibold text-slate-600">Valor</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
-                <th className="w-24"></th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600">Descrição</th>
+                <th className="hidden sm:table-cell text-left px-4 py-3 font-semibold text-slate-600">Categoria</th>
+                <th className="hidden sm:table-cell text-left px-4 py-3 font-semibold text-slate-600">Vencimento</th>
+                <th className="text-right px-3 py-3 font-semibold text-slate-600">Valor</th>
+                <th className="text-left px-3 py-3 font-semibold text-slate-600">Status</th>
+                <th className="w-20"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -184,43 +183,49 @@ export default function ContasPage() {
                 const isP = e.type === 'payable';
                 return (
                   <tr key={e.id} className="hover:bg-slate-50">
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <span>{isP ? <TrendingDown size={13} className="text-red-400" /> : <TrendingUp size={13} className="text-emerald-500" />}</span>
-                        <div>
-                          <p className="font-medium text-slate-800">{e.description}</p>
-                          {e.notes && <p className="text-xs text-slate-400">{e.notes}</p>}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="flex-shrink-0">{isP ? <TrendingDown size={13} className="text-red-400" /> : <TrendingUp size={13} className="text-emerald-500" />}</span>
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-800 truncate">{e.description}</p>
+                          {e.notes && <p className="text-xs text-slate-400 truncate">{e.notes}</p>}
+                          <div className="sm:hidden flex items-center gap-1 text-xs text-slate-400 mt-0.5">
+                            <Calendar size={10} />
+                            {new Date(e.dueDate + 'T00:00:00').toLocaleDateString('pt-BR')}
+                            {e.category && <span>· {e.category}</span>}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-500">{e.category || '—'}</td>
-                    <td className="px-4 py-3">
+                    <td className="hidden sm:table-cell px-4 py-3 text-xs text-slate-500">{e.category || '—'}</td>
+                    <td className="hidden sm:table-cell px-4 py-3">
                       <div className="flex items-center gap-1 text-xs text-slate-600">
                         <Calendar size={11} />
                         {new Date(e.dueDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </div>
                     </td>
-                    <td className={`px-4 py-3 text-right font-bold ${isP ? 'text-red-600' : 'text-emerald-600'}`}>
+                    <td className={`px-3 py-3 text-right font-bold whitespace-nowrap ${isP ? 'text-red-600' : 'text-emerald-600'}`}>
                       {isP ? '−' : '+'}{fmt(e.amount)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cfg.cls}`}>{cfg.label}</span>
                     </td>
-                    <td className="px-4 py-3 flex items-center gap-1">
-                      {(e.status === 'pending' || e.status === 'overdue') && (
-                        <button onClick={() => setPayingEntry(e)} title="Marcar como pago" className="p-1.5 text-slate-400 hover:text-emerald-600">
-                          <CheckCircle size={14} />
-                        </button>
-                      )}
-                      <button onClick={() => open(e)} className="p-1.5 text-slate-400 hover:text-blue-600"><Edit2 size={14} /></button>
-                      <button onClick={() => del(e.id)} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
+                    <td className="px-2 py-3">
+                      <div className="flex items-center gap-0.5">
+                        {(e.status === 'pending' || e.status === 'overdue') && (
+                          <button onClick={() => setPayingEntry(e)} title="Marcar como pago" className="p-1.5 text-slate-400 hover:text-emerald-600">
+                            <CheckCircle size={14} />
+                          </button>
+                        )}
+                        <button onClick={() => open(e)} className="p-1.5 text-slate-400 hover:text-blue-600"><Edit2 size={14} /></button>
+                        <button onClick={() => del(e.id)} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
+                      </div>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          </div>{/* /overflow-x-auto */}
         </div>
       )}
 
@@ -345,3 +350,4 @@ export default function ContasPage() {
     </div>
   );
 }
+

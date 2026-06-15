@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { PurchaseOrder, Supplier } from '../lib/types';
@@ -96,7 +96,7 @@ export default function PurchaseOrdersPage() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <ClipboardList size={22} className="text-emerald-600" />
@@ -156,17 +156,44 @@ export default function PurchaseOrdersPage() {
               </button>
 
               {isOpen && (
-                <div className="border-t border-slate-100 px-5 pb-5 pt-3">
-                  <div className="overflow-x-auto">
-                  <table className="w-full text-sm mb-3 min-w-[480px]">
+                <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+                  {/* Mobile: card por item */}
+                  <div className="sm:hidden space-y-2 mb-3">
+                    {forms.map((row, idx) => {
+                      const rowTotal = (parseFloat(row.quantity)||0) * (parseFloat(row.unitCost)||0);
+                      return (
+                        <div key={idx} className="bg-slate-50 rounded-xl p-3 space-y-2">
+                          <div className="flex gap-2">
+                            <input value={row.name} onChange={e => updateItemRow(order.id, idx, 'name', e.target.value)}
+                              placeholder="Nome do item" className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 min-w-0" />
+                            <button onClick={() => removeItemRow(order.id, idx)} className="text-red-400 hover:text-red-600 p-1 flex-shrink-0"><Trash2 size={14} /></button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <input value={row.quantity} onChange={e => updateItemRow(order.id, idx, 'quantity', e.target.value)}
+                              type="number" min="0" placeholder="Qtd" className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 min-w-0" />
+                            <select value={row.unit} onChange={e => updateItemRow(order.id, idx, 'unit', e.target.value)}
+                              className="border border-slate-200 rounded-lg px-1 py-1.5 text-xs focus:outline-none min-w-0">
+                              {['un','kg','g','L','ml','cx','pct'].map(u => <option key={u}>{u}</option>)}
+                            </select>
+                            <input value={row.unitCost} onChange={e => updateItemRow(order.id, idx, 'unitCost', e.target.value)}
+                              type="number" min="0" step="0.01" placeholder="R$/un" className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 min-w-0" />
+                          </div>
+                          <p className="text-xs text-slate-500 text-right font-medium">Total: {fmt(rowTotal)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Desktop: tabela */}
+                  <div className="hidden sm:block mb-3">
+                  <table className="w-full text-sm">
                     <thead>
                       <tr className="text-xs text-slate-500 border-b border-slate-100">
                         <th className="text-left pb-2 font-medium">Item</th>
-                        <th className="text-left pb-2 font-medium w-24">Qtd</th>
-                        <th className="text-left pb-2 font-medium w-20">Un</th>
-                        <th className="text-left pb-2 font-medium w-28">Custo unit</th>
-                        <th className="text-left pb-2 font-medium w-24">Total</th>
-                        <th className="w-8"></th>
+                        <th className="text-left pb-2 font-medium w-20">Qtd</th>
+                        <th className="text-left pb-2 font-medium w-16">Un</th>
+                        <th className="text-left pb-2 font-medium w-24">Custo unit</th>
+                        <th className="text-left pb-2 font-medium w-20">Total</th>
+                        <th className="w-6"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -174,27 +201,10 @@ export default function PurchaseOrdersPage() {
                         const rowTotal = (parseFloat(row.quantity) || 0) * (parseFloat(row.unitCost) || 0);
                         return (
                           <tr key={idx}>
-                            <td className="py-1.5 pr-2">
-                              <input value={row.name} onChange={e => updateItemRow(order.id, idx, 'name', e.target.value)}
-                                placeholder="ex: Farinha"
-                                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" />
-                            </td>
-                            <td className="py-1.5 pr-2">
-                              <input value={row.quantity} onChange={e => updateItemRow(order.id, idx, 'quantity', e.target.value)}
-                                type="number" min="0"
-                                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" />
-                            </td>
-                            <td className="py-1.5 pr-2">
-                              <select value={row.unit} onChange={e => updateItemRow(order.id, idx, 'unit', e.target.value)}
-                                className="w-full border border-slate-200 rounded-lg px-1 py-1 text-xs focus:outline-none">
-                                {['un','kg','g','L','ml','cx','pct'].map(u => <option key={u}>{u}</option>)}
-                              </select>
-                            </td>
-                            <td className="py-1.5 pr-2">
-                              <input value={row.unitCost} onChange={e => updateItemRow(order.id, idx, 'unitCost', e.target.value)}
-                                type="number" min="0" step="0.01" placeholder="0,00"
-                                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" />
-                            </td>
+                            <td className="py-1.5 pr-2"><input value={row.name} onChange={e => updateItemRow(order.id, idx, 'name', e.target.value)} placeholder="ex: Farinha" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
+                            <td className="py-1.5 pr-2"><input value={row.quantity} onChange={e => updateItemRow(order.id, idx, 'quantity', e.target.value)} type="number" min="0" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
+                            <td className="py-1.5 pr-2"><select value={row.unit} onChange={e => updateItemRow(order.id, idx, 'unit', e.target.value)} className="w-full border border-slate-200 rounded-lg px-1 py-1 text-xs focus:outline-none">{['un','kg','g','L','ml','cx','pct'].map(u => <option key={u}>{u}</option>)}</select></td>
+                            <td className="py-1.5 pr-2"><input value={row.unitCost} onChange={e => updateItemRow(order.id, idx, 'unitCost', e.target.value)} type="number" min="0" step="0.01" placeholder="0,00" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
                             <td className="py-1.5 pr-2 text-xs font-medium text-slate-600 whitespace-nowrap">{fmt(rowTotal)}</td>
                             <td><button onClick={() => removeItemRow(order.id, idx)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button></td>
                           </tr>
@@ -202,8 +212,8 @@ export default function PurchaseOrdersPage() {
                       })}
                     </tbody>
                   </table>
-                  </div>{/* /overflow-x-auto */}
-                  <div className="flex items-center justify-between">
+                  </div>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <button onClick={() => addItemRow(order.id)} className="flex items-center gap-1.5 text-sm text-emerald-600 hover:text-emerald-700 font-medium">
                       <Plus size={14} /> Adicionar item
                     </button>
@@ -262,3 +272,4 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
+

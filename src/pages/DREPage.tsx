@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { Order, MenuItem, FinancialEntry } from '../lib/types';
@@ -130,7 +130,7 @@ export default function DREPage() {
   const PERIOD_LABEL: Record<string, string> = { month: 'Mensal', quarter: 'Trimestral', year: 'Anual' };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <BarChart3 size={22} className="text-emerald-600" />
@@ -232,3 +232,4 @@ export default function DREPage() {
     </div>
   );
 }
+

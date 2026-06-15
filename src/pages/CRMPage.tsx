@@ -146,42 +146,43 @@ export default function CRMPage() {
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
+          <div>
           {/* Header */}
-          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider min-w-[480px]">
-            <div className="col-span-4">Cliente</div>
-            <button className="col-span-2 flex items-center gap-1 hover:text-slate-700 transition-colors" onClick={() => toggleSort('totalOrders')}>
+          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-400 uppercase tracking-wider">
+            <div className="col-span-7 sm:col-span-4">Cliente</div>
+            <button className="hidden sm:flex col-span-2 items-center gap-1 hover:text-slate-700 transition-colors" onClick={() => toggleSort('totalOrders')}>
               Pedidos {sortKey === 'totalOrders' ? (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : null}
             </button>
-            <button className="col-span-2 flex items-center gap-1 hover:text-slate-700 transition-colors" onClick={() => toggleSort('totalSpent')}>
+            <button className="hidden sm:flex col-span-2 items-center gap-1 hover:text-slate-700 transition-colors" onClick={() => toggleSort('totalSpent')}>
               Total gasto {sortKey === 'totalSpent' ? (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : null}
             </button>
-            <button className="col-span-2 flex items-center gap-1 hover:text-slate-700 transition-colors" onClick={() => toggleSort('lastOrderAt')}>
+            <button className="hidden sm:flex col-span-2 items-center gap-1 hover:text-slate-700 transition-colors" onClick={() => toggleSort('lastOrderAt')}>
               Ultimo pedido {sortKey === 'lastOrderAt' ? (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : null}
             </button>
-            <div className="col-span-2">Segmento</div>
+            <div className="col-span-5 sm:col-span-2">Segmento</div>
           </div>
 
-          <div className="divide-y divide-slate-100 min-w-[480px]">
+          <div className="divide-y divide-slate-100">
             {filtered.map(c => (
               <div key={c.phone}>
                 <button
                   className="w-full grid grid-cols-12 gap-2 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
                   onClick={() => setExpanded(e => e === c.phone ? null : c.phone)}
                 >
-                  <div className="col-span-4 flex items-center gap-2.5 min-w-0">
+                  <div className="col-span-7 sm:col-span-4 flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center flex-shrink-0">
                       <span className="text-white text-xs font-bold">{c.name.slice(0, 1).toUpperCase()}</span>
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-900 text-sm truncate">{c.name}</p>
-                      <p className="text-xs text-slate-400 font-mono">{c.phone}</p>
+                      <p className="text-xs text-slate-400 font-mono truncate">{c.phone}</p>
+                      <p className="text-xs text-emerald-600 font-semibold sm:hidden">R$ {fmt(c.totalSpent)} · {c.totalOrders} ped.</p>
                     </div>
                   </div>
-                  <div className="col-span-2 flex items-center text-sm font-bold text-slate-700">{c.totalOrders}</div>
-                  <div className="col-span-2 flex items-center text-sm font-bold text-emerald-600">R$ {fmt(c.totalSpent)}</div>
-                  <div className="col-span-2 flex items-center text-xs text-slate-500">{daysSince(c.lastOrderAt)}d atras</div>
-                  <div className="col-span-2 flex items-center">
+                  <div className="hidden sm:flex col-span-2 items-center text-sm font-bold text-slate-700">{c.totalOrders}</div>
+                  <div className="hidden sm:flex col-span-2 items-center text-sm font-bold text-emerald-600">R$ {fmt(c.totalSpent)}</div>
+                  <div className="hidden sm:flex col-span-2 items-center text-xs text-slate-500">{daysSince(c.lastOrderAt)}d atras</div>
+                  <div className="col-span-5 sm:col-span-2 flex items-center">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${SEG_COLOR[c.segment]}`}>
                       {c.segment === 'loyal' ? 'Fiel' : c.segment === 'active' ? 'Ativo' : c.segment === 'at_risk' ? 'Em risco' : 'Inativo'}
                     </span>
@@ -214,7 +215,7 @@ export default function CRMPage() {
               </div>
             ))}
           </div>
-          </div>{/* /overflow-x-auto */}
+          </div>
         </div>
       )}
 

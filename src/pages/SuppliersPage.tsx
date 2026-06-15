@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { Supplier } from '../lib/types';
@@ -60,7 +60,7 @@ export default function SuppliersPage() {
   const set = (k: keyof Supplier, v: unknown) => setForm(prev => ({ ...prev, [k]: v }));
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Truck size={22} className="text-emerald-600" />
@@ -92,48 +92,51 @@ export default function SuppliersPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[480px]">
+          <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="text-left px-5 py-3 font-semibold text-slate-600">Fornecedor</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Contato</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">CNPJ</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
-                <th className="w-20"></th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600">Fornecedor</th>
+                <th className="hidden sm:table-cell text-left px-4 py-3 font-semibold text-slate-600">Contato</th>
+                <th className="hidden sm:table-cell text-left px-4 py-3 font-semibold text-slate-600">CNPJ</th>
+                <th className="text-left px-3 py-3 font-semibold text-slate-600">Status</th>
+                <th className="w-16"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map(s => (
                 <tr key={s.id} className="hover:bg-slate-50">
-                  <td className="px-5 py-3">
+                  <td className="px-4 py-3">
                     <div>
-                      <p className="font-medium text-slate-800">{s.name}</p>
-                      {s.contactName && <p className="text-xs text-slate-500">{s.contactName}</p>}
-                      {s.address && <p className="text-xs text-slate-400">{s.address}</p>}
+                      <p className="font-medium text-slate-800 truncate max-w-[140px] sm:max-w-none">{s.name}</p>
+                      {s.contactName && <p className="text-xs text-slate-500 truncate">{s.contactName}</p>}
+                      <div className="sm:hidden mt-1 space-y-0.5">
+                        {s.phone && <div className="flex items-center gap-1 text-xs text-slate-600"><Phone size={10} />{s.phone}</div>}
+                        {s.email && <div className="flex items-center gap-1 text-xs text-slate-500 truncate"><Mail size={10} /><span className="truncate">{s.email}</span></div>}
+                      </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="hidden sm:table-cell px-4 py-3">
                     <div className="space-y-0.5">
                       {s.phone && <div className="flex items-center gap-1 text-xs text-slate-600"><Phone size={11} />{s.phone}</div>}
                       {s.email && <div className="flex items-center gap-1 text-xs text-slate-600"><Mail size={11} />{s.email}</div>}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{s.cnpj ? fmtCNPJ(s.cnpj) : '—'}</td>
-                  <td className="px-4 py-3">
+                  <td className="hidden sm:table-cell px-4 py-3 text-sm text-slate-600">{s.cnpj ? fmtCNPJ(s.cnpj) : '—'}</td>
+                  <td className="px-3 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                       {s.active ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 flex items-center gap-2">
-                    <button onClick={() => open(s)} className="p-1.5 text-slate-400 hover:text-emerald-600"><Edit2 size={14} /></button>
-                    <button onClick={() => del(s.id)} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => open(s)} className="p-1.5 text-slate-400 hover:text-emerald-600"><Edit2 size={14} /></button>
+                      <button onClick={() => del(s.id)} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          </div>
         </div>
       )}
 
@@ -206,3 +209,4 @@ export default function SuppliersPage() {
     </div>
   );
 }
+

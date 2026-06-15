@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { MenuItem, RecipeIngredient, Supplier } from '../lib/types';
@@ -96,7 +96,7 @@ export default function RecipesPage() {
   const filtered = items.filter(i => !search || i.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <BookOpen size={22} className="text-emerald-600" />
@@ -240,3 +240,4 @@ export default function RecipesPage() {
     </div>
   );
 }
+

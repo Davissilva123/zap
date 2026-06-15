@@ -384,7 +384,7 @@ export default function OperatorsPage() {
         <ol className="space-y-2 text-xs text-blue-800">
           <li className="flex gap-2"><span className="font-bold text-blue-500 flex-shrink-0">1.</span> Cadastre o operador aqui definindo uma senha de acesso.</li>
           <li className="flex gap-2"><span className="font-bold text-blue-500 flex-shrink-0">2.</span> Passe o e-mail, a senha e a URL do sistema para o operador.</li>
-          <li className="flex gap-2"><span className="font-bold text-blue-500 flex-shrink-0">3.</span> O operador acessa <strong>{window.location.origin}/login</strong> e entra com as credenciais.</li>
+          <li className="flex gap-2"><span className="font-bold text-blue-500 flex-shrink-0">3.</span> O operador acessa <strong className="break-all">{window.location.origin}/login</strong> e entra com as credenciais.</li>
           <li className="flex gap-2"><span className="font-bold text-blue-500 flex-shrink-0">4.</span> O sistema detecta o role e mostra apenas as páginas permitidas para ele.</li>
         </ol>
         <p className="text-[10px] text-blue-600 border-t border-blue-100 pt-2">
