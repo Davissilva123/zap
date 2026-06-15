@@ -15,6 +15,7 @@ export default function QRCodePage() {
   useEffect(() => {
     if (!user) return;
     db.getSettings(user.id).then(s => { if (s) setSettings(s); });
+    localStorage.setItem('zm_qr_tested', '1');
   }, [user]);
 
   if (!user || !settings) return null;
@@ -56,13 +57,13 @@ export default function QRCodePage() {
         <p className="text-slate-500 mt-0.5 text-sm">Compartilhe o link do seu cardápio digital</p>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-5">
-        <div className="card p-8 flex flex-col items-center">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="card p-4 sm:p-8 flex flex-col items-center overflow-hidden">
           <div ref={qrRef} className="p-5 bg-white rounded-2xl border-2 border-slate-100 shadow-sm mb-5">
             <QRCodeSVG value={menuUrl} size={200} level="H" fgColor={settings.accentColor} bgColor="#ffffff" />
           </div>
           <p className="text-sm text-slate-400 mb-5 font-medium">Escaneie para ver o cardápio</p>
-          <div className="flex gap-2.5 w-full">
+          <div className="flex flex-col sm:flex-row gap-2.5 w-full">
             <button onClick={downloadQR} className="btn-primary flex-1">
               <Download className="w-4 h-4" /> Download PNG
             </button>
@@ -72,24 +73,24 @@ export default function QRCodePage() {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <div className="card p-5">
+        <div className="space-y-3 min-w-0">
+          <div className="card p-5 min-w-0">
             <h3 className="font-semibold text-slate-900 text-sm mb-3 flex items-center gap-2">
               <Link2 className="w-4 h-4 text-slate-400" /> Link do cardápio
             </h3>
-            <div className="flex items-center gap-2 bg-slate-50 rounded-xl p-3 border border-slate-200">
-              <code className="text-sm text-emerald-600 flex-1 truncate font-medium">{menuUrl}</code>
+            <div className="flex items-center gap-2 bg-slate-50 rounded-xl p-3 border border-slate-200 min-w-0">
+              <code className="text-sm text-emerald-600 flex-1 min-w-0 truncate font-medium">{menuUrl}</code>
               <button onClick={copyLink} className="p-1.5 rounded-lg hover:bg-slate-200 transition-colors flex-shrink-0">
                 {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-slate-400" />}
               </button>
             </div>
           </div>
 
-          <div className="card p-5">
+          <div className="card p-5 min-w-0">
             <h3 className="font-semibold text-slate-900 text-sm mb-3">Slug personalizado</h3>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-sm text-slate-400">{window.location.origin}/m/</span>
-              <span className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1 rounded-lg">{settings.slug}</span>
+            <div className="flex items-center gap-1.5 overflow-hidden min-w-0">
+              <span className="text-sm text-slate-400 truncate min-w-0">{window.location.origin}/m/</span>
+              <span className="text-sm font-bold text-slate-800 bg-slate-100 px-3 py-1 rounded-lg flex-shrink-0">{settings.slug}</span>
             </div>
             <p className="text-xs text-slate-400 mt-2">Altere o slug em Configurações</p>
           </div>

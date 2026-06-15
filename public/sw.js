@@ -1,7 +1,11 @@
-const CACHE = 'menuzap-v2';
+const CACHE = 'menuzap-v10';
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/index.html'])));
+  // Limpa tudo e força ativação imediata
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => caches.open(CACHE).then(c => c.addAll(['/index.html'])))
+  );
   self.skipWaiting();
 });
 
@@ -17,31 +21,18 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
-  // Don't cache Supabase API calls
   if (url.hostname.includes('supabase')) return;
 
-  if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request).catch(() =>
-        caches.match('/index.html').then(r => r || Response.error())
-      )
-    );
-    return;
-  }
-
-  // Cache-first for same-origin static assets
   if (url.origin === self.location.origin) {
+    // Network-first: sempre busca o código mais recente, usa cache só offline
     e.respondWith(
-      caches.match(e.request).then(cached => {
-        if (cached) return cached;
-        return fetch(e.request).then(res => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-          }
-          return res;
-        });
-      })
+      fetch(e.request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request).then(r => r || Response.error()))
     );
   }
 });
