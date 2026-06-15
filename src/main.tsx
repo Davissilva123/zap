@@ -32,6 +32,15 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// Auto-reload when chunk fails to load after a new deploy (stale hashes)
+window.addEventListener('unhandledrejection', (event) => {
+  const msg = String(event.reason?.message ?? '');
+  if (msg.includes('Failed to fetch dynamically imported module') || msg.includes('Importing a module script failed')) {
+    event.preventDefault();
+    window.location.reload();
+  }
+});
+
 // Captura beforeinstallprompt antes do React montar para evitar race condition
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
