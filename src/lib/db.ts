@@ -397,10 +397,13 @@ export const db = {
     const { data: settingsData } = await supabase.from('restaurant_settings').select('*').eq('slug', slug).maybeSingle();
     if (!settingsData) return null;
     const settings = toSettings(settingsData as SettingsRow);
-    const [{ data: catsData }, { data: itemsData }] = await Promise.all([
+    const [{ data: catsData, error: catsErr }, { data: itemsData, error: itemsErr }] = await Promise.all([
       supabase.from('categories').select('*').eq('user_id', settings.userId).order('order', { ascending: true }),
       supabase.from('menu_items').select('*').eq('user_id', settings.userId).order('order', { ascending: true }),
     ]);
+    if (catsErr) console.error('[db.getPublicMenu] categories error:', catsErr);
+    if (itemsErr) console.error('[db.getPublicMenu] menu_items error:', itemsErr);
+    console.debug('[db.getPublicMenu]', { userId: settings.userId, cats: catsData?.length ?? 0, items: itemsData?.length ?? 0 });
     return { settings, categories: (catsData as CategoryRow[] || []).map(toCategory), items: (itemsData as MenuItemRow[] || []).map(toMenuItem) };
   },
 
