@@ -256,10 +256,13 @@ export const db = {
     return (data as CategoryRow[]).map(toCategory);
   },
 
-  async addCategory(userId: string, name: string, emoji: string): Promise<Category> {
+  async addCategory(userId: string, name: string, emoji: string, availableFrom?: string, availableTo?: string): Promise<Category> {
     const { data: existing } = await supabase.from('categories').select('order').eq('user_id', userId).order('order', { ascending: false }).limit(1);
     const maxOrder = existing && existing.length > 0 ? (existing[0] as { order: number }).order : -1;
-    const { data, error } = await supabase.from('categories').insert({ user_id: userId, name, emoji, order: maxOrder + 1 }).select().single();
+    const row: Record<string, unknown> = { user_id: userId, name, emoji, order: maxOrder + 1 };
+    if (availableFrom) row.available_from = availableFrom;
+    if (availableTo) row.available_to = availableTo;
+    const { data, error } = await supabase.from('categories').insert(row).select().single();
     if (error) throw error;
     return toCategory(data as CategoryRow);
   },
