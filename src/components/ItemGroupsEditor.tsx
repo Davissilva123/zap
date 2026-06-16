@@ -95,7 +95,12 @@ export default function ItemGroupsEditor({ menuItemId }: Props) {
   };
 
   const deleteGroup = async (id: string) => {
-    if (!confirm('Excluir grupo e todas as opções?')) return;
+    const group = groups.find(g => g.id === id);
+    if (group && group.options.length > 0) {
+      alert(`Não é possível excluir: este grupo possui ${group.options.length} opção${group.options.length !== 1 ? 'ões' : ''} vinculada${group.options.length !== 1 ? 's' : ''}. Remova as opções antes de excluir o grupo.`);
+      return;
+    }
+    if (!confirm('Excluir grupo?')) return;
     await db.deleteItemGroup(id);
     setGroups(prev => prev.filter(g => g.id !== id));
   };
