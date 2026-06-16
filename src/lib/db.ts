@@ -393,7 +393,7 @@ export const db = {
   },
 
   // ---- Public Menu ----
-  async getPublicMenu(slug: string): Promise<{ settings: RestaurantSettings; categories: Category[]; items: MenuItem[]; promotions: Promotion[] } | null> {
+  async getPublicMenu(slug: string): Promise<{ settings: RestaurantSettings; categories: Category[]; items: MenuItem[]; promotions: Promotion[]; combos: Combo[] } | null> {
     const { data: settingsData } = await supabase.from('restaurant_settings').select('*').eq('slug', slug).maybeSingle();
     if (!settingsData) return null;
     const settings = toSettings(settingsData as SettingsRow);
@@ -411,7 +411,15 @@ export const db = {
       targetType: r.target_type as 'all' | 'category' | 'item',
       targetId: r.target_id ?? null, active: r.active, createdAt: r.created_at,
     }));
-    return { settings, categories: (catsData as CategoryRow[] || []).map(toCategory), items: (itemsData as MenuItemRow[] || []).map(toMenuItem), promotions };
+    const { data: combosData, error: combosErr } = await supabase.from('combos').select('*').eq('user_id', settings.userId).eq('active', true);
+    console.log('[db.getPublicMenu] combos:', { count: combosData?.length, err: combosErr, userId: settings.userId });
+    if (combosErr) console.error('[db.getPublicMenu] combos error:', combosErr);
+    const combos: Combo[] = (combosData as any[] || []).map(r => ({
+      id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji ?? '🍱',
+      description: r.description ?? '', price: Number(r.price ?? 0),
+      active: r.active, imageUrl: r.image_url ?? '', items: (r.items as ComboItem[]) ?? [], createdAt: r.created_at,
+    }));
+    return { settings, categories: (catsData as CategoryRow[] || []).map(toCategory), items: (itemsData as MenuItemRow[] || []).map(toMenuItem), promotions, combos };
   },
 
   async getItemGroupsForItems(menuItemIds: string[]): Promise<ItemGroup[]> {

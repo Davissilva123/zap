@@ -6,7 +6,7 @@ import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS, t
 import { createMpPixCharge, checkMpPayment, cancelMpPayment } from '../lib/mercadopago';
 import { useCustomerAuth } from '../lib/customerAuth';
 import { supabaseCustomer } from '../lib/supabaseCustomer';
-import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption, Promotion } from '../lib/types';
+import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption, Promotion, Combo } from '../lib/types';
 import { isRestaurantOpen } from '../lib/menuUtils';
 import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift, Search, Info, ChevronRight } from 'lucide-react';
 
@@ -26,6 +26,7 @@ export default function PublicMenuPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [combos, setCombos] = useState<Combo[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCat, setActiveCat] = useState('');
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -129,6 +130,7 @@ export default function PublicMenuPage() {
       setCategories(data.categories);
       setItems(data.items);
       setPromotions(data.promotions);
+      setCombos(data.combos);
       db.addScan(data.settings.userId);
       db.getPublicReviews(data.settings.userId).then(setPublicReviews);
       // Repetir pedido: check sessionStorage for pre-filled cart
@@ -607,9 +609,10 @@ export default function PublicMenuPage() {
         <>
           {/* ══ MOBILE ══ */}
           <div className="md:hidden">
-            {/* Hero: fundo desfocado + logo centralizado */}
-            <div className="relative bg-black overflow-hidden" style={{ height: 240 }}>
-              <img src={settings.coverUrl} alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-45" />
+            {/* Hero: capa nítida + logo centralizado */}
+            <div className="relative overflow-hidden" style={{ height: 240 }}>
+              <img src={settings.coverUrl} alt="capa" className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-black/30" />
               <div className="absolute inset-0 flex items-center justify-center">
                 {settings.logoUrl ? (
                   <img src={settings.logoUrl} alt={settings.name} className="w-28 h-28 rounded-full object-cover border-4 border-white/30 shadow-2xl" />
@@ -941,7 +944,54 @@ export default function PublicMenuPage() {
           );
         })()}
 
-        {/* Avaliações removidas do feed — acessar pelo botao no header */}
+        {/* Combos e Kits section */}
+        {searchResults === null && !activeCat && combos.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center gap-3 mb-3 px-1">
+              <div className="w-1 h-6 rounded-full" style={{ backgroundColor: '#8b5cf6' }} />
+              <Gift className="w-5 h-5 text-purple-500" />
+              <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Combos e Kits</h2>
+            </div>
+            <div className="space-y-3">
+              {combos.map(combo => (
+                <div key={combo.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5">
+                  {combo.imageUrl && (
+                    <div className="w-full h-32 overflow-hidden">
+                      <img src={combo.imageUrl} alt={combo.name} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className="p-4">
+                    <div className="flex items-start gap-3">
+                      {!combo.imageUrl && (
+                        <span className="text-3xl flex-shrink-0">{combo.emoji}</span>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-extrabold text-slate-900 text-base leading-tight">{combo.name}</p>
+                        {combo.description && (
+                          <p className="text-xs text-slate-400 mt-1">{combo.description}</p>
+                        )}
+                        {combo.items.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {combo.items.map((ci, idx) => (
+                              <span key={idx} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                                {ci.quantity}x {ci.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-shrink-0 text-right">
+                        <span className="text-lg font-extrabold" style={{ color: accent }}>
+                          R$ {combo.price.toFixed(2).replace('.', ',')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Normal category view */}
         {searchResults === null && filteredCategories.map(cat => {
