@@ -108,4 +108,8 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, { label: string; emoji
   debit_card: { label: 'Cartão de Débito', emoji: '💳' },
   cash: { label: 'Dinheiro', emoji: '💵' },
   meal_voucher: { label: 'Vale-Refeição', emoji: '🎟️' },
+  food_voucher: { label: 'Vale-Alimentação', emoji: '🍽️' },
+  picpay: { label: 'PicPay', emoji: '💚' },
+  bank_transfer: { label: 'Transferência Bancária', emoji: '🏦' },
+  payment_link: { label: 'Link de Pagamento', emoji: '🔗' },
 };

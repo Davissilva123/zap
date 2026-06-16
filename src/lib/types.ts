@@ -70,7 +70,7 @@ export interface Scan {
   scannedAt: string;
 }
 
-export type PaymentMethod = 'pix' | 'credit_card' | 'debit_card' | 'cash' | 'meal_voucher';
+export type PaymentMethod = 'pix' | 'credit_card' | 'debit_card' | 'cash' | 'meal_voucher' | 'food_voucher' | 'picpay' | 'bank_transfer' | 'payment_link';
 
 export interface DayHours {
   open: boolean;

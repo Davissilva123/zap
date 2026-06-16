@@ -8,7 +8,7 @@ import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, 
 import { useNavigate } from 'react-router-dom';
 import type { DayHours } from '../lib/types';
 
-const allPaymentMethods: PaymentMethod[] = ['pix', 'credit_card', 'debit_card', 'cash', 'meal_voucher'];
+const allPaymentMethods: PaymentMethod[] = ['pix', 'credit_card', 'debit_card', 'cash', 'meal_voucher', 'food_voucher', 'picpay', 'bank_transfer', 'payment_link'];
 
 const accentColors = [
   { name: 'Esmeralda', value: '#059669' },
