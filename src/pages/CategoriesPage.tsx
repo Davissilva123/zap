@@ -215,7 +215,14 @@ export default function CategoriesPage() {
                 <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-slate-400" /> Horário de disponibilidade
                 </label>
-                <p className="text-xs text-slate-400 mb-2">Deixe vazio para sempre disponível</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-slate-400">Deixe vazio para sempre disponível</p>
+                  {(form.availableFrom || form.availableTo) && (
+                    <button type="button" onClick={() => setForm(f => ({ ...f, availableFrom: '', availableTo: '' }))} className="text-xs text-red-400 hover:text-red-600 font-medium">
+                      Limpar horário
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <input type="time" value={form.availableFrom} onChange={e => setForm(f => ({ ...f, availableFrom: e.target.value }))} className="input flex-1 text-sm" />
                   <span className="text-slate-400 text-sm">até</span>
