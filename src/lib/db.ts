@@ -403,7 +403,6 @@ export const db = {
     ]);
     if (catsErr) console.error('[db.getPublicMenu] categories error:', catsErr);
     if (itemsErr) console.error('[db.getPublicMenu] menu_items error:', itemsErr);
-    console.debug('[db.getPublicMenu]', { userId: settings.userId, cats: catsData?.length ?? 0, items: itemsData?.length ?? 0 });
     return { settings, categories: (catsData as CategoryRow[] || []).map(toCategory), items: (itemsData as MenuItemRow[] || []).map(toMenuItem) };
   },
 

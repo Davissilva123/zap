@@ -565,12 +565,7 @@ export default function PublicMenuPage() {
     const [th, tm] = cat.availableTo.split(':').map(Number);
     return cur >= fh * 60 + fm && cur <= th * 60 + tm;
   };
-  const visibleCategories = categories.filter(c => {
-    const hasItems = items.some(i => i.categoryId === c.id);
-    const isAvailable = isCategoryAvailableNow(c);
-    if (!hasItems || !isAvailable) console.debug('[filtro cat]', c.name, { hasItems, isAvailable, from: c.availableFrom, to: c.availableTo });
-    return hasItems && isAvailable;
-  });
+  const visibleCategories = categories.filter(c => items.some(i => i.categoryId === c.id) && isCategoryAvailableNow(c));
   const filteredCategories = activeCat ? visibleCategories.filter(c => c.id === activeCat) : visibleCategories;
   const searchQuery = menuSearch.trim().toLowerCase();
   const searchResults = searchQuery

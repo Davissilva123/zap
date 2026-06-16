@@ -101,7 +101,7 @@ export default function CategoriesPage() {
 
   const save = async () => {
     if (!form.name.trim()) return;
-    if (editCat) await db.updateCategory(editCat.id, { name: form.name.trim(), emoji: form.emoji, availableFrom: form.availableFrom || undefined, availableTo: form.availableTo || undefined });
+    if (editCat) await db.updateCategory(editCat.id, { name: form.name.trim(), emoji: form.emoji, availableFrom: form.availableFrom, availableTo: form.availableTo });
     else await db.addCategory(user.id, form.name.trim(), form.emoji, form.availableFrom || undefined, form.availableTo || undefined);
     setShowModal(false);
     load();
