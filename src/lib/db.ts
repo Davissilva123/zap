@@ -1323,6 +1323,14 @@ export const db = {
     await supabase.from('combos').delete().eq('id', id);
   },
 
+  async isItemInCombo(userId: string, itemId: string): Promise<string | null> {
+    const { data } = await supabase.from('combos').select('name, items').eq('user_id', userId).eq('active', true);
+    if (!data) return null;
+    const found = (data as { name: string; items: { menuItemId: string }[] }[])
+      .find(c => c.items?.some(i => i.menuItemId === itemId));
+    return found ? found.name : null;
+  },
+
   // ---- Promotions ----
   async getPromotions(userId: string): Promise<Promotion[]> {
     const { data, error } = await supabase

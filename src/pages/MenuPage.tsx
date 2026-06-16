@@ -116,6 +116,14 @@ export default function MenuPage() {
   };
 
   const deleteItem = async (id: string) => {
+    if (restaurantId) {
+      const comboName = await db.isItemInCombo(restaurantId, id);
+      if (comboName) {
+        alert(`Não é possível excluir: este item faz parte do combo "${comboName}". Remova-o do combo antes de excluir.`);
+        return;
+      }
+    }
+    if (!confirm('Excluir este item?')) return;
     await db.deleteMenuItem(id);
     load();
   };
