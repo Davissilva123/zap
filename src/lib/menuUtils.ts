@@ -41,3 +41,22 @@ export function calcCartTotal({
 export function clampCashback(cashbackBalance: number, amountBeforeCashback: number): number {
   return Math.min(cashbackBalance, Math.max(0, amountBeforeCashback));
 }
+
+export function calcDeliveryFee(
+  fee: number,
+  subtotal: number,
+  freeShippingEnabled: boolean,
+  freeShippingMinOrder: number,
+): number {
+  if (freeShippingEnabled && subtotal >= freeShippingMinOrder) return 0;
+  return fee;
+}
+
+export function meetsMinimumOrder(subtotal: number, minimumOrder: number): boolean {
+  return minimumOrder <= 0 || subtotal >= minimumOrder;
+}
+
+export function calcCashbackEarned(orderTotal: number, cashbackPercent: number): number {
+  if (cashbackPercent <= 0) return 0;
+  return Math.floor(orderTotal * (cashbackPercent / 100) * 100) / 100;
+}

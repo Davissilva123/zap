@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { isRestaurantOpen, calcCartSubtotal, calcCartTotal, clampCashback } from './menuUtils';
+import { isRestaurantOpen, calcCartSubtotal, calcCartTotal, clampCashback, calcDeliveryFee, meetsMinimumOrder, calcCashbackEarned } from './menuUtils';
 import type { RestaurantSettings } from './types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -225,5 +225,115 @@ describe('calcCartTotal — checkout completo', () => {
       { menuItemId: '1', name: 'Água', price: 4, quantity: 3, selectedOptions: {} },
     ] as Parameters<typeof calcCartSubtotal>[0];
     expect(calcCartSubtotal(items)).toBe(12);
+  });
+});
+
+// ── calcDeliveryFee ──────────────────────────────────────────────────────────
+
+describe('calcDeliveryFee', () => {
+  it('retorna a taxa normal quando frete grátis está desativado', () => {
+    expect(calcDeliveryFee(8, 100, false, 50)).toBe(8);
+  });
+
+  it('retorna 0 quando subtotal atinge o mínimo para frete grátis', () => {
+    expect(calcDeliveryFee(8, 50, true, 50)).toBe(0);
+  });
+
+  it('retorna 0 quando subtotal supera o mínimo para frete grátis', () => {
+    expect(calcDeliveryFee(8, 120, true, 50)).toBe(0);
+  });
+
+  it('retorna taxa normal quando subtotal está abaixo do mínimo para frete grátis', () => {
+    expect(calcDeliveryFee(8, 49, true, 50)).toBe(8);
+  });
+
+  it('retorna 0 quando a taxa de entrega é 0', () => {
+    expect(calcDeliveryFee(0, 10, false, 0)).toBe(0);
+  });
+});
+
+// ── meetsMinimumOrder ────────────────────────────────────────────────────────
+
+describe('meetsMinimumOrder', () => {
+  it('retorna true quando não há pedido mínimo configurado (0)', () => {
+    expect(meetsMinimumOrder(0, 0)).toBe(true);
+  });
+
+  it('retorna true quando subtotal exatamente igual ao mínimo', () => {
+    expect(meetsMinimumOrder(30, 30)).toBe(true);
+  });
+
+  it('retorna true quando subtotal supera o mínimo', () => {
+    expect(meetsMinimumOrder(50, 30)).toBe(true);
+  });
+
+  it('retorna false quando subtotal está abaixo do mínimo', () => {
+    expect(meetsMinimumOrder(29, 30)).toBe(false);
+  });
+
+  it('retorna true para carrinho vazio quando mínimo é 0', () => {
+    expect(meetsMinimumOrder(0, 0)).toBe(true);
+  });
+});
+
+// ── calcCashbackEarned ───────────────────────────────────────────────────────
+
+describe('calcCashbackEarned', () => {
+  it('retorna 0 quando cashback está desativado (0%)', () => {
+    expect(calcCashbackEarned(100, 0)).toBe(0);
+  });
+
+  it('calcula 5% de cashback corretamente', () => {
+    expect(calcCashbackEarned(100, 5)).toBe(5);
+  });
+
+  it('calcula 10% de cashback com valor não inteiro (arredonda para baixo)', () => {
+    expect(calcCashbackEarned(33, 10)).toBe(3.3);
+  });
+
+  it('retorna 0 para pedido com total 0', () => {
+    expect(calcCashbackEarned(0, 10)).toBe(0);
+  });
+
+  it('cashback percentual negativo retorna 0', () => {
+    expect(calcCashbackEarned(100, -5)).toBe(0);
+  });
+});
+
+// ── Fluxo completo de checkout ───────────────────────────────────────────────
+
+describe('fluxo completo de checkout — delivery com cupom e cashback', () => {
+  it('cenário: delivery R$100, frete R$8, cupom 10%, cashback R$5', () => {
+    const subtotal = calcCartSubtotal([
+      { menuItemId: '1', name: 'Pizza', price: 50, quantity: 2, selectedOptions: {} },
+    ] as Parameters<typeof calcCartSubtotal>[0]);
+    expect(subtotal).toBe(100);
+
+    const fee = calcDeliveryFee(8, subtotal, false, 0);
+    expect(fee).toBe(8);
+
+    const cashback = clampCashback(5, subtotal + fee);
+    const total = calcCartTotal({ subtotal, deliveryFee: fee, isDelivery: true, couponDiscount: 10, cashbackApplied: cashback });
+    // 100 + 8 - 10 cupom - 5 cashback = 93
+    expect(total).toBe(93);
+  });
+
+  it('cenário: retirada com frete grátis ativado, cupom fixo R$20', () => {
+    const subtotal = 80;
+    const fee = calcDeliveryFee(10, subtotal, true, 50); // frete grátis: subtotal >= 50
+    expect(fee).toBe(0);
+
+    const total = calcCartTotal({ subtotal, deliveryFee: fee, isDelivery: false, couponDiscount: 20, cashbackApplied: 0 });
+    expect(total).toBe(60);
+  });
+
+  it('cenário: cashback ganho após pedido de R$120 a 5%', () => {
+    const earned = calcCashbackEarned(120, 5);
+    expect(earned).toBe(6);
+  });
+
+  it('cenário: pedido abaixo do mínimo bloqueia checkout', () => {
+    expect(meetsMinimumOrder(25, 30)).toBe(false);
+    expect(meetsMinimumOrder(30, 30)).toBe(true);
   });
 });
