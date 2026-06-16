@@ -11,7 +11,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { accessToken: rawToken, amount, description, payerEmail } = await req.json();
-    const accessToken = (rawToken || '').trim();
+    const accessToken = (rawToken || '').trim().replace(/^Bearer\s+/i, '');
+
+    console.log('[mp-create-payment] token length:', accessToken.length, 'starts:', accessToken.substring(0, 8));
 
     if (!accessToken || !amount) {
       return new Response(
