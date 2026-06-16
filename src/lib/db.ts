@@ -393,17 +393,25 @@ export const db = {
   },
 
   // ---- Public Menu ----
-  async getPublicMenu(slug: string): Promise<{ settings: RestaurantSettings; categories: Category[]; items: MenuItem[] } | null> {
+  async getPublicMenu(slug: string): Promise<{ settings: RestaurantSettings; categories: Category[]; items: MenuItem[]; promotions: Promotion[] } | null> {
     const { data: settingsData } = await supabase.from('restaurant_settings').select('*').eq('slug', slug).maybeSingle();
     if (!settingsData) return null;
     const settings = toSettings(settingsData as SettingsRow);
-    const [{ data: catsData, error: catsErr }, { data: itemsData, error: itemsErr }] = await Promise.all([
+    const [{ data: catsData, error: catsErr }, { data: itemsData, error: itemsErr }, { data: promosData }] = await Promise.all([
       supabase.from('categories').select('*').eq('user_id', settings.userId).order('order', { ascending: true }),
       supabase.from('menu_items').select('*').eq('user_id', settings.userId).order('order', { ascending: true }),
+      supabase.from('promotions').select('*').eq('user_id', settings.userId).eq('active', true),
     ]);
     if (catsErr) console.error('[db.getPublicMenu] categories error:', catsErr);
     if (itemsErr) console.error('[db.getPublicMenu] menu_items error:', itemsErr);
-    return { settings, categories: (catsData as CategoryRow[] || []).map(toCategory), items: (itemsData as MenuItemRow[] || []).map(toMenuItem) };
+    const promotions: Promotion[] = (promosData as any[] || []).map(r => ({
+      id: r.id, userId: r.user_id, name: r.name,
+      daysOfWeek: r.days_of_week ?? [], startTime: r.start_time, endTime: r.end_time,
+      discountPercent: Number(r.discount_percent ?? 0),
+      targetType: r.target_type as 'all' | 'category' | 'item',
+      targetId: r.target_id ?? null, active: r.active, createdAt: r.created_at,
+    }));
+    return { settings, categories: (catsData as CategoryRow[] || []).map(toCategory), items: (itemsData as MenuItemRow[] || []).map(toMenuItem), promotions };
   },
 
   async getItemGroupsForItems(menuItemIds: string[]): Promise<ItemGroup[]> {

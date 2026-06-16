@@ -6,7 +6,7 @@ import { createPixCharge, checkPixPayment, createOrder, PAYMENT_METHOD_LABELS, t
 import { createMpPixCharge, checkMpPayment, cancelMpPayment } from '../lib/mercadopago';
 import { useCustomerAuth } from '../lib/customerAuth';
 import { supabaseCustomer } from '../lib/supabaseCustomer';
-import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption } from '../lib/types';
+import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption, Promotion } from '../lib/types';
 import { isRestaurantOpen } from '../lib/menuUtils';
 import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift, Search, Info, ChevronRight } from 'lucide-react';
 
@@ -25,6 +25,7 @@ export default function PublicMenuPage() {
   const [settings, setSettings] = useState<RestaurantSettings | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCat, setActiveCat] = useState('');
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -127,6 +128,7 @@ export default function PublicMenuPage() {
       setSettings(data.settings);
       setCategories(data.categories);
       setItems(data.items);
+      setPromotions(data.promotions);
       db.addScan(data.settings.userId);
       db.getPublicReviews(data.settings.userId).then(setPublicReviews);
       // Repetir pedido: check sessionStorage for pre-filled cart
@@ -199,7 +201,7 @@ export default function PublicMenuPage() {
 
   const addToCart = (item: MenuItem, qty = 1, opts: SelectedOption[] = []) => {
     const optPrice = opts.reduce((s, o) => s + o.priceDelta, 0);
-    const unitPrice = item.price + optPrice;
+    const unitPrice = getItemFinalPrice(item) + optPrice;
     const key = item.id + (opts.length ? '_' + opts.map(o => o.optionId).join(',') : '');
     setCart(prev => {
       const existing = prev.find(c => c.menuItemId === key);
@@ -557,6 +559,29 @@ export default function PublicMenuPage() {
   const avgRating = publicReviews.length
     ? Math.round((publicReviews.reduce((s, r) => s + r.rating, 0) / publicReviews.length) * 10) / 10
     : 0;
+  const isPromoActiveNow = (p: Promotion): boolean => {
+    const now = new Date();
+    const day = now.getDay();
+    if (!p.daysOfWeek.includes(day)) return false;
+    const cur = now.getHours() * 60 + now.getMinutes();
+    const [sh, sm] = p.startTime.split(':').map(Number);
+    const [eh, em] = p.endTime.split(':').map(Number);
+    return cur >= sh * 60 + sm && cur <= eh * 60 + em;
+  };
+  const activePromos = promotions.filter(isPromoActiveNow);
+  const sitewidePromo = activePromos.find(p => p.targetType === 'all') ?? null;
+
+  const getItemFinalPrice = (item: MenuItem): number => {
+    if (item.promoPrice) return item.promoPrice;
+    let bestDiscount = 0;
+    for (const p of activePromos) {
+      if (p.targetType === 'all' || (p.targetType === 'category' && p.targetId === item.categoryId) || (p.targetType === 'item' && p.targetId === item.id))
+        bestDiscount = Math.max(bestDiscount, p.discountPercent);
+    }
+    if (bestDiscount === 0) return item.price;
+    return Math.round(item.price * (1 - bestDiscount / 100) * 100) / 100;
+  };
+
   const isCategoryAvailableNow = (cat: Category) => {
     if (!cat.availableFrom || !cat.availableTo) return true;
     const now = new Date();
@@ -795,6 +820,20 @@ export default function PublicMenuPage() {
             )}
           </div>
         </div>
+        {/* Banner de promoção sitewide */}
+        {sitewidePromo && (
+          <div className="max-w-xl mx-auto px-4 pb-3">
+            <div className="flex items-center gap-3 bg-red-500 text-white rounded-2xl px-4 py-3 shadow-md">
+              <span className="text-2xl flex-shrink-0">🔥</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-extrabold text-sm leading-tight">{sitewidePromo.name}</p>
+                <p className="text-xs text-red-100 mt-0.5">{sitewidePromo.discountPercent}% de desconto em todo o cardápio</p>
+              </div>
+              <span className="text-xl font-black flex-shrink-0">-{sitewidePromo.discountPercent}%</span>
+            </div>
+          </div>
+        )}
+
         {/* Category pills — hidden while searching */}
         {!menuSearch && (
           <div ref={catBarRef} className="max-w-xl mx-auto px-4 pb-3 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -874,7 +913,8 @@ export default function PublicMenuPage() {
               </div>
               <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
                 {featuredItems.map(item => {
-                  const effectivePrice = item.promoPrice ?? item.price;
+                  const effectivePrice = getItemFinalPrice(item);
+                  const hasPromo = effectivePrice < item.price;
                   return (
                     <button key={item.id} onClick={() => openItemModal(item)}
                       className="flex-shrink-0 w-44 bg-white rounded-2xl overflow-hidden shadow-md border border-black/5 text-left active:scale-[0.97] transition-all duration-150 hover:shadow-lg">
@@ -882,7 +922,7 @@ export default function PublicMenuPage() {
                         {item.imageUrl
                           ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                           : <div className="w-full h-full flex items-center justify-center text-5xl">{item.emoji}</div>}
-                        {item.promoPrice && (
+                        {hasPromo && (
                           <span className="absolute top-2 left-2 text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded-full">PROMO</span>
                         )}
                       </div>
@@ -890,7 +930,7 @@ export default function PublicMenuPage() {
                         <p className="font-bold text-slate-900 text-xs leading-tight line-clamp-2">{item.name}</p>
                         <div className="mt-1.5 flex items-baseline gap-1.5">
                           <span className="text-sm font-extrabold" style={{ color: accent }}>R$ {effectivePrice.toFixed(2).replace('.', ',')}</span>
-                          {item.promoPrice && <span className="text-[10px] text-slate-400 line-through">R$ {item.price.toFixed(2).replace('.', ',')}</span>}
+                          {hasPromo && <span className="text-[10px] text-slate-400 line-through">R$ {item.price.toFixed(2).replace('.', ',')}</span>}
                         </div>
                       </div>
                     </button>
@@ -926,7 +966,8 @@ export default function PublicMenuPage() {
                   const inCart = cart.find(c => c.menuItemId === item.id);
                   const outOfStock = item.stock != null && item.stock <= 0;
                   const effectiveUnavailable = !item.available || outOfStock;
-                  const effectivePrice = item.promoPrice ?? item.price;
+                  const effectivePrice = getItemFinalPrice(item);
+                  const hasPromo = effectivePrice < item.price;
                   return (
                     <div
                       key={item.id}
@@ -958,10 +999,10 @@ export default function PublicMenuPage() {
                             <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">{item.description}</p>
                           )}
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            {item.promoPrice ? (
+                            {hasPromo ? (
                               <>
                                 <p className="text-base font-extrabold tracking-tight" style={{ color: accent }}>
-                                  R$ {item.promoPrice.toFixed(2).replace('.', ',')}
+                                  R$ {effectivePrice.toFixed(2).replace('.', ',')}
                                 </p>
                                 <p className="text-xs text-slate-400 line-through">
                                   R$ {item.price.toFixed(2).replace('.', ',')}
@@ -1265,7 +1306,10 @@ export default function PublicMenuPage() {
                       <p className="text-sm text-slate-400 mt-0.5 leading-snug">{itemModal.item.description}</p>
                     )}
                     <p className="font-extrabold mt-1 text-base" style={{ color: accent }}>
-                      R$ {itemModal.item.price.toFixed(2).replace('.', ',')}
+                      R$ {getItemFinalPrice(itemModal.item).toFixed(2).replace('.', ',')}
+                      {getItemFinalPrice(itemModal.item) < itemModal.item.price && (
+                        <span className="text-sm text-slate-400 line-through ml-2">R$ {itemModal.item.price.toFixed(2).replace('.', ',')}</span>
+                      )}
                     </p>
                   </div>
                   <button onClick={() => setItemModal(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 mt-1">
@@ -1341,7 +1385,7 @@ export default function PublicMenuPage() {
                     style={{ backgroundColor: accent, boxShadow: `0 8px 24px ${accent}40` }}
                   >
                     <ShoppingCart className="w-5 h-5" />
-                    Adicionar • R$ {((itemModal.item.price + Object.values(selectedOptions).reduce((s, o) => s + o.priceDelta, 0)) * itemModalQty).toFixed(2).replace('.', ',')}
+                    Adicionar • R$ {((getItemFinalPrice(itemModal.item) + Object.values(selectedOptions).reduce((s, o) => s + o.priceDelta, 0)) * itemModalQty).toFixed(2).replace('.', ',')}
                   </button>
                 </div>
               </>
