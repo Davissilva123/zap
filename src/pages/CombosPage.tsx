@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
+import { uploadImage } from '../lib/upload';
 import type { Combo, ComboItem, MenuItem } from '../lib/types';
-import { Plus, Trash2, Pencil, X, Check, Loader2, Package2, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Trash2, Pencil, X, Check, Loader2, Package2, ToggleLeft, ToggleRight, ImagePlus } from 'lucide-react';
 
 const emptyCombo: Omit<Combo, 'id' | 'userId' | 'createdAt'> = {
-  name: '', emoji: '🍱', description: '', price: 0, active: true, items: [],
+  name: '', emoji: '🍱', description: '', price: 0, active: true, imageUrl: '', items: [],
 };
 
 function fmt(n: number) { return n.toFixed(2).replace('.', ','); }
@@ -20,6 +21,9 @@ export default function CombosPage() {
   const [form, setForm] = useState(emptyCombo);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     if (!user) return;
@@ -34,15 +38,33 @@ export default function CombosPage() {
   const openAdd = () => {
     setEditingId(null);
     setForm(emptyCombo);
+    setImageFile(null);
+    setImagePreview('');
     setError('');
     setShowForm(true);
   };
 
   const openEdit = (c: Combo) => {
     setEditingId(c.id);
-    setForm({ name: c.name, emoji: c.emoji, description: c.description, price: c.price, active: c.active, items: c.items });
+    setForm({ name: c.name, emoji: c.emoji, description: c.description, price: c.price, active: c.active, imageUrl: c.imageUrl ?? '', items: c.items });
+    setImageFile(null);
+    setImagePreview(c.imageUrl ?? '');
     setError('');
     setShowForm(true);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview('');
+    setForm(f => ({ ...f, imageUrl: '' }));
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const addItem = (item: MenuItem) => {
@@ -69,8 +91,14 @@ export default function CombosPage() {
     setSaving(true);
     setError('');
     try {
-      if (editingId) await db.updateCombo(editingId, form);
-      else await db.addCombo(user.id, form);
+      let imageUrl = form.imageUrl ?? '';
+      if (imageFile) {
+        const uploaded = await uploadImage(imageFile, 'combos');
+        if (uploaded) imageUrl = uploaded;
+      }
+      const data = { ...form, imageUrl };
+      if (editingId) await db.updateCombo(editingId, data);
+      else await db.addCombo(user.id, data);
       setShowForm(false);
       await load();
     } catch (e: any) {
@@ -132,6 +160,25 @@ export default function CombosPage() {
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Descricao</label>
             <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} className="input w-full" placeholder="Descricao opcional..." />
+          </div>
+
+          {/* Imagem */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Foto do combo</label>
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+            {imagePreview ? (
+              <div className="relative w-full h-36 rounded-xl overflow-hidden border border-slate-200">
+                <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+                <button type="button" onClick={removeImage} className="absolute top-2 right-2 w-7 h-7 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center">
+                  <X className="w-3.5 h-3.5 text-white" />
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full h-24 rounded-xl border-2 border-dashed border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 transition-colors flex flex-col items-center justify-center gap-1.5 text-slate-400 hover:text-emerald-600">
+                <ImagePlus className="w-5 h-5" />
+                <span className="text-xs font-medium">Adicionar foto</span>
+              </button>
+            )}
           </div>
 
           <div>
@@ -209,10 +256,15 @@ export default function CombosPage() {
       ) : (
         <div className="grid sm:grid-cols-2 gap-3">
           {combos.map(c => (
-            <div key={c.id} className={`card p-4 space-y-3 ${!c.active ? 'opacity-60' : ''}`}>
-              <div className="flex items-start justify-between gap-2">
+            <div key={c.id} className={`card overflow-hidden space-y-3 ${!c.active ? 'opacity-60' : ''}`}>
+              {c.imageUrl && (
+                <div className="h-32 w-full overflow-hidden">
+                  <img src={c.imageUrl} alt={c.name} className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="flex items-start justify-between gap-2 px-4 pt-1 pb-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="text-2xl">{c.emoji}</span>
+                  {!c.imageUrl && <span className="text-2xl">{c.emoji}</span>}
                   <div>
                     <p className="font-bold text-slate-900">{c.name}</p>
                     {c.description && <p className="text-xs text-slate-400 truncate">{c.description}</p>}
@@ -227,7 +279,7 @@ export default function CombosPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 px-4">
                 {c.items.map(ci => (
                   <span key={ci.menuItemId} className="px-2 py-0.5 bg-slate-100 rounded-lg text-xs text-slate-600">
                     {ci.emoji} {ci.name} {ci.quantity > 1 ? `x${ci.quantity}` : ''}
@@ -235,7 +287,7 @@ export default function CombosPage() {
                 ))}
               </div>
 
-              <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+              <div className="flex items-center justify-between px-4 pb-4 pt-1 border-t border-slate-100">
                 <span className="text-xs text-slate-400">{c.items.length} iten{c.items.length !== 1 ? 's' : ''}</span>
                 <span className="text-lg font-black text-emerald-600">R$ {fmt(c.price)}</span>
               </div>

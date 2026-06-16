@@ -243,6 +243,7 @@ export interface Combo {
   description: string;
   price: number;
   active: boolean;
+  imageUrl?: string;
   items: ComboItem[];
   createdAt: string;
 }

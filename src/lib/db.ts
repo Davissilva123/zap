@@ -1294,7 +1294,7 @@ export const db = {
     return (data as any[]).map(r => ({
       id: r.id, userId: r.user_id, name: r.name, emoji: r.emoji ?? '🍱',
       description: r.description ?? '', price: Number(r.price ?? 0),
-      active: r.active, items: (r.items as ComboItem[]) ?? [], createdAt: r.created_at,
+      active: r.active, imageUrl: r.image_url ?? '', items: (r.items as ComboItem[]) ?? [], createdAt: r.created_at,
     }));
   },
 
@@ -1302,7 +1302,7 @@ export const db = {
     const { error } = await supabase.from('combos').insert({
       user_id: userId, name: combo.name, emoji: combo.emoji,
       description: combo.description, price: combo.price,
-      active: combo.active, items: combo.items,
+      active: combo.active, image_url: combo.imageUrl ?? '', items: combo.items,
     });
     if (error) throw new Error(error.message);
   },
@@ -1314,6 +1314,7 @@ export const db = {
     if (updates.description !== undefined) row.description = updates.description;
     if (updates.price !== undefined) row.price = updates.price;
     if (updates.active !== undefined) row.active = updates.active;
+    if (updates.imageUrl !== undefined) row.image_url = updates.imageUrl;
     if (updates.items !== undefined) row.items = updates.items;
     await supabase.from('combos').update(row).eq('id', id);
   },
