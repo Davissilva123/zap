@@ -850,19 +850,6 @@ export default function PublicMenuPage() {
             >
               Todos
             </button>
-            {visibleCategories.map(cat => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCat(activeCat === cat.id ? '' : cat.id)}
-                className="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border flex items-center gap-1.5"
-                style={activeCat === cat.id
-                  ? { backgroundColor: accent, color: '#fff', borderColor: accent }
-                  : { backgroundColor: 'transparent', color: '#6b7280', borderColor: '#e5e7eb' }}
-              >
-                <span>{cat.emoji}</span>
-                <span>{cat.name}</span>
-              </button>
-            ))}
             {combos.length > 0 && (
               <button
                 onClick={() => {
@@ -878,6 +865,19 @@ export default function PublicMenuPage() {
                 <span>Combos</span>
               </button>
             )}
+            {visibleCategories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCat(activeCat === cat.id ? '' : cat.id)}
+                className="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border flex items-center gap-1.5"
+                style={activeCat === cat.id
+                  ? { backgroundColor: accent, color: '#fff', borderColor: accent }
+                  : { backgroundColor: 'transparent', color: '#6b7280', borderColor: '#e5e7eb' }}
+              >
+                <span>{cat.emoji}</span>
+                <span>{cat.name}</span>
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -1003,32 +1003,17 @@ export default function PublicMenuPage() {
                         <span className="text-lg font-extrabold" style={{ color: accent }}>
                           R$ {combo.price.toFixed(2).replace('.', ',')}
                         </span>
-                        {inCart ? (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setCart(prev => {
-                                const qty = (prev.find(c => c.menuItemId === combo.id)?.quantity ?? 1) - 1;
-                                return qty <= 0 ? prev.filter(c => c.menuItemId !== combo.id) : prev.map(c => c.menuItemId === combo.id ? { ...c, quantity: qty } : c);
-                              })}
-                              className="w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold"
-                              style={{ borderColor: accent, color: accent }}
-                            ><Minus className="w-4 h-4" /></button>
-                            <span className="font-extrabold text-slate-900 w-5 text-center">{inCart.quantity}</span>
-                            <button
-                              onClick={() => setCart(prev => prev.map(c => c.menuItemId === combo.id ? { ...c, quantity: c.quantity + 1 } : c))}
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
-                              style={{ backgroundColor: accent }}
-                            ><Plus className="w-4 h-4" /></button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setCart(prev => [...prev, { menuItemId: combo.id, name: combo.name, emoji: combo.emoji, price: combo.price, quantity: 1, categoryId: '__combos__' }])}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-bold"
-                            style={{ backgroundColor: accent }}
-                          >
-                            <Plus className="w-4 h-4" /> Adicionar
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setCart(prev => {
+                            const existing = prev.find(c => c.menuItemId === combo.id);
+                            if (existing) return prev.map(c => c.menuItemId === combo.id ? { ...c, quantity: c.quantity + 1 } : c);
+                            return [...prev, { menuItemId: combo.id, name: combo.name, emoji: combo.emoji, price: combo.price, quantity: 1, categoryId: '__combos__' }];
+                          })}
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-md flex-shrink-0"
+                          style={{ backgroundColor: accent }}
+                        >
+                          {inCart ? <span className="text-sm font-extrabold">{inCart.quantity}</span> : <Plus className="w-5 h-5" />}
+                        </button>
                       </div>
                     </div>
                   </div>
