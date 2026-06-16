@@ -1145,7 +1145,7 @@ export default function PublicMenuPage() {
           );
         })}
 
-        {searchResults === null && filteredCategories.length === 0 && (
+        {searchResults === null && activeCat !== '__combos__' && filteredCategories.length === 0 && (
           <div className="text-center py-24">
             <div className="w-20 h-20 rounded-3xl bg-white shadow-sm flex items-center justify-center mx-auto mb-4">
               <ChefHat className="w-9 h-9 text-slate-200" />
