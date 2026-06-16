@@ -10,11 +10,12 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
 
   try {
-    const { accessToken, amount, description, payerEmail } = await req.json();
+    const { accessToken: rawToken, amount, description, payerEmail } = await req.json();
+    const accessToken = (rawToken || '').trim();
 
     if (!accessToken || !amount) {
       return new Response(
-        JSON.stringify({ error: "accessToken e amount são obrigatórios" }),
+        JSON.stringify({ error: `Token Mercado Pago não configurado. Acesse Configurações e cole o Access Token.` }),
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
       );
     }

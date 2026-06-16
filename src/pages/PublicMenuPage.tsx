@@ -361,7 +361,7 @@ export default function PublicMenuPage() {
         let pixResult: PixChargeResult;
         if (hasMp) {
           pixGatewayRef.current = 'mp';
-          const mp = await createMpPixCharge(settings.mercadoPagoToken, cartTotal, `Pedido ${settings.name}`, customer?.email || 'cliente@zapmenu.app');
+          const mp = await createMpPixCharge(settings.mercadoPagoToken.trim(), cartTotal, `Pedido ${settings.name}`, customer?.email || 'cliente@zapmenu.app');
           pixResult = {
             id: mp.txId,
             txId: mp.txId,
