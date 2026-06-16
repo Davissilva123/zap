@@ -108,7 +108,12 @@ export default function CategoriesPage() {
   };
 
   const deleteCat = async (id: string) => {
-    if (!confirm('Ao apagar a categoria, todos os itens nela serão removidos. Continuar?')) return;
+    const count = itemCounts[id] ?? 0;
+    if (count > 0) {
+      alert(`Não é possível excluir: esta categoria possui ${count} item${count > 1 ? 'ns' : ''} vinculado${count > 1 ? 's' : ''}. Remova os itens antes de excluir a categoria.`);
+      return;
+    }
+    if (!confirm('Excluir categoria? Esta ação não pode ser desfeita.')) return;
     await db.deleteCategory(id);
     load();
   };
