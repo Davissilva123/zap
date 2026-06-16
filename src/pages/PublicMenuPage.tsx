@@ -55,6 +55,7 @@ export default function PublicMenuPage() {
   const [pixCountdown, setPixCountdown] = useState(0);
   const [cashChange, setCashChange] = useState('');
   const catBarRef = useRef<HTMLDivElement>(null);
+  const combosRef = useRef<HTMLDivElement>(null);
   const pixGatewayRef = useRef<'xgate' | 'mp'>('xgate');
 
   // Adicionais
@@ -862,6 +863,21 @@ export default function PublicMenuPage() {
                 <span>{cat.name}</span>
               </button>
             ))}
+            {combos.length > 0 && (
+              <button
+                onClick={() => {
+                  setActiveCat('__combos__');
+                  setTimeout(() => combosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                }}
+                className="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border flex items-center gap-1.5"
+                style={activeCat === '__combos__'
+                  ? { backgroundColor: accent, color: '#fff', borderColor: accent }
+                  : { backgroundColor: 'transparent', color: '#6b7280', borderColor: '#e5e7eb' }}
+              >
+                <span>🎁</span>
+                <span>Combos</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -945,50 +961,79 @@ export default function PublicMenuPage() {
         })()}
 
         {/* Combos e Kits section */}
-        {searchResults === null && !activeCat && combos.length > 0 && (
-          <div className="mt-6">
+        {searchResults === null && (!activeCat || activeCat === '__combos__') && combos.length > 0 && (
+          <div ref={combosRef} className="mt-6">
             <div className="flex items-center gap-3 mb-3 px-1">
               <div className="w-1 h-6 rounded-full" style={{ backgroundColor: '#8b5cf6' }} />
               <Gift className="w-5 h-5 text-purple-500" />
               <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">Combos e Kits</h2>
             </div>
             <div className="space-y-3">
-              {combos.map(combo => (
-                <div key={combo.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5">
-                  {combo.imageUrl && (
-                    <div className="w-full h-32 overflow-hidden">
-                      <img src={combo.imageUrl} alt={combo.name} className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                  <div className="p-4">
-                    <div className="flex items-start gap-3">
-                      {!combo.imageUrl && (
-                        <span className="text-3xl flex-shrink-0">{combo.emoji}</span>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-extrabold text-slate-900 text-base leading-tight">{combo.name}</p>
-                        {combo.description && (
-                          <p className="text-xs text-slate-400 mt-1">{combo.description}</p>
-                        )}
-                        {combo.items.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {combo.items.map((ci, idx) => (
-                              <span key={idx} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                                {ci.quantity}x {ci.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+              {combos.map(combo => {
+                const inCart = cart.find(c => c.menuItemId === combo.id);
+                return (
+                  <div key={combo.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-black/5">
+                    {combo.imageUrl && (
+                      <div className="w-full h-36 overflow-hidden">
+                        <img src={combo.imageUrl} alt={combo.name} className="w-full h-full object-cover" />
                       </div>
-                      <div className="flex-shrink-0 text-right">
+                    )}
+                    <div className="p-4">
+                      <div className="flex items-start gap-3">
+                        {!combo.imageUrl && (
+                          <span className="text-3xl flex-shrink-0">{combo.emoji}</span>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-extrabold text-slate-900 text-base leading-tight">{combo.name}</p>
+                          {combo.description && (
+                            <p className="text-xs text-slate-400 mt-1">{combo.description}</p>
+                          )}
+                          {combo.items.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {combo.items.map((ci, idx) => (
+                                <span key={idx} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                                  {ci.quantity}x {ci.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-3">
                         <span className="text-lg font-extrabold" style={{ color: accent }}>
                           R$ {combo.price.toFixed(2).replace('.', ',')}
                         </span>
+                        {inCart ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setCart(prev => {
+                                const qty = (prev.find(c => c.menuItemId === combo.id)?.quantity ?? 1) - 1;
+                                return qty <= 0 ? prev.filter(c => c.menuItemId !== combo.id) : prev.map(c => c.menuItemId === combo.id ? { ...c, quantity: qty } : c);
+                              })}
+                              className="w-8 h-8 rounded-full flex items-center justify-center border-2 font-bold"
+                              style={{ borderColor: accent, color: accent }}
+                            ><Minus className="w-4 h-4" /></button>
+                            <span className="font-extrabold text-slate-900 w-5 text-center">{inCart.quantity}</span>
+                            <button
+                              onClick={() => setCart(prev => prev.map(c => c.menuItemId === combo.id ? { ...c, quantity: c.quantity + 1 } : c))}
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
+                              style={{ backgroundColor: accent }}
+                            ><Plus className="w-4 h-4" /></button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setCart(prev => [...prev, { menuItemId: combo.id, name: combo.name, emoji: combo.emoji, price: combo.price, quantity: 1, categoryId: '__combos__' }])}
+                            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-white text-sm font-bold"
+                            style={{ backgroundColor: accent }}
+                          >
+                            <Plus className="w-4 h-4" /> Adicionar
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
