@@ -920,7 +920,7 @@ export default function PublicMenuPage() {
         )}
 
         {/* Featured items section */}
-        {searchResults === null && !activeCat && (() => {
+        {searchResults === null && !activeCat && activeCat !== '__combos__' && (() => {
           const featuredItems = items.filter(i => i.featured && i.available && (i.stock == null || i.stock > 0));
           if (featuredItems.length === 0) return null;
           return (
@@ -1024,7 +1024,7 @@ export default function PublicMenuPage() {
         )}
 
         {/* Normal category view */}
-        {searchResults === null && filteredCategories.map(cat => {
+        {searchResults === null && activeCat !== '__combos__' && filteredCategories.map(cat => {
           const catItems = items.filter(i => {
             if (i.categoryId !== cat.id) return false;
             if (settings?.hideOutOfStock && i.stock != null && i.stock <= 0) return false;
