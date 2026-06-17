@@ -329,6 +329,7 @@ export interface PurchaseOrderItem {
   id: string;
   orderId: string;
   userId: string;
+  menuItemId?: string | null;
   name: string;
   quantity: number;
   unit: string;

@@ -1,8 +1,8 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
-import type { PurchaseOrder, Supplier } from '../lib/types';
-import { ClipboardList, Plus, Trash2, X, Save, ChevronDown, ChevronRight, Send, CheckCircle2 } from 'lucide-react';
+import type { PurchaseOrder, Supplier, MenuItem } from '../lib/types';
+import { ClipboardList, Plus, Trash2, X, Save, ChevronDown, ChevronRight, Send, CheckCircle2, PackageCheck } from 'lucide-react';
 import { parseCurrency, numToCurrency } from '../lib/masks';
 
 const STATUS_CFG = {
@@ -14,24 +14,31 @@ const STATUS_CFG = {
 
 const fmt = (v: number) => `R$ ${v.toFixed(2).replace('.', ',')}`;
 
-interface ItemForm { id?: string; name: string; quantity: string; unit: string; unitCost: string }
-const emptyItem = (): ItemForm => ({ name: '', quantity: '', unit: 'un', unitCost: '' });
+interface ItemForm { id?: string; menuItemId: string; name: string; quantity: string; unit: string; unitCost: string }
+const emptyItem = (): ItemForm => ({ menuItemId: '', name: '', quantity: '', unit: 'un', unitCost: '' });
 
 export default function PurchaseOrdersPage() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [itemForms, setItemForms] = useState<Record<string, ItemForm[]>>({});
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState<Partial<PurchaseOrder>>({});
   const [saving, setSaving] = useState(false);
+  const [receivingId, setReceivingId] = useState<string | null>(null);
 
   const load = async () => {
     if (!user) return;
-    const [pos, sups] = await Promise.all([db.getPurchaseOrders(user.id), db.getSuppliers(user.id)]);
+    const [pos, sups, items] = await Promise.all([
+      db.getPurchaseOrders(user.id),
+      db.getSuppliers(user.id),
+      db.getMenuItems(user.id),
+    ]);
     setOrders(pos);
     setSuppliers(sups.filter(s => s.active));
+    setMenuItems(items.filter(i => i.available));
   };
 
   useEffect(() => { load(); }, [user]);
@@ -41,7 +48,7 @@ export default function PurchaseOrdersPage() {
     setExpanded(id);
     if (!itemForms[id]) {
       const items = await db.getPurchaseOrderItems(id);
-      setItemForms(prev => ({ ...prev, [id]: items.map(i => ({ id: i.id, name: i.name, quantity: String(i.quantity), unit: i.unit, unitCost: String(i.unitCost) })) }));
+      setItemForms(prev => ({ ...prev, [id]: items.map(i => ({ id: i.id, menuItemId: i.menuItemId ?? '', name: i.name, quantity: String(i.quantity), unit: i.unit, unitCost: String(i.unitCost) })) }));
     }
   };
 
@@ -64,6 +71,17 @@ export default function PurchaseOrdersPage() {
   const updateItemRow = (orderId: string, idx: number, field: keyof ItemForm, val: string) =>
     setItemForms(prev => ({ ...prev, [orderId]: prev[orderId].map((r, i) => i === idx ? { ...r, [field]: val } : r) }));
 
+  const selectMenuItemForRow = (orderId: string, idx: number, menuItemId: string) => {
+    const mi = menuItems.find(m => m.id === menuItemId);
+    setItemForms(prev => ({
+      ...prev,
+      [orderId]: prev[orderId].map((r, i) => i === idx
+        ? { ...r, menuItemId, name: mi ? `${mi.emoji} ${mi.name}` : r.name }
+        : r
+      ),
+    }));
+  };
+
   const removeItemRow = async (orderId: string, idx: number) => {
     const row = itemForms[orderId]?.[idx];
     if (row?.id) await db.deletePurchaseOrderItem(row.id);
@@ -75,7 +93,15 @@ export default function PurchaseOrdersPage() {
     setSaving(true);
     const forms = itemForms[orderId] ?? [];
     await Promise.all(forms.filter(f => f.name.trim()).map(f =>
-      db.upsertPurchaseOrderItem(user.id, { id: f.id, orderId, name: f.name.trim(), quantity: parseFloat(f.quantity) || 0, unit: f.unit, unitCost: parseFloat(f.unitCost) || 0 })
+      db.upsertPurchaseOrderItem(user.id, {
+        id: f.id,
+        orderId,
+        menuItemId: f.menuItemId || null,
+        name: f.name.trim(),
+        quantity: parseFloat(f.quantity) || 0,
+        unit: f.unit,
+        unitCost: parseFloat(f.unitCost) || 0,
+      })
     ));
     const total = forms.reduce((s, f) => s + (parseFloat(f.quantity) || 0) * (parseFloat(f.unitCost) || 0), 0);
     await db.upsertPurchaseOrder(user.id, { id: orderId, total });
@@ -84,10 +110,21 @@ export default function PurchaseOrdersPage() {
   };
 
   const setStatus = async (id: string, status: PurchaseOrder['status']) => {
-    const updates: Partial<PurchaseOrder> = { id, status };
-    if (status === 'received') updates.receivedDate = new Date().toISOString().slice(0, 10);
-    await db.upsertPurchaseOrder(user!.id, updates);
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
+    if (status === 'received') {
+      setReceivingId(id);
+      // Save pending items first
+      if (itemForms[id]) await saveItems(id);
+      // Apply stock update for linked products
+      await db.applyPurchaseOrderStock(id);
+      const updates: Partial<PurchaseOrder> = { id, status, receivedDate: new Date().toISOString().slice(0, 10) };
+      await db.upsertPurchaseOrder(user!.id, updates);
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
+      setReceivingId(null);
+    } else {
+      const updates: Partial<PurchaseOrder> = { id, status };
+      await db.upsertPurchaseOrder(user!.id, updates);
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, ...updates } : o));
+    }
   };
 
   const del = async (id: string) => {
@@ -122,20 +159,23 @@ export default function PurchaseOrdersPage() {
           const cfg = STATUS_CFG[order.status];
           const isOpen = expanded === order.id;
           const forms = itemForms[order.id] ?? [];
+          const isReceiving = receivingId === order.id;
+          const linkedCount = forms.filter(f => f.menuItemId).length;
 
           return (
             <div key={order.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <button onClick={() => toggleExpand(order.id)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-slate-50 text-left">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <span className="font-semibold text-slate-800">#{order.id.slice(-6).toUpperCase()}</span>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cfg.cls}`}>{cfg.label}</span>
                     {order.supplierName && <span className="text-sm text-slate-500">{order.supplierName}</span>}
                   </div>
-                  <div className="flex items-center gap-4 mt-0.5 text-xs text-slate-400">
+                  <div className="flex items-center gap-4 mt-0.5 text-xs text-slate-400 flex-wrap">
                     <span>{new Date(order.createdAt).toLocaleDateString('pt-BR')}</span>
                     {order.expectedDate && <span>Previsão: {new Date(order.expectedDate + 'T00:00:00').toLocaleDateString('pt-BR')}</span>}
                     {order.total > 0 && <span className="font-semibold text-slate-600">{fmt(order.total)}</span>}
+                    {order.receivedDate && <span className="text-green-600 font-medium">Recebido em {new Date(order.receivedDate + 'T00:00:00').toLocaleDateString('pt-BR')}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -146,9 +186,9 @@ export default function PurchaseOrdersPage() {
                     </button>
                   )}
                   {order.status === 'sent' && (
-                    <button onClick={e => { e.stopPropagation(); setStatus(order.id, 'received'); }}
-                      className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-xs hover:bg-green-100">
-                      <CheckCircle2 size={12} /> Recebido
+                    <button onClick={e => { e.stopPropagation(); setStatus(order.id, 'received'); }} disabled={isReceiving}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-xs hover:bg-green-100 disabled:opacity-60">
+                      <PackageCheck size={12} /> {isReceiving ? 'Recebendo...' : 'Recebido'}
                     </button>
                   )}
                   <button onClick={e => { e.stopPropagation(); del(order.id); }} className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
@@ -158,6 +198,13 @@ export default function PurchaseOrdersPage() {
 
               {isOpen && (
                 <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+                  {order.status === 'sent' && linkedCount > 0 && (
+                    <div className="mb-3 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-700">
+                      <PackageCheck size={14} />
+                      {linkedCount} {linkedCount === 1 ? 'produto vinculado' : 'produtos vinculados'} — ao marcar como Recebido, o estoque será atualizado automaticamente.
+                    </div>
+                  )}
+
                   {/* Mobile: card por item */}
                   <div className="sm:hidden space-y-2 mb-3">
                     {forms.map((row, idx) => {
@@ -165,8 +212,18 @@ export default function PurchaseOrdersPage() {
                       return (
                         <div key={idx} className="bg-slate-50 rounded-xl p-3 space-y-2">
                           <div className="flex gap-2">
-                            <input value={row.name} onChange={e => updateItemRow(order.id, idx, 'name', e.target.value)}
-                              placeholder="Nome do item" className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 min-w-0" />
+                            <div className="flex-1 space-y-1.5">
+                              <select
+                                value={row.menuItemId}
+                                onChange={e => selectMenuItemForRow(order.id, idx, e.target.value)}
+                                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                              >
+                                <option value="">— Produto do cardápio (opcional) —</option>
+                                {menuItems.map(m => <option key={m.id} value={m.id}>{m.emoji} {m.name}</option>)}
+                              </select>
+                              <input value={row.name} onChange={e => updateItemRow(order.id, idx, 'name', e.target.value)}
+                                placeholder="Nome do item" className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+                            </div>
                             <button onClick={() => removeItemRow(order.id, idx)} className="text-red-400 hover:text-red-600 p-1 flex-shrink-0"><Trash2 size={14} /></button>
                           </div>
                           <div className="grid grid-cols-3 gap-2">
@@ -184,43 +241,58 @@ export default function PurchaseOrdersPage() {
                       );
                     })}
                   </div>
+
                   {/* Desktop: tabela */}
                   <div className="hidden sm:block mb-3">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-xs text-slate-500 border-b border-slate-100">
-                        <th className="text-left pb-2 font-medium">Item</th>
-                        <th className="text-left pb-2 font-medium w-20">Qtd</th>
-                        <th className="text-left pb-2 font-medium w-16">Un</th>
-                        <th className="text-left pb-2 font-medium w-24">Custo unit</th>
-                        <th className="text-left pb-2 font-medium w-20">Total</th>
-                        <th className="w-6"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {forms.map((row, idx) => {
-                        const rowTotal = (parseFloat(row.quantity) || 0) * (parseFloat(row.unitCost) || 0);
-                        return (
-                          <tr key={idx}>
-                            <td className="py-1.5 pr-2"><input value={row.name} onChange={e => updateItemRow(order.id, idx, 'name', e.target.value)} placeholder="ex: Farinha" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
-                            <td className="py-1.5 pr-2"><input value={row.quantity} onChange={e => updateItemRow(order.id, idx, 'quantity', e.target.value)} type="number" min="0" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
-                            <td className="py-1.5 pr-2"><select value={row.unit} onChange={e => updateItemRow(order.id, idx, 'unit', e.target.value)} className="w-full border border-slate-200 rounded-lg px-1 py-1 text-xs focus:outline-none">{['un','kg','g','L','ml','cx','pct'].map(u => <option key={u}>{u}</option>)}</select></td>
-                            <td className="py-1.5 pr-2"><input value={numToCurrency(parseFloat(row.unitCost) || 0)} onChange={e => updateItemRow(order.id, idx, 'unitCost', String(parseCurrency(e.target.value)))} type="text" inputMode="numeric" placeholder="R$ 0,00" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
-                            <td className="py-1.5 pr-2 text-xs font-medium text-slate-600 whitespace-nowrap">{fmt(rowTotal)}</td>
-                            <td><button onClick={() => removeItemRow(order.id, idx)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button></td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs text-slate-500 border-b border-slate-100">
+                          <th className="text-left pb-2 font-medium">Produto do cardápio</th>
+                          <th className="text-left pb-2 font-medium">Nome / Descrição</th>
+                          <th className="text-left pb-2 font-medium w-16">Qtd</th>
+                          <th className="text-left pb-2 font-medium w-14">Un</th>
+                          <th className="text-left pb-2 font-medium w-24">Custo unit</th>
+                          <th className="text-left pb-2 font-medium w-20">Total</th>
+                          <th className="w-6"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {forms.map((row, idx) => {
+                          const rowTotal = (parseFloat(row.quantity) || 0) * (parseFloat(row.unitCost) || 0);
+                          return (
+                            <tr key={idx}>
+                              <td className="py-1.5 pr-2">
+                                <select
+                                  value={row.menuItemId}
+                                  onChange={e => selectMenuItemForRow(order.id, idx, e.target.value)}
+                                  className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                >
+                                  <option value="">— Nenhum —</option>
+                                  {menuItems.map(m => <option key={m.id} value={m.id}>{m.emoji} {m.name}</option>)}
+                                </select>
+                              </td>
+                              <td className="py-1.5 pr-2">
+                                <input value={row.name} onChange={e => updateItemRow(order.id, idx, 'name', e.target.value)} placeholder="ex: Farinha" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+                              </td>
+                              <td className="py-1.5 pr-2"><input value={row.quantity} onChange={e => updateItemRow(order.id, idx, 'quantity', e.target.value)} type="number" min="0" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
+                              <td className="py-1.5 pr-2"><select value={row.unit} onChange={e => updateItemRow(order.id, idx, 'unit', e.target.value)} className="w-full border border-slate-200 rounded-lg px-1 py-1 text-xs focus:outline-none">{['un','kg','g','L','ml','cx','pct'].map(u => <option key={u}>{u}</option>)}</select></td>
+                              <td className="py-1.5 pr-2"><input value={numToCurrency(parseFloat(row.unitCost) || 0)} onChange={e => updateItemRow(order.id, idx, 'unitCost', String(parseCurrency(e.target.value)))} type="text" inputMode="numeric" placeholder="R$ 0,00" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
+                              <td className="py-1.5 pr-2 text-xs font-medium text-slate-600 whitespace-nowrap">{fmt(rowTotal)}</td>
+                              <td><button onClick={() => removeItemRow(order.id, idx)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
+
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <button onClick={() => addItemRow(order.id)} className="flex items-center gap-1.5 text-sm text-emerald-600 hover:text-emerald-700 font-medium">
                       <Plus size={14} /> Adicionar item
                     </button>
                     <div className="flex items-center gap-3">
                       <span className="text-sm text-slate-600 font-medium">Total: {fmt(forms.reduce((s, f) => s + (parseFloat(f.quantity)||0)*(parseFloat(f.unitCost)||0), 0))}</span>
-                      <button onClick={() => saveItems(order.id)} disabled={saving}
+                      <button onClick={() => saveItems(order.id)} disabled={saving || order.status === 'received'}
                         className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white rounded-lg text-sm font-medium">
                         <Save size={14} />{saving ? 'Salvando...' : 'Salvar itens'}
                       </button>
@@ -273,4 +345,3 @@ export default function PurchaseOrdersPage() {
     </div>
   );
 }
-

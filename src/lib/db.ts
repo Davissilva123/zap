@@ -1541,7 +1541,7 @@ export const db = {
   async getPurchaseOrderItems(orderId: string): Promise<import('./types').PurchaseOrderItem[]> {
     const { data } = await supabase.from('purchase_order_items').select('*').eq('order_id', orderId).order('created_at');
     if (!data) return [];
-    return (data as any[]).map(r => ({ id: r.id, orderId: r.order_id, userId: r.user_id, name: r.name, quantity: Number(r.quantity), unit: r.unit ?? 'un', unitCost: Number(r.unit_cost), createdAt: r.created_at }));
+    return (data as any[]).map(r => ({ id: r.id, orderId: r.order_id, userId: r.user_id, menuItemId: r.menu_item_id ?? null, name: r.name, quantity: Number(r.quantity), unit: r.unit ?? 'un', unitCost: Number(r.unit_cost), createdAt: r.created_at }));
   },
   async upsertPurchaseOrder(userId: string, po: Partial<import('./types').PurchaseOrder>): Promise<string> {
     const row: Record<string, unknown> = { user_id: userId, supplier_id: po.supplierId ?? null, status: po.status ?? 'draft', expected_date: po.expectedDate ?? null, received_date: po.receivedDate ?? null, total: po.total ?? 0, notes: po.notes ?? '' };
@@ -1550,9 +1550,18 @@ export const db = {
     return (data as any).id as string;
   },
   async upsertPurchaseOrderItem(userId: string, item: Partial<import('./types').PurchaseOrderItem> & { orderId: string; name: string }): Promise<void> {
-    const row: Record<string, unknown> = { order_id: item.orderId, user_id: userId, name: item.name, quantity: item.quantity ?? 0, unit: item.unit ?? 'un', unit_cost: item.unitCost ?? 0 };
+    const row: Record<string, unknown> = { order_id: item.orderId, user_id: userId, menu_item_id: item.menuItemId ?? null, name: item.name, quantity: item.quantity ?? 0, unit: item.unit ?? 'un', unit_cost: item.unitCost ?? 0 };
     if (item.id) row.id = item.id;
     await supabase.from('purchase_order_items').upsert(row, { onConflict: 'id' });
+  },
+  async applyPurchaseOrderStock(orderId: string): Promise<void> {
+    const items = await this.getPurchaseOrderItems(orderId);
+    const linked = items.filter(i => i.menuItemId);
+    for (const item of linked) {
+      const { data } = await supabase.from('menu_items').select('stock').eq('id', item.menuItemId!).single();
+      const current = Number((data as any)?.stock ?? 0);
+      await supabase.from('menu_items').update({ stock: current + item.quantity }).eq('id', item.menuItemId!);
+    }
   },
   async deletePurchaseOrderItem(id: string): Promise<void> {
     await supabase.from('purchase_order_items').delete().eq('id', id);
