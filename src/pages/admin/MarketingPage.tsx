@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/db';
 import { Save, Check, Loader2, Globe, MessageCircle, Mail, Phone, Type, AlignLeft, Building2, Clock, Instagram, Twitter, Facebook, Link, Search, Star, Plus, Trash2, Image } from 'lucide-react';
+import { maskPhone } from '../../lib/masks';
 
 type Settings = {
   whatsappNumber: string;
@@ -222,7 +223,7 @@ export default function MarketingPage() {
         </Field>
 
         <Field label="Telefone de exibicao" icon={Phone} hint="Exibido apenas como texto na secao de contato.">
-          <input value={form.contactPhone} onChange={set('contactPhone')} className={inputCls} placeholder="+55 (11) 99999-9999" />
+          <input type="tel" value={form.contactPhone} onChange={e => setForm(f => ({ ...f, contactPhone: maskPhone(e.target.value) }))} className={inputCls} placeholder="(11) 99999-9999" />
         </Field>
 
         <Field label="Horario de atendimento" icon={Clock}>

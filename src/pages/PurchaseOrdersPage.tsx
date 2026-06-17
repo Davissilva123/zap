@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { PurchaseOrder, Supplier } from '../lib/types';
 import { ClipboardList, Plus, Trash2, X, Save, ChevronDown, ChevronRight, Send, CheckCircle2 } from 'lucide-react';
+import { parseCurrency, numToCurrency } from '../lib/masks';
 
 const STATUS_CFG = {
   draft:     { label: 'Rascunho',  cls: 'bg-slate-100 text-slate-600' },
@@ -175,8 +176,8 @@ export default function PurchaseOrdersPage() {
                               className="border border-slate-200 rounded-lg px-1 py-1.5 text-xs focus:outline-none min-w-0">
                               {['un','kg','g','L','ml','cx','pct'].map(u => <option key={u}>{u}</option>)}
                             </select>
-                            <input value={row.unitCost} onChange={e => updateItemRow(order.id, idx, 'unitCost', e.target.value)}
-                              type="number" min="0" step="0.01" placeholder="R$/un" className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 min-w-0" />
+                            <input value={numToCurrency(parseFloat(row.unitCost) || 0)} onChange={e => updateItemRow(order.id, idx, 'unitCost', String(parseCurrency(e.target.value)))}
+                              type="text" inputMode="numeric" placeholder="R$/un" className="border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 min-w-0" />
                           </div>
                           <p className="text-xs text-slate-500 text-right font-medium">Total: {fmt(rowTotal)}</p>
                         </div>
@@ -204,7 +205,7 @@ export default function PurchaseOrdersPage() {
                             <td className="py-1.5 pr-2"><input value={row.name} onChange={e => updateItemRow(order.id, idx, 'name', e.target.value)} placeholder="ex: Farinha" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
                             <td className="py-1.5 pr-2"><input value={row.quantity} onChange={e => updateItemRow(order.id, idx, 'quantity', e.target.value)} type="number" min="0" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
                             <td className="py-1.5 pr-2"><select value={row.unit} onChange={e => updateItemRow(order.id, idx, 'unit', e.target.value)} className="w-full border border-slate-200 rounded-lg px-1 py-1 text-xs focus:outline-none">{['un','kg','g','L','ml','cx','pct'].map(u => <option key={u}>{u}</option>)}</select></td>
-                            <td className="py-1.5 pr-2"><input value={row.unitCost} onChange={e => updateItemRow(order.id, idx, 'unitCost', e.target.value)} type="number" min="0" step="0.01" placeholder="0,00" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
+                            <td className="py-1.5 pr-2"><input value={numToCurrency(parseFloat(row.unitCost) || 0)} onChange={e => updateItemRow(order.id, idx, 'unitCost', String(parseCurrency(e.target.value)))} type="text" inputMode="numeric" placeholder="R$ 0,00" className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" /></td>
                             <td className="py-1.5 pr-2 text-xs font-medium text-slate-600 whitespace-nowrap">{fmt(rowTotal)}</td>
                             <td><button onClick={() => removeItemRow(order.id, idx)} className="text-red-400 hover:text-red-600"><Trash2 size={12} /></button></td>
                           </tr>

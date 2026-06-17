@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { FinancialEntry, FinancialEntryType, Supplier } from '../lib/types';
 import { Wallet, Plus, X, Save, Trash2, CheckCircle, AlertCircle, Calendar, TrendingUp, TrendingDown, Edit2, Banknote, CreditCard } from 'lucide-react';
+import { parseCurrency, numToCurrency } from '../lib/masks';
 
 const STATUS_CFG = {
   pending:   { label: 'Pendente',  cls: 'bg-amber-100 text-amber-700'  },
@@ -288,8 +289,8 @@ export default function ContasPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-medium text-slate-700">Valor *</label>
-                  <input type="number" min="0" step="0.01" value={form.amount ?? ''} onChange={e => set('amount', parseFloat(e.target.value) || 0)}
-                    placeholder="0,00" className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                  <input type="text" inputMode="numeric" value={numToCurrency(form.amount ?? 0)} onChange={e => set('amount', parseCurrency(e.target.value))}
+                    placeholder="R$ 0,00" className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-slate-700">Vencimento *</label>

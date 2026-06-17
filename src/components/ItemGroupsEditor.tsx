@@ -3,6 +3,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp, GripVertical, Loader2, Utensils }
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
 import type { ItemGroup, ItemOption } from '../lib/types';
+import { parseCurrency, numToCurrency } from '../lib/masks';
 
 interface Props {
   menuItemId: string;
@@ -230,13 +231,13 @@ export default function ItemGroupsEditor({ menuItemId }: Props) {
                     placeholder="Nome da opção"
                   />
                   <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1.5 flex-shrink-0">
-                    <span className="text-xs text-slate-400">+R$</span>
+                    <span className="text-xs text-slate-400">+</span>
                     <input
-                      type="number" min={0} step={0.5}
-                      className="w-12 text-sm outline-none text-center"
-                      value={opt.priceDelta}
-                      onChange={e => updateOption(group.id, opt.id, 'priceDelta', Number(e.target.value))}
-                      onBlur={e => db.updateItemOption(opt.id, { priceDelta: Number(e.target.value) })}
+                      type="text" inputMode="numeric"
+                      className="w-16 text-xs outline-none text-center"
+                      value={numToCurrency(opt.priceDelta)}
+                      onChange={e => updateOption(group.id, opt.id, 'priceDelta', parseCurrency(e.target.value))}
+                      onBlur={e => db.updateItemOption(opt.id, { priceDelta: parseCurrency(e.target.value) })}
                     />
                   </div>
                   <button onClick={() => deleteOption(group.id, opt.id)} className="p-1 hover:bg-red-50 rounded flex-shrink-0">

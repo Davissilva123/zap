@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { MenuItem, RecipeIngredient, Supplier } from '../lib/types';
 import { BookOpen, Plus, Trash2, Save, ChevronDown, ChevronRight, AlertCircle } from 'lucide-react';
+import { parseCurrency, numToCurrency } from '../lib/masks';
 
 const UNITS = ['g', 'kg', 'ml', 'L', 'un', 'cx', 'pct', 'col', 'xíc'];
 
@@ -189,8 +190,8 @@ export default function RecipesPage() {
                               </select>
                             </td>
                             <td className="py-1.5 pr-2">
-                              <input value={row.unitCost} onChange={e => updateRow(item.id, idx, 'unitCost', e.target.value)}
-                                type="number" min="0" step="0.01" placeholder="0,00"
+                              <input value={numToCurrency(parseFloat(row.unitCost) || 0)} onChange={e => updateRow(item.id, idx, 'unitCost', String(parseCurrency(e.target.value)))}
+                                type="text" inputMode="numeric" placeholder="R$ 0,00"
                                 className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500" />
                             </td>
                             <td className="py-1.5 pr-2">

@@ -6,6 +6,7 @@ import {
   FileText, Plus, Trash2, Settings, RefreshCw, Mail, AlertTriangle, Clock,
   CheckCircle, XCircle, Wallet, Printer, X, Power, Edit3,
 } from 'lucide-react';
+import { maskPhone } from '../../lib/masks';
 
 type Detail = Awaited<ReturnType<typeof db.getRestaurantDetailAdmin>>;
 type Order = { id: string; status: string; total: number; customerName: string; deliveryType: string; paymentMethod: string; createdAt: string };
@@ -449,9 +450,9 @@ export default function RestaurantDetailPage() {
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Telefone / WhatsApp</label>
               <input
-                type="text"
+                type="tel"
                 value={editForm.phone}
-                onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                onChange={e => setEditForm(f => ({ ...f, phone: maskPhone(e.target.value) }))}
                 className="input w-full"
                 placeholder="(11) 99999-9999"
               />

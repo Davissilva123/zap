@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import type { Order, RestaurantSettings } from '../lib/types';
 import { LayoutGrid, Loader2, CheckCircle, Clock, Printer, Percent, X, ChefHat, Truck, AlertCircle } from 'lucide-react';
 import { printOrder } from '../lib/print';
+import { parseCurrency, numToCurrency } from '../lib/masks';
 
 function elapsed(createdAt: string) {
   const m = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
@@ -266,10 +267,10 @@ export default function ComandasPage() {
                   {/* Valor + OK */}
                   <div className="flex gap-2">
                     <input
-                      type="number" min="0" step="0.01"
-                      value={discountModal.value}
-                      onChange={e => setDiscountModal(d => d ? { ...d, value: e.target.value } : d)}
-                      placeholder={discountModal.type === 'percent' ? 'Ex: 10' : 'Ex: 5,00'}
+                      type="text" inputMode="numeric"
+                      value={discountModal.type === 'fixed' ? numToCurrency(parseFloat(discountModal.value) || 0) : discountModal.value}
+                      onChange={e => setDiscountModal(d => d ? { ...d, value: d.type === 'fixed' ? String(parseCurrency(e.target.value)) : e.target.value.replace(/\D/g, '') } : d)}
+                      placeholder={discountModal.type === 'percent' ? 'Ex: 10' : 'R$ 0,00'}
                       className="flex-1 px-3 py-2 border border-amber-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-1 focus:ring-amber-400"
                       autoFocus
                     />
