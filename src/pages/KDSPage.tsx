@@ -20,7 +20,10 @@ function getAdvanceConfig(order: Order): { next: Order['status']; label: string;
   if (order.status === 'PREPARING' && order.deliveryType === 'delivery') {
     return { next: 'READY', label: 'Pronto na cozinha', cls: 'bg-orange-500 hover:bg-orange-600' };
   }
-  // READY delivery: kitchen done, waiting for owner to dispatch
+  if (order.status === 'PREPARING' && order.deliveryType === 'pickup') {
+    return { next: 'READY', label: 'Pronto para Retirada', cls: 'bg-teal-500 hover:bg-teal-600' };
+  }
+  // READY: kitchen done for both pickup and delivery — awaiting customer/driver
   if (order.status === 'READY') return null;
   // DELIVERING delivery: owner dispatched, no kitchen action
   if (order.status === 'DELIVERING' && order.deliveryType === 'delivery') return null;
@@ -218,6 +221,13 @@ function KDSCard({ order, onAdvance }: { order: Order; onAdvance: (o: Order) => 
         <div className="flex items-center gap-1.5 text-xs text-amber-400 justify-center bg-amber-900/30 rounded-lg px-3 py-2">
           <Clock size={12} />
           Pronto — aguardando entregador
+        </div>
+      )}
+
+      {order.status === 'READY' && order.deliveryType === 'pickup' && (
+        <div className="flex items-center gap-1.5 text-xs text-teal-400 justify-center bg-teal-900/30 rounded-lg px-3 py-2">
+          <CheckCircle size={12} />
+          Pronto para retirada
         </div>
       )}
 

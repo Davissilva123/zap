@@ -16,7 +16,7 @@ const statusConfig: Record<string, { label: string; icon: typeof Clock; color: s
   PAID: { label: 'Pago', icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
   CANCELLED: { label: 'Cancelado', icon: XCircle, color: 'text-red-500', bg: 'bg-red-50' },
   PREPARING: { label: 'Preparando', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
-  READY: { label: 'Pronto na cozinha', icon: ChefHat, color: 'text-orange-600', bg: 'bg-orange-50' },
+  READY: { label: 'Pronto', icon: ChefHat, color: 'text-orange-600', bg: 'bg-orange-50' },
   DELIVERING: { label: 'Entregando', icon: Truck, color: 'text-teal-600', bg: 'bg-teal-50' },
   COMPLETED: { label: 'Concluído', icon: CheckCircle, color: 'text-slate-600', bg: 'bg-slate-100' },
 };
@@ -323,7 +323,7 @@ export default function OrdersPage() {
       </div>
 
       <div className="flex gap-1.5 flex-wrap">
-        {[['', 'Todos'], ['PENDING', 'Pendente'], ['PAID', 'Pago'], ['PREPARING', 'Preparando'], ['READY', 'Pronto na cozinha'], ['DELIVERING', 'Entregando'], ['COMPLETED', 'Concluído'], ['CANCELLED', 'Cancelado']].map(([f, label]) => {
+        {[['', 'Todos'], ['PENDING', 'Pendente'], ['PAID', 'Pago'], ['PREPARING', 'Preparando'], ['READY', 'Pronto'], ['DELIVERING', 'Entregando'], ['COMPLETED', 'Concluído'], ['CANCELLED', 'Cancelado']].map(([f, label]) => {
           const cfg = f ? statusConfig[f] : null;
           const active = filter === f;
           return (
@@ -463,9 +463,10 @@ export default function OrdersPage() {
                 <div className="flex gap-1.5 flex-wrap justify-end">
                   {selectedOrder.status === 'PENDING' && <button onClick={() => updateStatus(selectedOrder.id, 'PAID')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100/80 transition-colors">Confirmar pgto</button>}
                   {(selectedOrder.status === 'PAID' || selectedOrder.status === 'PENDING') && <button onClick={() => updateStatus(selectedOrder.id, 'PREPARING')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100/80 transition-colors">Preparar</button>}
-                  {selectedOrder.status === 'READY' && <button onClick={() => updateStatus(selectedOrder.id, 'DELIVERING')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-100/80 transition-colors">Saiu para entrega</button>}
+                  {selectedOrder.status === 'READY' && selectedOrder.deliveryType === 'delivery' && <button onClick={() => updateStatus(selectedOrder.id, 'DELIVERING')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-100/80 transition-colors">Saiu para entrega</button>}
+                  {selectedOrder.status === 'READY' && selectedOrder.deliveryType === 'pickup' && <button onClick={() => updateStatus(selectedOrder.id, 'COMPLETED')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100/80 transition-colors">Retirado ✓</button>}
                   {selectedOrder.status === 'PREPARING' && selectedOrder.deliveryType === 'delivery' && <button onClick={() => updateStatus(selectedOrder.id, 'DELIVERING')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-100/80 transition-colors">Saiu para entrega</button>}
-                  {selectedOrder.status === 'PREPARING' && selectedOrder.deliveryType === 'pickup' && <button onClick={() => updateStatus(selectedOrder.id, 'COMPLETED')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200/80 transition-colors">Entregue</button>}
+                  {selectedOrder.status === 'PREPARING' && selectedOrder.deliveryType === 'pickup' && <button onClick={() => updateStatus(selectedOrder.id, 'READY')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100/80 transition-colors">Pronto para Retirada</button>}
                   {selectedOrder.status === 'DELIVERING' && <button onClick={() => updateStatus(selectedOrder.id, 'COMPLETED')} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200/80 transition-colors">Entregue</button>}
                   {selectedOrder.status !== 'CANCELLED' && selectedOrder.status !== 'COMPLETED' && (
                     <button onClick={() => cancelOrder(selectedOrder.id)} className="px-3 py-1.5 text-[12px] font-semibold rounded-lg bg-red-50 text-red-500 hover:bg-red-100/80 transition-colors flex items-center gap-1">
