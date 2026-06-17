@@ -56,6 +56,7 @@ export default function PublicMenuPage() {
   const [cashChange, setCashChange] = useState('');
   const catBarRef = useRef<HTMLDivElement>(null);
   const combosRef = useRef<HTMLDivElement>(null);
+  const cashChangeRef = useRef<HTMLDivElement>(null);
   const pixGatewayRef = useRef<'xgate' | 'mp'>('xgate');
 
   // Adicionais
@@ -178,6 +179,12 @@ export default function PublicMenuPage() {
     };
     loadBalance();
   }, [customer, settings?.userId, settings?.cashbackEnabled, settings?.cashbackPercent]);
+
+  useEffect(() => {
+    if (selectedPayment === 'cash') {
+      setTimeout(() => cashChangeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+    }
+  }, [selectedPayment]);
 
   // Persiste carrinho no localStorage
   useEffect(() => {
@@ -2010,11 +2017,12 @@ export default function PublicMenuPage() {
                               </div>
                             </button>
                             {method === 'cash' && active && (
-                              <div className="mt-2 bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                              <div ref={cashChangeRef} className="mt-2 bg-amber-50 border border-amber-100 rounded-2xl p-4">
                                 <label className="block text-xs font-bold text-amber-700 mb-2 uppercase tracking-wider">Troco para quanto?</label>
                                 <input type="text" value={cashChange} onChange={e => setCashChange(e.target.value)}
                                   className="w-full px-4 py-3 rounded-xl border border-amber-200 bg-white text-sm font-medium placeholder:text-amber-300 focus:outline-none"
-                                  placeholder="Ex: R$ 50,00 (deixe vazio se não precisar)" />
+                                  placeholder="Ex: R$ 50,00 (deixe vazio se não precisar)"
+                                  autoFocus />
                               </div>
                             )}
                           </div>
