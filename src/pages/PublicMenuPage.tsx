@@ -57,6 +57,7 @@ export default function PublicMenuPage() {
   const catBarRef = useRef<HTMLDivElement>(null);
   const combosRef = useRef<HTMLDivElement>(null);
   const cashChangeRef = useRef<HTMLDivElement>(null);
+  const checkoutScrollRef = useRef<HTMLDivElement>(null);
   const pixGatewayRef = useRef<'xgate' | 'mp'>('xgate');
 
   // Adicionais
@@ -182,7 +183,14 @@ export default function PublicMenuPage() {
 
   useEffect(() => {
     if (selectedPayment === 'cash') {
-      setTimeout(() => cashChangeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+      setTimeout(() => {
+        const container = checkoutScrollRef.current;
+        const el = cashChangeRef.current;
+        if (container && el) {
+          const elBottom = el.offsetTop + el.offsetHeight;
+          container.scrollTo({ top: elBottom - container.clientHeight + 16, behavior: 'smooth' });
+        }
+      }, 120);
     }
   }, [selectedPayment]);
 
@@ -1579,7 +1587,7 @@ export default function PublicMenuPage() {
             <div className="h-px bg-slate-100 mx-5 flex-shrink-0" />
 
             {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto overscroll-contain">
+            <div ref={checkoutScrollRef} className="flex-1 overflow-y-auto overscroll-contain">
 
               {/* ── STEP: CART ── */}
               {step === 'cart' && (
