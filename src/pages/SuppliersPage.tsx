@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth';
 import { db } from '../lib/db';
 import type { Supplier } from '../lib/types';
 import { Truck, Plus, Edit2, Trash2, X, Save, Search, Phone, Mail, ToggleLeft, ToggleRight } from 'lucide-react';
+import { maskPhone } from '../lib/masks';
 
 const empty = (): Partial<Supplier> => ({ name: '', email: '', phone: '', cnpj: '', address: '', contactName: '', notes: '', active: true });
 
@@ -157,7 +158,7 @@ export default function SuppliersPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-medium text-slate-700">Telefone</label>
-                  <input value={form.phone ?? ''} onChange={e => set('phone', e.target.value)} placeholder="(11) 99999-9999"
+                  <input type="tel" value={form.phone ?? ''} onChange={e => set('phone', maskPhone(e.target.value))} placeholder="(11) 99999-9999"
                     className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                 </div>
                 <div>

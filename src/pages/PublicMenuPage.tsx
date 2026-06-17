@@ -8,6 +8,7 @@ import { useCustomerAuth } from '../lib/customerAuth';
 import { supabaseCustomer } from '../lib/supabaseCustomer';
 import type { Category, MenuItem, RestaurantSettings, OrderItem, PaymentMethod, DeliveryAddress, ItemGroup, SelectedOption, Promotion, Combo } from '../lib/types';
 import { isRestaurantOpen } from '../lib/menuUtils';
+import { maskPhone } from '../lib/masks';
 import { MapPin, Phone, ShoppingBag, Plus, Minus, Trash2, X, Copy, Check, Loader2, QrCode, Truck, ArrowLeft, ChefHat, Zap, ShoppingCart, User, LogIn, Eye, EyeOff, Clock, Star, Tag, LayoutGrid, Gift, Search, Info, ChevronRight } from 'lucide-react';
 
 interface CartItem extends OrderItem { categoryId: string; }
@@ -1824,7 +1825,7 @@ export default function PublicMenuPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">WhatsApp / Telefone *</label>
-                      <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                      <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(maskPhone(e.target.value))}
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-900 placeholder:text-slate-300 focus:outline-none focus:border-slate-400 bg-slate-50 transition-colors"
                         placeholder="(11) 99999-0000" />
                     </div>

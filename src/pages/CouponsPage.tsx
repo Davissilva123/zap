@@ -3,6 +3,7 @@ import { db } from '../lib/db';
 import { useAuth, useRestaurantId } from '../lib/auth';
 import type { Coupon } from '../lib/types';
 import { Plus, Trash2, ToggleLeft, ToggleRight, Tag, Copy, Check } from 'lucide-react';
+import { parseCurrency, numToCurrency } from '../lib/masks';
 
 const emptyForm = { code: '', discountType: 'percent' as 'percent' | 'fixed', discountValue: '10', minOrder: '0', maxUses: '', expiresAt: '' };
 
@@ -98,8 +99,8 @@ export default function CouponsPage() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Pedido mínimo</label>
-              <input type="number" value={form.minOrder} onChange={e => setForm(f => ({ ...f, minOrder: e.target.value }))}
-                className="input w-full" placeholder="0" min="0" step="0.01" />
+              <input type="text" inputMode="numeric" value={numToCurrency(parseFloat(form.minOrder) || 0)} onChange={e => setForm(f => ({ ...f, minOrder: String(parseCurrency(e.target.value)) }))}
+                className="input w-full" placeholder="R$ 0,00" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Usos máximos</label>

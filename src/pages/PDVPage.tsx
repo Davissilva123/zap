@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useAuth, useRestaurantId } from '../lib/auth';
 import { db } from '../lib/db';
 import type { MenuItem, Category, Order, PaymentMethod, CashSession } from '../lib/types';
+import { maskPhone } from '../lib/masks';
 import { isSerialSupported, printReceiptSerial, printOrder } from '../lib/print';
 import { isScaleSupported, readScaleWeight, formatWeight } from '../lib/scale';
 import {
@@ -481,9 +482,10 @@ export default function PDVPage() {
               )}
 
               <input
+                type="tel"
                 value={customerPhone}
-                onChange={e => setCustomerPhone(e.target.value)}
-                placeholder="Telefone do cliente (opcional)"
+                onChange={e => setCustomerPhone(maskPhone(e.target.value))}
+                placeholder="(11) 99999-9999 (opcional)"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
               />
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
 import type { Driver, Order } from '../lib/types';
+import { maskPhone } from '../lib/masks';
 import { Bike, Plus, Edit2, Trash2, Phone, X, Check, ToggleLeft, ToggleRight, Copy, LocateFixed, WifiOff, MapPin, RefreshCw, Navigation, Package, ExternalLink } from 'lucide-react';
 
 function formatAddr(addr: Order['deliveryAddress']): string {
@@ -353,7 +354,7 @@ export default function DriversPage() {
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">Telefone</label>
                 <input
                   value={form.phone}
-                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                  onChange={e => setForm(f => ({ ...f, phone: maskPhone(e.target.value) }))}
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 placeholder:text-slate-300"
                   placeholder="(11) 99999-9999"
                   type="tel"

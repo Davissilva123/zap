@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { db } from '../lib/db';
 import { useAuth, useRestaurantId } from '../lib/auth';
 import type { CashSession, CashEntry } from '../lib/types';
+import { maskCurrency, parseCurrency } from '../lib/masks';
 import { Wallet, Lock, Unlock, History, X, Check, Loader2, ArrowUpRight, ArrowDownRight, ShoppingBag } from 'lucide-react';
 
 function fmt(n: number) { return n.toFixed(2).replace('.', ','); }
@@ -67,7 +68,7 @@ export default function CashRegisterPage() {
   const handleOpen = async () => {
     if (!restaurantId || !openAmt) return;
     setSaving(true);
-    await db.openCashSession(restaurantId, Number(openAmt), openNotes);
+    await db.openCashSession(restaurantId, parseCurrency(openAmt), openNotes);
     setOpenModal(false);
     setOpenAmt('');
     setOpenNotes('');
@@ -78,7 +79,7 @@ export default function CashRegisterPage() {
   const handleClose = async () => {
     if (!restaurantId || !session || !closeAmt) return;
     setSaving(true);
-    await db.closeCashSession(session.id, Number(closeAmt), closeNotes);
+    await db.closeCashSession(session.id, parseCurrency(closeAmt), closeNotes);
     setCloseModal(false);
     setCloseAmt('');
     setCloseNotes('');
@@ -261,7 +262,7 @@ export default function CashRegisterPage() {
             <div className="p-5 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Valor inicial (troco)</label>
-                <input type="number" min="0" step="0.01" value={openAmt} onChange={e => setOpenAmt(e.target.value)} className="input w-full" placeholder="0,00" />
+                <input type="text" inputMode="numeric" value={openAmt} onChange={e => setOpenAmt(maskCurrency(e.target.value))} className="input w-full" placeholder="R$ 0,00" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Observacoes</label>
@@ -293,7 +294,7 @@ export default function CashRegisterPage() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Valor contado no caixa</label>
-                <input type="number" min="0" step="0.01" value={closeAmt} onChange={e => setCloseAmt(e.target.value)} className="input w-full" placeholder="0,00" />
+                <input type="text" inputMode="numeric" value={closeAmt} onChange={e => setCloseAmt(maskCurrency(e.target.value))} className="input w-full" placeholder="R$ 0,00" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Observacoes</label>

@@ -5,6 +5,7 @@ import { uploadImage } from '../lib/upload';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { RestaurantSettings, PaymentMethod } from '../lib/types';
 import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift, Crown, XCircle, ExternalLink, Globe, Shield, Copy, Users, Printer } from 'lucide-react';
+import { maskPhone, parseCurrency, numToCurrency } from '../lib/masks';
 import { useNavigate } from 'react-router-dom';
 import type { DayHours } from '../lib/types';
 
@@ -156,7 +157,7 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Telefone</label>
-            <input type="text" value={form.phone} onChange={e => setForm(f => ({ ...f!, phone: e.target.value }))} className="input-field" />
+            <input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f!, phone: maskPhone(e.target.value) }))} className="input-field" placeholder="(11) 99999-9999" />
           </div>
         </div>
       </SectionCard>
@@ -350,16 +351,16 @@ export default function SettingsPage() {
         <div className={`grid sm:grid-cols-2 gap-4 ${form.freeShippingEnabled ? 'opacity-40 pointer-events-none' : ''}`}>
           <div>
             <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Taxa de entrega padrão (R$)</label>
-            <input type="number" min={0} step={0.5} value={form.deliveryFee}
-              onChange={e => setForm(f => ({ ...f!, deliveryFee: Number(e.target.value) }))}
-              className="input-field" placeholder="0,00" />
+            <input type="text" inputMode="numeric" value={numToCurrency(form.deliveryFee)}
+              onChange={e => setForm(f => ({ ...f!, deliveryFee: parseCurrency(e.target.value) }))}
+              className="input-field" placeholder="R$ 0,00" />
             <p className="text-[11px] text-slate-400 mt-1">Usada quando nenhum bairro abaixo bater</p>
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Pedido mínimo para delivery (R$)</label>
-            <input type="number" min={0} step={1} value={form.minimumOrder ?? 0}
-              onChange={e => setForm(f => ({ ...f!, minimumOrder: Number(e.target.value) }))}
-              className="input-field" placeholder="0,00" />
+            <input type="text" inputMode="numeric" value={numToCurrency(form.minimumOrder ?? 0)}
+              onChange={e => setForm(f => ({ ...f!, minimumOrder: parseCurrency(e.target.value) }))}
+              className="input-field" placeholder="R$ 0,00" />
             <p className="text-[11px] text-slate-400 mt-1">0 = sem valor mínimo</p>
           </div>
         </div>
@@ -378,18 +379,16 @@ export default function SettingsPage() {
                   }}
                   className="input-field flex-1 py-1.5 text-sm" placeholder="Nome do bairro"
                 />
-                <div className="flex items-center gap-1 border border-slate-200 rounded-lg px-2 py-1.5">
-                  <span className="text-xs text-slate-400">R$</span>
-                  <input
-                    type="number" min={0} step={0.5} value={nb.fee}
-                    onChange={e => {
-                      const arr = [...form.deliveryNeighborhoods];
-                      arr[i] = { ...arr[i], fee: Number(e.target.value) };
-                      setForm(f => ({ ...f!, deliveryNeighborhoods: arr }));
-                    }}
-                    className="w-16 text-sm outline-none text-center"
-                  />
-                </div>
+                <input
+                  type="text" inputMode="numeric" value={numToCurrency(nb.fee)}
+                  onChange={e => {
+                    const arr = [...form.deliveryNeighborhoods];
+                    arr[i] = { ...arr[i], fee: parseCurrency(e.target.value) };
+                    setForm(f => ({ ...f!, deliveryNeighborhoods: arr }));
+                  }}
+                  className="w-24 text-sm border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:ring-1 focus:ring-emerald-400 text-center"
+                  placeholder="R$ 0,00"
+                />
                 {nb.fee === 0 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full flex-shrink-0">Grátis</span>}
                 <button onClick={() => setForm(f => ({ ...f!, deliveryNeighborhoods: f!.deliveryNeighborhoods.filter((_, j) => j !== i) }))}
                   className="p-1.5 hover:bg-red-50 rounded-lg">

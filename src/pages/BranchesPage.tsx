@@ -3,6 +3,7 @@ import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
 import type { Branch } from '../lib/types';
 import { Plus, Trash2, QrCode, ToggleLeft, ToggleRight, Store, ExternalLink, Pencil, X, Check, Loader2, MapPin, Phone, Copy } from 'lucide-react';
+import { maskPhone } from '../lib/masks';
 
 const emptyForm = { name: '', slug: '', address: '', phone: '' };
 
@@ -170,8 +171,9 @@ export default function BranchesPage() {
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Telefone</label>
               <input
+                type="tel"
                 value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                onChange={e => setForm(f => ({ ...f, phone: maskPhone(e.target.value) }))}
                 className="input w-full"
                 placeholder="(11) 99999-9999"
               />

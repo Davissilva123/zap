@@ -3,6 +3,7 @@ import { db } from '../lib/db';
 import { useAuth } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import type { Combo, ComboItem, MenuItem } from '../lib/types';
+import { parseCurrency, numToCurrency } from '../lib/masks';
 import { Plus, Trash2, Pencil, X, Check, Loader2, Package2, ToggleLeft, ToggleRight, ImagePlus } from 'lucide-react';
 
 const emptyCombo: Omit<Combo, 'id' | 'userId' | 'createdAt'> = {
@@ -183,7 +184,7 @@ export default function CombosPage() {
 
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Preco do combo (R$)</label>
-            <input type="number" min="0" step="0.01" value={form.price || ''} onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))} className="input w-full" placeholder="0,00" />
+            <input type="text" inputMode="numeric" value={numToCurrency(form.price)} onChange={e => setForm(f => ({ ...f, price: parseCurrency(e.target.value) }))} className="input w-full" placeholder="R$ 0,00" />
             {comboItemsTotal > 0 && (
               <p className="text-xs text-slate-400 mt-1">
                 Valor individual dos itens: R$ {fmt(comboItemsTotal)}

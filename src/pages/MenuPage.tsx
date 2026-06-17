@@ -3,6 +3,7 @@ import { db } from '../lib/db';
 import { useAuth, useRestaurantId } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import type { Category, MenuItem } from '../lib/types';
+import { parseCurrency, numToCurrency } from '../lib/masks';
 import { Plus, Minus, Pencil, Trash2, ToggleLeft, ToggleRight, Search, X, ImagePlus, Loader2, Settings2, Star, GripVertical } from 'lucide-react';
 import ItemGroupsEditor from '../components/ItemGroupsEditor';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -302,17 +303,17 @@ export default function MenuPage() {
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Preço (R$)</label>
-                  <input type="number" step="0.01" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className="input-field" placeholder="0,00" />
+                  <input type="text" inputMode="numeric" value={numToCurrency(form.price)} onChange={e => setForm(f => ({ ...f, price: String(parseCurrency(e.target.value)) }))} className="input-field" placeholder="R$ 0,00" />
                 </div>
                 <div className="flex-1">
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Preço Promo (R$)</label>
-                  <input type="number" step="0.01" value={form.promoPrice} onChange={e => setForm(f => ({ ...f, promoPrice: e.target.value }))} className="input-field" placeholder="Vazio = sem promoção" />
+                  <input type="text" inputMode="numeric" value={numToCurrency(form.promoPrice)} onChange={e => setForm(f => ({ ...f, promoPrice: parseCurrency(e.target.value) ? String(parseCurrency(e.target.value)) : '' }))} className="input-field" placeholder="Vazio = sem promoção" />
                 </div>
               </div>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Custo de produção (R$)</label>
-                  <input type="number" step="0.01" min="0" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} className="input-field" placeholder="Vazio = não calcular margem" />
+                  <input type="text" inputMode="numeric" value={numToCurrency(form.cost)} onChange={e => setForm(f => ({ ...f, cost: parseCurrency(e.target.value) ? String(parseCurrency(e.target.value)) : '' }))} className="input-field" placeholder="Vazio = não calcular margem" />
                 </div>
                 {form.cost && form.price && parseFloat(form.cost) > 0 && parseFloat(form.price) > 0 && (
                   <div className="flex-1 flex items-end pb-1">
