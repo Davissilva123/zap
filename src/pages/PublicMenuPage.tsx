@@ -2003,39 +2003,40 @@ export default function PublicMenuPage() {
                         const cfg = PAYMENT_METHOD_LABELS[method];
                         const active = selectedPayment === method;
                         return (
-                          <div key={method}>
-                            <button
-                              onClick={() => setSelectedPayment(method)}
-                              className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all duration-200 text-left"
-                              style={active
-                                ? { borderColor: accent, backgroundColor: accent + '08' }
-                                : { borderColor: '#f1f5f9', backgroundColor: '#f8fafc' }}
-                            >
+                          <div key={method}
+                            onClick={() => setSelectedPayment(method)}
+                            className="rounded-2xl border-2 transition-all duration-200 overflow-hidden cursor-pointer"
+                            style={active ? { borderColor: accent, backgroundColor: accent + '08' } : { borderColor: '#f1f5f9', backgroundColor: '#f8fafc' }}
+                          >
+                            <div className="flex items-center gap-3 p-4">
                               <span className="text-2xl w-8 text-center">{cfg.emoji}</span>
                               <span className="text-sm font-bold flex-1" style={active ? { color: accent } : { color: '#374151' }}>
                                 {cfg.label}
                               </span>
-                              <div
-                                className="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200"
-                                style={active
-                                  ? { borderColor: accent, backgroundColor: accent }
-                                  : { borderColor: '#e2e8f0' }}
-                              >
+                              <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200"
+                                style={active ? { borderColor: accent, backgroundColor: accent } : { borderColor: '#e2e8f0' }}>
                                 {active && <Check className="w-3 h-3 text-white" />}
                               </div>
-                            </button>
+                            </div>
                             {method === 'cash' && active && (
-                              <div ref={cashChangeRef} className="mt-2 bg-amber-50 border border-amber-100 rounded-2xl p-4">
-                                <label className="block text-xs font-bold text-amber-700 mb-2 uppercase tracking-wider">Troco para quanto?</label>
-                                <input type="text" value={cashChange} onChange={e => setCashChange(e.target.value)}
-                                  className="w-full px-4 py-3 rounded-xl border border-amber-200 bg-white text-sm font-medium placeholder:text-amber-300 focus:outline-none"
-                                  placeholder="Ex: R$ 50,00 (deixe vazio se não precisar)"
-                                  autoFocus />
+                              <div className="px-4 pb-4" onClick={e => e.stopPropagation()}>
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                                  <label className="block text-xs font-bold text-amber-700 mb-1.5 uppercase tracking-wider">Troco para quanto?</label>
+                                  <input
+                                    type="text"
+                                    value={cashChange}
+                                    onChange={e => setCashChange(e.target.value)}
+                                    className="w-full px-3 py-2.5 rounded-lg border border-amber-200 bg-white text-sm font-medium placeholder:text-amber-300 focus:outline-none"
+                                    placeholder="Ex: R$ 50,00 (deixe vazio se não precisar)"
+                                  />
+                                </div>
                               </div>
                             )}
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
                 </div>
               )}
 
