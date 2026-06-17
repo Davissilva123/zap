@@ -1988,40 +1988,38 @@ export default function PublicMenuPage() {
                         const cfg = PAYMENT_METHOD_LABELS[method];
                         const active = selectedPayment === method;
                         return (
-                          <button
-                            key={method}
-                            onClick={() => setSelectedPayment(method)}
-                            className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all duration-200 text-left"
-                            style={active
-                              ? { borderColor: accent, backgroundColor: accent + '08' }
-                              : { borderColor: '#f1f5f9', backgroundColor: '#f8fafc' }}
-                          >
-                            <span className="text-2xl w-8 text-center">{cfg.emoji}</span>
-                            <span className="text-sm font-bold flex-1" style={active ? { color: accent } : { color: '#374151' }}>
-                              {cfg.label}
-                            </span>
-                            <div
-                              className="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200"
+                          <div key={method}>
+                            <button
+                              onClick={() => setSelectedPayment(method)}
+                              className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all duration-200 text-left"
                               style={active
-                                ? { borderColor: accent, backgroundColor: accent }
-                                : { borderColor: '#e2e8f0' }}
+                                ? { borderColor: accent, backgroundColor: accent + '08' }
+                                : { borderColor: '#f1f5f9', backgroundColor: '#f8fafc' }}
                             >
-                              {active && <Check className="w-3 h-3 text-white" />}
-                            </div>
-                          </button>
+                              <span className="text-2xl w-8 text-center">{cfg.emoji}</span>
+                              <span className="text-sm font-bold flex-1" style={active ? { color: accent } : { color: '#374151' }}>
+                                {cfg.label}
+                              </span>
+                              <div
+                                className="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200"
+                                style={active
+                                  ? { borderColor: accent, backgroundColor: accent }
+                                  : { borderColor: '#e2e8f0' }}
+                              >
+                                {active && <Check className="w-3 h-3 text-white" />}
+                              </div>
+                            </button>
+                            {method === 'cash' && active && (
+                              <div className="mt-2 bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                                <label className="block text-xs font-bold text-amber-700 mb-2 uppercase tracking-wider">Troco para quanto?</label>
+                                <input type="text" value={cashChange} onChange={e => setCashChange(e.target.value)}
+                                  className="w-full px-4 py-3 rounded-xl border border-amber-200 bg-white text-sm font-medium placeholder:text-amber-300 focus:outline-none"
+                                  placeholder="Ex: R$ 50,00 (deixe vazio se não precisar)" />
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
-                    </div>
-                  </div>
-
-                  {selectedPayment === 'cash' && (
-                    <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
-                      <label className="block text-xs font-bold text-amber-700 mb-2 uppercase tracking-wider">Troco para quanto?</label>
-                      <input type="text" value={cashChange} onChange={e => setCashChange(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-amber-200 bg-white text-sm font-medium placeholder:text-amber-300 focus:outline-none"
-                        placeholder="Ex: R$ 50,00 (deixe vazio se não precisar)" />
-                    </div>
-                  )}
                 </div>
               )}
 
