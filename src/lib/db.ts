@@ -19,6 +19,7 @@ interface SettingsRow {
   waiter_discount_enabled: boolean;
   free_shipping_enabled: boolean;
   hide_out_of_stock: boolean;
+  auto_print: boolean;
   blocked?: boolean;
   blocked_reason?: string;
   disabled?: boolean;
@@ -61,6 +62,7 @@ function toSettings(r: SettingsRow): RestaurantSettings {
     waiterDiscountEnabled: r.waiter_discount_enabled ?? false,
     freeShippingEnabled: r.free_shipping_enabled ?? false,
     hideOutOfStock: r.hide_out_of_stock ?? true,
+    autoPrint: r.auto_print ?? false,
     blocked: r.blocked ?? false,
     blockedReason: r.blocked_reason ?? undefined,
     disabled: r.disabled ?? false,
@@ -231,6 +233,7 @@ export const db = {
     if (updates.waiterDiscountEnabled !== undefined) row.waiter_discount_enabled = updates.waiterDiscountEnabled;
     if (updates.freeShippingEnabled !== undefined) row.free_shipping_enabled = updates.freeShippingEnabled;
     if (updates.hideOutOfStock !== undefined) row.hide_out_of_stock = updates.hideOutOfStock;
+    if (updates.autoPrint !== undefined) row.auto_print = updates.autoPrint;
     await supabase.from('restaurant_settings').update(row).eq('user_id', userId);
   },
 

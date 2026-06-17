@@ -116,6 +116,7 @@ export interface RestaurantSettings {
   waiterDiscountEnabled: boolean;
   freeShippingEnabled: boolean;
   hideOutOfStock: boolean;
+  autoPrint: boolean;
   blocked?: boolean;
   blockedReason?: string;
   disabled?: boolean;

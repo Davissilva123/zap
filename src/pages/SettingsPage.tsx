@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth';
 import { uploadImage } from '../lib/upload';
 import { PAYMENT_METHOD_LABELS } from '../lib/xgate';
 import type { RestaurantSettings, PaymentMethod } from '../lib/types';
-import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift, Crown, XCircle, ExternalLink, Globe, Shield, Copy, Users } from 'lucide-react';
+import { Save, Check, Store, QrCode, Palette, Link2, CreditCard, AlertTriangle, MessageCircle, ImagePlus, Loader2, X, Clock, Truck, Plus, Trash2, Gift, Crown, XCircle, ExternalLink, Globe, Shield, Copy, Users, Printer } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DayHours } from '../lib/types';
 
@@ -485,6 +485,31 @@ export default function SettingsPage() {
             <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.hideOutOfStock ? 'translate-x-5' : ''}`} />
           </div>
         </div>
+      </SectionCard>
+
+      {/* Impressão automática */}
+      <SectionCard icon={Printer} title="Impressão automática" description="Imprimir cupom automaticamente quando chegar um novo pedido">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <span className="text-sm font-medium text-slate-700">Imprimir pedidos automaticamente</span>
+            <p className="text-xs text-slate-400 mt-0.5">Quando ativado, cada novo pedido é impresso automaticamente na impressora padrão do computador</p>
+          </div>
+          <div
+            onClick={() => setForm(f => ({ ...f!, autoPrint: !f!.autoPrint }))}
+            className={`w-11 h-6 rounded-full transition-colors duration-200 flex items-center cursor-pointer flex-shrink-0 ${form.autoPrint ? 'bg-emerald-500' : 'bg-slate-200'}`}
+          >
+            <div className={`w-5 h-5 rounded-full bg-white shadow-sm mx-0.5 transition-transform duration-200 ${form.autoPrint ? 'translate-x-5' : ''}`} />
+          </div>
+        </div>
+        {form.autoPrint && (
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 space-y-1.5">
+            <p className="font-bold">Para imprimir sem abrir o diálogo do navegador:</p>
+            <p>1. Feche o Chrome</p>
+            <p>2. Crie um atalho do Chrome com o parâmetro: <span className="font-mono bg-blue-100 px-1 rounded">--kiosk-printing</span></p>
+            <p>3. Certifique-se que a impressora térmica está configurada como <strong>impressora padrão</strong> no Windows</p>
+            <p className="text-blue-500 mt-1">Dica: clique com o botão direito na área de trabalho → Novo → Atalho → cole o caminho do Chrome com a flag</p>
+          </div>
+        )}
       </SectionCard>
 
       {/* Permissões da equipe */}

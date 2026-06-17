@@ -66,6 +66,7 @@ export default function OrdersPage() {
     setOrders(o);
     setSettings(s);
     settingsRef.current = s;
+    if (s?.autoPrint) setAutoPrint(true);
     setDrivers(drvs);
     knownIdsRef.current = new Set(o.map(x => x.id));
   };
